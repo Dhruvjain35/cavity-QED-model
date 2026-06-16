@@ -1,0 +1,19 @@
+# dependencies / build output
+node_modules/
+dist/
+*.log
+.DS_Store
+
+# Rust / wasm build artifacts
+wasm/target/
+wasm/pkg/
+wasm/pkg-web/
+
+# Python golden-generator venv (the committed goldens under wasm/golden/ are kept)
+golden/.venv/
+__pycache__/
+*.pyc
+
+# internal scratch (workflow scripts, design notes)
+.wf-*.js
+.impeccable.md
