@@ -1,0 +1,96 @@
+/* Dark cavity-QED workstation — flat, high-contrast, instrument-grade (LabOne/Labber lineage).
+   Single-viewport: the page is exactly 100vh and never scrolls; individual panes scroll internally.
+   Physics colors are strict data traces (cobalt photons / crimson atom / emerald purity). */
+:root {
+  --bg: #090d16; --panel: #0b101c; --rule: #1e293b; --rule-soft: #141b2b;
+  --ink: #e2e8f0; --dim: #94a3b8; --faint: #64748b; --axis: #475569;
+  --cobalt: #3b82f6; --crimson: #ef4444; --emerald: #10b981; --amber: #f59e0b;
+  --serif: "B612", system-ui, sans-serif;
+  --mono: "B612 Mono", ui-monospace, "SFMono-Regular", monospace;
+}
+* { box-sizing: border-box; }
+html, body, #root { margin: 0; height: 100%; }
+body { background: var(--bg); color: var(--ink); font-family: var(--serif); -webkit-font-smoothing: antialiased; }
+
+.ws-root { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+
+/* top status bar */
+.topbar { flex: 0 0 34px; display: flex; align-items: center; justify-content: space-between; padding: 0 14px; border-bottom: 1px solid var(--rule); font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.08em; }
+.topbar .brand { color: var(--ink); font-weight: 600; }
+.topbar .status { color: var(--faint); }
+.topbar .live { color: var(--emerald); font-size: 12px; vertical-align: middle; }
+
+/* 3-column desktop grid */
+.workstation { flex: 1; min-height: 0; display: grid; grid-template-columns: 230px minmax(0, 1fr) 352px; overflow: hidden; }
+@media (max-width: 1040px) { .workstation { grid-template-columns: 1fr; overflow-y: auto; } .ws-root { overflow: auto; } }
+.rail { border-right: 1px solid var(--rule); }
+.dock { border-left: 1px solid var(--rule); }
+.rail, .dock { overflow-y: auto; min-height: 0; }
+.center { display: flex; flex-direction: column; min-height: 0; overflow-y: auto; }
+
+/* panes */
+.pane { border-bottom: 1px solid var(--rule); padding: 10px 13px; }
+.pane:last-child { border-bottom: none; }
+.pane.grow { flex: 1; min-height: 0; }
+.pane-head { font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--faint); margin-bottom: 9px; line-height: 1.4; }
+.pane-head i { font-style: normal; }
+.cv { display: block; max-width: 100%; height: auto; }
+.cv.click { cursor: crosshair; }
+.phase-row { display: flex; gap: 10px; flex-wrap: wrap; }
+
+/* rail — configuration tree */
+.rail-head { font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.12em; color: var(--faint); padding: 11px 13px 8px; border-bottom: 1px solid var(--rule); }
+.regime-toggle { display: flex; margin: 10px 13px; border: 1px solid var(--rule); }
+.regime-toggle button { flex: 1; font-family: var(--mono); font-size: 9px; letter-spacing: 0.04em; padding: 7px 3px; border: none; border-right: 1px solid var(--rule); background: transparent; color: var(--faint); cursor: pointer; }
+.regime-toggle button:last-child { border-right: none; }
+.regime-toggle button:hover { color: var(--ink); }
+.regime-toggle button.on { background: var(--cobalt); color: #fff; }
+.tree-group { border-bottom: 1px solid var(--rule-soft); }
+.tree-head { width: 100%; text-align: left; font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.07em; color: var(--dim); background: transparent; border: none; padding: 9px 13px; cursor: pointer; }
+.tree-head:hover { color: var(--ink); }
+.tree-caret { color: var(--cobalt); margin-right: 8px; font-weight: 700; }
+.tree-body { padding: 4px 13px 12px; }
+
+/* controls */
+.knob { margin-bottom: 12px; }
+.knob-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; gap: 6px; }
+.knob-name { font-size: 12.5px; color: var(--ink); }
+.knob-name i { font-style: italic; color: var(--cobalt); margin-right: 3px; }
+.knob-entry { display: inline-flex; align-items: baseline; gap: 3px; }
+.knob.num-only { display: flex; align-items: center; justify-content: space-between; }
+.knob-input { width: 56px; font-family: var(--mono); font-size: 11.5px; font-variant-numeric: tabular-nums; text-align: right; color: var(--ink); background: #060a12; border: 1px solid var(--rule); padding: 2px 5px; }
+.knob-input.wide { width: 84px; }
+.knob-input:focus { outline: none; border-color: var(--cobalt); }
+.knob-input::-webkit-outer-spin-button, .knob-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.knob-input[type="number"] { -moz-appearance: textfield; }
+.knob-entry .u, .u { font-family: var(--mono); font-size: 10px; color: var(--faint); }
+input[type="range"] { width: 100%; height: 2px; -webkit-appearance: none; appearance: none; background: var(--rule); cursor: pointer; }
+input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 11px; height: 11px; background: var(--cobalt); border: none; border-radius: 50%; cursor: pointer; }
+input[type="range"]::-moz-range-thumb { width: 11px; height: 11px; background: var(--cobalt); border: none; border-radius: 50%; cursor: pointer; }
+
+/* buttons */
+.btn-row { display: flex; margin-top: 10px; border: 1px solid var(--rule); width: fit-content; flex-wrap: wrap; }
+.btn-row button { font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.03em; padding: 6px 10px; border: none; border-right: 1px solid var(--rule); background: transparent; color: var(--dim); cursor: pointer; }
+.btn-row button:last-child { border-right: none; }
+.btn-row button:hover { background: var(--rule); color: var(--ink); }
+.btn-row button.on { background: var(--cobalt); color: #fff; }
+
+/* tables / metrics */
+table.metrics { width: 100%; border-collapse: collapse; }
+.metrics td { padding: 3px 0; vertical-align: baseline; }
+.metrics td.k { color: var(--dim); font-size: 12px; }
+.metrics td.k i { font-style: italic; }
+.metrics td.v { text-align: right; font-family: var(--mono); font-size: 11.5px; font-variant-numeric: tabular-nums; color: var(--ink); white-space: nowrap; }
+
+/* bridge (collective lower pane) */
+.bridge { display: flex; gap: 14px; align-items: flex-start; }
+.bridge .cv { flex-shrink: 0; }
+.bridge .metrics { flex: 1; }
+
+/* validation HUD */
+.hud .hud-pass { font-family: var(--mono); font-size: 10px; color: var(--emerald); margin-top: 8px; }
+
+/* dark scrollbars */
+.rail::-webkit-scrollbar, .dock::-webkit-scrollbar, .center::-webkit-scrollbar { width: 8px; }
+.rail::-webkit-scrollbar-thumb, .dock::-webkit-scrollbar-thumb, .center::-webkit-scrollbar-thumb { background: var(--rule); }
+.rail::-webkit-scrollbar-track, .dock::-webkit-scrollbar-track, .center::-webkit-scrollbar-track { background: transparent; }
