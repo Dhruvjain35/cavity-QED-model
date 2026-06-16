@@ -13,8 +13,9 @@ import * as THREE from "three";
 type Dyn = { eigs: Float64Array; vecs: Float64Array; n: number; c: Float64Array; bright: Float64Array; modeAmp: Float64Array; hist: unknown } | null;
 
 const HALF = 4.3; // cavity half-length along x (mirror at ±HALF)
-const GROUND = new THREE.Color("#828c9b"), WARM = new THREE.Color("#f7a516"), HOT = new THREE.Color("#fff4d4");
-const COB_LO = new THREE.Color("#1c3358"), COB_HI = new THREE.Color("#8fd0ff");
+// matter excitation: ground slate → coherent laser red → hot white. field: dim → stark cyan.
+const GROUND = new THREE.Color("#5a6470"), WARM = new THREE.Color("#ff3333"), HOT = new THREE.Color("#ffdcdc");
+const COB_LO = new THREE.Color("#0a3a44"), COB_HI = new THREE.Color("#00ffff");
 
 // naphthalene carbon skeleton (two fused hexagons, bond-length units) + bonds — a real chromophore
 const CARB = [
@@ -74,7 +75,8 @@ function buildFilm(ens: Ens) {
   const S = 0.18, xaxis = new THREE.Vector3(1, 0, 0), up = new THREE.Vector3(0, 1, 0);
   const atoms: { p: THREE.Vector3; mol: number }[] = [];
   const bonds: { p: THREE.Vector3; q: THREE.Quaternion; len: number; mol: number }[] = [];
-  const mols: { center: THREE.Vector3; dir: THREE.Vector3 }[] = [];
+  const mols: { center: THREE.Vector3; dir: THREE.Vector3; coupling: number }[] = [];
+  let fmax = 1e-6; for (let i = 0; i < ens.m; i++) fmax = Math.max(fmax, Math.abs(ens.factors[i]!));
   for (let mi = 0; mi < ens.m; mi++) {
     const center = new THREE.Vector3(...ens.centers[mi]!);
     const dir = new THREE.Vector3(...ens.dipoles[mi]!).normalize();
@@ -85,11 +87,12 @@ function buildFilm(ens: Ens) {
       const pa = w[a]!, pb = w[b]!, d = new THREE.Vector3().subVectors(pb, pa), len = d.length();
       bonds.push({ p: new THREE.Vector3().addVectors(pa, pb).multiplyScalar(0.5), q: new THREE.Quaternion().setFromUnitVectors(up, d.clone().normalize()), len, mol: mi });
     });
-    mols.push({ center, dir });
+    mols.push({ center, dir, coupling: Math.abs(ens.factors[mi]!) / fmax });
   }
   return { atoms, bonds, mols };
 }
-const DIP = new THREE.Color("#4fcabe"), DIP_HOT = new THREE.Color("#eafff6");
+// dipoles coloured by COUPLING |μ̂·ε̂(θ)|·f(r): decoupled (⟂ field) → dark gray, fully coupled → bright white
+const DIP_OFF = new THREE.Color("#3a4046"), DIP_ON = new THREE.Color("#eef4f8");
 
 type Film = ReturnType<typeof buildFilm>;
 
@@ -137,26 +140,22 @@ function Dipoles({ stateRef, tRef, inspectRef, m, film }: { stateRef: MutableRef
   const cc = useMemo(() => new THREE.Color(), []);
   const tf = useMemo(() => {
     const up = new THREE.Vector3(0, 1, 0), L = 0.82;
-    return film.mols.map((mol) => ({ dir: mol.dir, q: new THREE.Quaternion().setFromUnitVectors(up, mol.dir), center: mol.center, shaft: L * 0.72, tip: L * 0.72 + 0.085 }));
+    return film.mols.map((mol) => ({ dir: mol.dir, q: new THREE.Quaternion().setFromUnitVectors(up, mol.dir), center: mol.center, coupling: mol.coupling, shaft: L * 0.72, tip: L * 0.72 + 0.085 }));
   }, [film]);
+  // colour each dipole by its COUPLING g_i = g_0(μ̂·ε̂)f(r): decoupled (⟂ field, or rotated by θ) → dark
+  // gray, fully coupled → bright white. Static per ensemble; recolours when θ / orientation changes.
   useLayoutEffect(() => {
     const sM = shaftRef.current, hM = headRef.current; if (!sM || !hM) return;
     const d = new THREE.Object3D();
     tf.forEach((t, i) => {
-      d.position.copy(t.center).addScaledVector(t.dir, t.shaft / 2); d.quaternion.copy(t.q); d.scale.set(1, t.shaft, 1); d.updateMatrix(); sM.setMatrixAt(i, d.matrix); sM.setColorAt(i, DIP);
-      d.position.copy(t.center).addScaledVector(t.dir, t.tip); d.quaternion.copy(t.q); d.scale.set(1, 1, 1); d.updateMatrix(); hM.setMatrixAt(i, d.matrix); hM.setColorAt(i, DIP);
+      cc.copy(DIP_OFF).lerp(DIP_ON, t.coupling);
+      d.position.copy(t.center).addScaledVector(t.dir, t.shaft / 2); d.quaternion.copy(t.q); d.scale.set(1, t.shaft, 1); d.updateMatrix(); sM.setMatrixAt(i, d.matrix); sM.setColorAt(i, cc);
+      d.position.copy(t.center).addScaledVector(t.dir, t.tip); d.quaternion.copy(t.q); d.scale.set(1, 1, 1); d.updateMatrix(); hM.setMatrixAt(i, d.matrix); hM.setColorAt(i, cc);
     });
     sM.instanceMatrix.needsUpdate = hM.instanceMatrix.needsUpdate = true;
     if (sM.instanceColor) sM.instanceColor.needsUpdate = true;
     if (hM.instanceColor) hM.instanceColor.needsUpdate = true;
-  }, [tf]);
-  useFrame(() => {
-    const sM = shaftRef.current, hM = headRef.current, ds = stateRef.current; if (!sM || !hM || !ds || ds.n !== m + 1) return;
-    const w = molValues(ds, inspectRef.current, tRef.current, m);
-    for (let i = 0; i < m; i++) { cc.copy(DIP).lerp(DIP_HOT, Math.min(1, Math.sqrt(w[i]!))); sM.setColorAt(i, cc); hM.setColorAt(i, cc); }
-    if (sM.instanceColor) sM.instanceColor.needsUpdate = true;
-    if (hM.instanceColor) hM.instanceColor.needsUpdate = true;
-  });
+  }, [tf, cc]);
   return (
     <group>
       <instancedMesh ref={shaftRef} args={[undefined, undefined, m]}>
@@ -247,9 +246,9 @@ function PolarizationAxis({ theta }: { theta: number }) {
   const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
   return (
     <group quaternion={q}>
-      <mesh><cylinderGeometry args={[0.026, 0.026, 2 * L, 10]} /><meshBasicMaterial color="#f5b942" toneMapped={false} /></mesh>
-      <mesh position={[0, L, 0]}><coneGeometry args={[0.09, 0.26, 12]} /><meshBasicMaterial color="#ffd98a" toneMapped={false} /></mesh>
-      <mesh position={[0, -L, 0]} rotation={[Math.PI, 0, 0]}><coneGeometry args={[0.09, 0.26, 12]} /><meshBasicMaterial color="#ffd98a" toneMapped={false} /></mesh>
+      <mesh><cylinderGeometry args={[0.026, 0.026, 2 * L, 10]} /><meshBasicMaterial color="#ffcc00" toneMapped={false} /></mesh>
+      <mesh position={[0, L, 0]}><coneGeometry args={[0.09, 0.26, 12]} /><meshBasicMaterial color="#ffe066" toneMapped={false} /></mesh>
+      <mesh position={[0, -L, 0]} rotation={[Math.PI, 0, 0]}><coneGeometry args={[0.09, 0.26, 12]} /><meshBasicMaterial color="#ffe066" toneMapped={false} /></mesh>
     </group>
   );
 }
@@ -274,7 +273,7 @@ export function LiveCavityScene({ stateRef, tRef, inspectRef, m, ensemble, waist
     <div className="cav-stage">
       <div className="cav-tag cav-tag-l">mirror</div>
       <div className="cav-tag cav-tag-r">mirror</div>
-      <div className="cav-tag cav-tag-mode">ω<sub>c</sub> TEM₀₀ mode · <span style={{ color: "#f5b942" }}>ε̂</span> polariz.</div>
+      <div className="cav-tag cav-tag-mode">ω<sub>c</sub> TEM₀₀ · <span style={{ color: "#ffcc00" }}>ε̂</span> POLARIZ.</div>
       <div className="cav-tag cav-tag-mol">{m} naphthalene emitters · μ̂ → g<sub>i</sub></div>
       <Canvas shadows dpr={[1, 2]} gl={{ antialias: true, alpha: true }} camera={{ position: [8.3, 3.9, 9.4], fov: 33 }}>
         <PerspectiveCamera makeDefault fov={33} position={[8.3, 3.9, 9.4]} />

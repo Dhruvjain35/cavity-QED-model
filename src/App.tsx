@@ -57,9 +57,11 @@ const HT_CW = HT_ML + HT_PW + HT_MR, HT_CH = HT_MT + HT_PH + HT_MB;
 const HTC_GRID = 760; // absorption-spectrum sampling points
 const MX_S = 196; // live Hamiltonian heatmap size (px)
 
-const PANEL = "#0b101c", INK = "#e2e8f0", DIM = "#94a3b8", AXIS = "#475569";
-const COBALT = "#3b82f6", CRIMSON = "#ef4444", EMERALD = "#10b981", AMBER = "#f59e0b", SLATE = "#475569";
-const GRIDLINE = "rgba(148,163,184,0.12)", CROSS = "rgba(148,163,184,0.45)";
+// industrial spectroscopic palette: cyan photons · red excitons · amber phonons · purple dark · green calib.
+const PANEL = "#0c0f12", INK = "#ffffff", DIM = "#8b949e", AXIS = "#484f58";
+const CYAN = "#00ffff", RED = "#ff3333", AMBER = "#ffcc00", PURPLE = "#9e77ed", GREEN = "#00ff66";
+const COBALT = CYAN, CRIMSON = RED, EMERALD = GREEN, SLATE = "#484f58"; // legacy aliases → new palette
+const GRIDLINE = "#1b2026", DASH = "#1f242c", CROSS = "rgba(120,130,145,0.4)";
 
 const minus = (s: string) => s.replace("-", "−");
 const fmt = (v: number, d: number) => minus(v.toFixed(d));
@@ -560,7 +562,7 @@ export function App() {
     return { ph, br, dk: Math.max(0, pm - br) };
   }
 
-  const DARKC = "#b08cf0"; // dark-manifold colour (distinct from photon-cobalt / bright-amber)
+  const DARKC = PURPLE; // dark-manifold (subradiant) colour
 
   // P3 · dressed-state spectrum: each eigenstate is a marker at (photon fraction |v₀ₖ|², energy E_k).
   // The two polaritons sit at the energy extremes near 50% photon; the M−1 dark states stack in a
@@ -769,7 +771,7 @@ export function App() {
     };
     trace(2, DARKC, true);  // dark manifold (filled — the leakage you watch grow)
     trace(0, COBALT, false); // photon
-    trace(1, AMBER, false);  // bright collective mode
+    trace(1, RED, false);  // bright collective (superradiant) mode — matter
     ctx.lineWidth = 0.75; ctx.strokeStyle = AXIS; ctx.strokeRect(PP_ML, PP_MT, PP_PW, PP_PH);
     ctx.fillStyle = INK; ctx.font = "italic 11px 'B612', sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
     ctx.fillText("time   t Ω_R / 2π   (Rabi cycles)", PP_ML + PP_PW / 2, PP_CH - 8);
@@ -904,13 +906,13 @@ export function App() {
             </Group>
           ) : regime === "dynamics" ? (
             <Group title="MOLECULAR ENSEMBLE" k="dyn" c={collapsed} t={toggle}>
-              <Field sym="N" texSym="N" label="Ensemble size" value={dyn.m} min={2} max={40} step={1} unit="" int onChange={(m) => setDyn((s) => ({ ...s, m: Math.round(m) }))} />
-              <Field sym="g" texSym="g_0/\omega_c" label="Bare coupling" value={dyn.g} min={0.01} max={0.2} step={0.005} unit="" onChange={(g) => setDyn((s) => ({ ...s, g }))} />
-              <Field sym="σ" texSym="\sigma_\omega/\omega_c" label="Inhomog. linewidth" value={dyn.sigma} min={0} max={0.25} step={0.005} unit="" onChange={(sigma) => setDyn((s) => ({ ...s, sigma }))} />
-              <Field sym="ω" texSym="\hbar\omega_c" label="Cavity energy" value={wcEv} min={0.5} max={4} step={0.05} unit="eV" onChange={setWcEv} />
-              <Field sym="η" texSym="\eta" label="Orientational order" value={dyn.order} min={0} max={1} step={0.02} unit="" onChange={(order) => setDyn((s) => ({ ...s, order }))} />
-              <Field sym="Γ" texSym="\Gamma/\omega_c" label="Linewidth (κ+γ)" value={dyn.gamma} min={0.003} max={0.06} step={0.002} unit="" onChange={(gamma) => setDyn((s) => ({ ...s, gamma }))} />
-              <Field sym="θ" texSym="\theta_{\hat\epsilon}" label="Polarization angle" value={dyn.theta} min={0} max={90} step={1} unit="°" onChange={(theta) => setDyn((s) => ({ ...s, theta }))} />
+              <Field sym="N" texSym="(N)" label="Ensemble Dimension" value={dyn.m} min={2} max={40} step={1} unit="" int onChange={(m) => setDyn((s) => ({ ...s, m: Math.round(m) }))} />
+              <Field sym="g" texSym="(g_0/\omega_c)" label="Bare Vacuum Rabi Coupling" value={dyn.g} min={0.01} max={0.2} step={0.005} unit="" onChange={(g) => setDyn((s) => ({ ...s, g }))} />
+              <Field sym="σ" texSym="(\sigma_\omega/\omega_c)" label="Inhomogeneous Linewidth" value={dyn.sigma} min={0} max={0.25} step={0.005} unit="" onChange={(sigma) => setDyn((s) => ({ ...s, sigma }))} />
+              <Field sym="ω" texSym="(\hbar\omega_c)" label="Cavity Resonance Energy" value={wcEv} min={0.5} max={4} step={0.05} unit="eV" onChange={setWcEv} />
+              <Field sym="η" texSym="(\eta)" label="Orientational Order" value={dyn.order} min={0} max={1} step={0.02} unit="" onChange={(order) => setDyn((s) => ({ ...s, order }))} />
+              <Field sym="Γ" texSym="(\Gamma{=}\kappa{+}\gamma)" label="Total Dissipation Rate" value={dyn.gamma} min={0.003} max={0.06} step={0.002} unit="" onChange={(gamma) => setDyn((s) => ({ ...s, gamma }))} />
+              <Field sym="θ" texSym="(\theta_E)" label="Transverse Polarization Angle" value={dyn.theta} min={0} max={90} step={1} unit="°" onChange={(theta) => setDyn((s) => ({ ...s, theta }))} />
               <div className="btn-row">
                 <button className={dyn.order >= 0.999 ? "on" : ""} onClick={() => setDyn((s) => ({ ...s, order: 1 }))}>CRYSTAL</button>
                 <button className={dyn.order <= 0.15 ? "on" : ""} onClick={() => setDyn((s) => ({ ...s, order: 0.1 }))}>AMORPHOUS</button>
@@ -1013,7 +1015,7 @@ export function App() {
                 <div className="live3d"><Suspense fallback={<div className="cv-loading">loading 3D…</div>}><LiveCavityScene stateRef={dynState} tRef={simT} m={dyn.m} inspectRef={inspectRef} ensemble={ensemble} waist={MODE_WAIST} polTheta={dyn.theta * Math.PI / 180} /></Suspense></div>
               </div>
               <div className="pane">
-                <div className="pane-head">Populations — photon <i style={{ color: COBALT, fontStyle: "normal" }}>━</i> bright <i style={{ color: AMBER, fontStyle: "normal" }}>━</i> dark <i style={{ color: DARKC, fontStyle: "normal" }}>━</i></div>
+                <div className="pane-head">Populations — photon <i style={{ color: CYAN, fontStyle: "normal" }}>━</i> bright/superradiant <i style={{ color: RED, fontStyle: "normal" }}>━</i> dark/subradiant <i style={{ color: PURPLE, fontStyle: "normal" }}>━</i></div>
                 <canvas ref={popCanvas} className="cv" />
               </div>
               <div className="pane">
