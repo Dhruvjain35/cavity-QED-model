@@ -113,18 +113,5 @@ It is **not** a QuTiP replacement, **not** a novel research result, and makes no
 - **Sharma & Chen (2024)** — collective electron transfer / polariton model, *J. Chem. Phys.* **161**, 104102 (2024). (Single-mode, homogeneous coupling; see `docs/GROUNDING-RESEARCH.md`.)
 - **matplotlib `RdBu`** — the diverging ColorBrewer RdBu colormap used for the Wigner rendering, with midpoint `#F7F7F7`. <https://matplotlib.org/>
 
-## License & acknowledgments
 
-Released under the **MIT License**, © 2026 Dhruv Jain.
 
-Developed by Dhruv Jain (high-school researcher) in collaboration context with the **Hsing-Ta Chen group, University of Notre Dame**. The collective electron-transfer model is drawn from Sharma & Chen, *J. Chem. Phys.* **161**, 104102 (2024). Validation references are produced with QuTiP and NumPy.
-
-## AI-use disclosure
-
-This project was built with AI assistance (Anthropic's Claude) used as a coding and research
-tool, under the direction of the author. The author is responsible for the design decisions and
-for understanding the physics. Crucially, the AI's output is **not trusted on its own**: every
-physics result is independently validated bit-for-bit against **QuTiP** and **NumPy** via the
-committed golden files and the test suite (`cargo test` + `wasm/validate_wasm.cjs`; see
-`docs/VALIDATION.md`), and the conventions are source-cited in `docs/GROUNDING-RESEARCH.md`. This
-disclosure is provided in line with JOSS and academic norms on AI use.
