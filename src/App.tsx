@@ -806,34 +806,28 @@ export function App() {
                 </div>
               </div>
             </>
+          ) : dynSweep ? (
+            <div className="pane grow">
+              <div className="pane-head">Coupling sweep · polariton dispersion E(g) · {SWEEP_STEPS} diagonalizations · bright split as 2g√M, dark flat at ω_a · amber = live g</div>
+              <canvas ref={sweepCanvas} className="cv" />
+            </div>
           ) : (
-            <div className="dyn-split">
-              <div className="pane grow dyn-3d">
-                {dynSweep ? (
-                  <>
-                    <div className="pane-head">Coupling sweep · polariton dispersion E(g) · {SWEEP_STEPS} diagonalizations · bright split as 2g√M, dark flat at ω_a</div>
-                    <canvas ref={sweepCanvas} className="cv" />
-                  </>
-                ) : (
-                  <>
-                    <div className="pane-head">Live cavity · {dyn.m} naphthalene emitters + 1 photon{inspect != null ? <> · <i style={{ color: "#fff", fontStyle: "normal" }}>inspecting eigenstate #{inspect}</i></> : <> · matter amber · field cobalt · dipoles <i style={{ color: "#4fcabe", fontStyle: "normal" }}>μ</i> · drag to orbit</>}</div>
-                    <div className="live3d"><Suspense fallback={<div className="cv-loading">loading 3D…</div>}><LiveCavityScene stateRef={dynState} tRef={simT} m={dyn.m} inspectRef={inspectRef} sigma={dyn.sigma} /></Suspense></div>
-                  </>
-                )}
+            <div className="dyn-bento">
+              <div className="pane bento-3d">
+                <div className="pane-head">Live cavity · {dyn.m} naphthalene emitters + 1 photon{inspect != null ? <> · <i style={{ color: "#fff", fontStyle: "normal" }}>inspecting eigenstate #{inspect}</i></> : <> · matter amber · field cobalt · dipoles <i style={{ color: "#4fcabe", fontStyle: "normal" }}>μ</i></>}</div>
+                <div className="live3d"><Suspense fallback={<div className="cv-loading">loading 3D…</div>}><LiveCavityScene stateRef={dynState} tRef={simT} m={dyn.m} inspectRef={inspectRef} sigma={dyn.sigma} /></Suspense></div>
               </div>
-              <div className="dyn-2d">
-                <div className="pane">
-                  <div className="pane-head">Populations — photon <i style={{ color: COBALT, fontStyle: "normal" }}>━</i> bright mode <i style={{ color: AMBER, fontStyle: "normal" }}>━</i> dark manifold <i style={{ color: DARKC, fontStyle: "normal" }}>━</i></div>
-                  <canvas ref={popCanvas} className="cv" />
-                </div>
-                <div className="pane">
-                  <div className="pane-head">Transmission spectrum · S(ω) · FFT of the photon field · vacuum-Rabi doublet</div>
-                  <canvas ref={fftCanvas} className="cv" />
-                </div>
-                <div className="pane grow">
-                  <div className="pane-head">Dressed-state spectrum · E<sub>k</sub> vs photon fraction · {inspect != null ? <span style={{ color: "#fff" }}>▸ eigenstate #{inspect} on the 3D · click again to release</span> : <span>click an eigenstate to project it onto the molecules</span>}</div>
-                  <canvas ref={hopCanvas} className="cv click" onClick={onHopClick} />
-                </div>
+              <div className="pane">
+                <div className="pane-head">Populations — photon <i style={{ color: COBALT, fontStyle: "normal" }}>━</i> bright <i style={{ color: AMBER, fontStyle: "normal" }}>━</i> dark <i style={{ color: DARKC, fontStyle: "normal" }}>━</i></div>
+                <canvas ref={popCanvas} className="cv" />
+              </div>
+              <div className="pane">
+                <div className="pane-head">Dressed states · E<sub>k</sub> vs photon fraction · {inspect != null ? <span style={{ color: "#fff" }}>▸ #{inspect} on 3D · click to release</span> : <span>click a state to project onto molecules</span>}</div>
+                <canvas ref={hopCanvas} className="cv click" onClick={onHopClick} />
+              </div>
+              <div className="pane">
+                <div className="pane-head">Transmission S(ω) · FFT of the photon field · vacuum-Rabi doublet</div>
+                <canvas ref={fftCanvas} className="cv" />
               </div>
             </div>
           )}

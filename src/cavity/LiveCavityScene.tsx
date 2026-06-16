@@ -271,8 +271,8 @@ export function LiveCavityScene({ stateRef, tRef, inspectRef, m, sigma }: { stat
       <div className="cav-tag cav-tag-r">mirror</div>
       <div className="cav-tag cav-tag-mode">ω<sub>c</sub> photon mode</div>
       <div className="cav-tag cav-tag-mol">{m} naphthalene emitters</div>
-      <Canvas shadows dpr={[1, 2]} gl={{ antialias: true, alpha: true }} camera={{ position: [12.8, 6.2, 15], fov: 33 }}>
-        <PerspectiveCamera makeDefault fov={33} position={[12.8, 6.2, 15]} />
+      <Canvas shadows dpr={[1, 2]} gl={{ antialias: true, alpha: true }} camera={{ position: [9.2, 4.3, 10.4], fov: 33 }}>
+        <PerspectiveCamera makeDefault fov={33} position={[9.2, 4.3, 10.4]} />
         <Studio />
         <ambientLight intensity={0.26} />
         <directionalLight castShadow intensity={0.5} position={[5, 8, 6]} shadow-mapSize={[1024, 1024]} shadow-bias={-0.0001} />
