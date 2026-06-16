@@ -110,6 +110,8 @@ export function App() {
   const [dynSweep, setDynSweep] = useState(false); // coupling-sweep dispersion mode (replaces the 3D)
   const [wcEv, setWcEv] = useState(2.0); // physical cavity-photon energy ℏω_c in eV (display scale only)
   const [regLog, setRegLog] = useState<string[]>([]); // in-browser regression console output
+  const [polAnim, setPolAnim] = useState(false); // polarization-sweep animation active
+  const polRaf = useRef(0);
   // the shared molecular ensemble (positions, dipoles, coupling factors) — feeds BOTH the WASM
   // arrowhead and the 3D view, so orientation/position physics and visuals never diverge.
   const ensemble = useMemo(() => buildEnsemble(dyn.m, dyn.seed, dyn.order, MODE_WAIST, dyn.theta * Math.PI / 180), [dyn.m, dyn.seed, dyn.order, dyn.theta]);
@@ -200,10 +202,10 @@ export function App() {
       inspectRef.current = null; setInspect(null); // a new ensemble invalidates the inspected state
       matData.current = arrowheadMatrixGi(WA, WA, dyn.sigma, dyn.seed, gi);
       fftData.current = cavityPowerSpectrumGi(WA, WA, dyn.sigma, dyn.seed, gi, FFT_N, FFT_DT, dyn.gamma);
-      sweepData.current = couplingSweepGi(WA, WA, dyn.sigma, dyn.seed, ensemble.factors, 0, SWEEP_GMAX, SWEEP_STEPS);
+      if (dynSweep) sweepData.current = couplingSweepGi(WA, WA, dyn.sigma, dyn.seed, ensemble.factors, 0, SWEEP_GMAX, SWEEP_STEPS); // 90 diagonalizations — only when displayed
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [regime, dyn]);
+  }, [regime, dyn, dynSweep]);
 
   useEffect(() => {
     if (regime !== "vibronic") return;
@@ -846,6 +848,23 @@ export function App() {
     });
   }
 
+  // Feature · live polarization sweep: ramp the transverse polarization angle θ_E from 0°→90° over 3 s,
+  // re-diagonalizing per frame. The user watches the polariton markers slide into the dark reservoir
+  // and the transmission doublet collapse to a single resonance as ε̂ rotates ⟂ the dipoles.
+  function animatePol() {
+    cancelAnimationFrame(polRaf.current);
+    if (polAnim) { setPolAnim(false); return; }
+    setPolAnim(true);
+    const t0 = performance.now(), dur = 3000;
+    const step = (now: number) => {
+      const u = Math.min(1, (now - t0) / dur);
+      setDyn((s) => ({ ...s, theta: Math.round(u * 90) }));
+      if (u < 1) polRaf.current = requestAnimationFrame(step); else setPolAnim(false);
+    };
+    setDyn((s) => ({ ...s, theta: 0 }));
+    polRaf.current = requestAnimationFrame(step);
+  }
+
   function exportHamiltonian() {
     const gi = Float64Array.from(ensemble.factors, (f) => f * dyn.g);
     const { h, n } = arrowheadMatrixGi(WA, WA, dyn.sigma, dyn.seed, gi);
@@ -930,6 +949,9 @@ export function App() {
               <Field sym="η" texSym="(\eta)" label="Orientational Order" value={dyn.order} min={0} max={1} step={0.02} unit="" onChange={(order) => setDyn((s) => ({ ...s, order }))} />
               <Field sym="Γ" texSym="(\Gamma{=}\kappa{+}\gamma)" label="Total Dissipation Rate" value={dyn.gamma} min={0.003} max={0.06} step={0.002} unit="" onChange={(gamma) => setDyn((s) => ({ ...s, gamma }))} />
               <Field sym="θ" texSym="(\theta_E)" label="Transverse Polarization Angle" value={dyn.theta} min={0} max={90} step={1} unit="°" onChange={(theta) => setDyn((s) => ({ ...s, theta }))} />
+              <div className="btn-row">
+                <button className={polAnim ? "on" : ""} onClick={animatePol}>{polAnim ? "■ SWEEPING θ…" : "▶ ANIMATE θ SWEEP 0→90°"}</button>
+              </div>
               <div className="btn-row">
                 <button className={dyn.order >= 0.999 ? "on" : ""} onClick={() => setDyn((s) => ({ ...s, order: 1 }))}>CRYSTAL</button>
                 <button className={dyn.order <= 0.15 ? "on" : ""} onClick={() => setDyn((s) => ({ ...s, order: 0.1 }))}>AMORPHOUS</button>
