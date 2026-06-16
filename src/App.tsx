@@ -28,11 +28,11 @@ const CV_CW = CV_ML + CV_W + CV_MR, CV_CH = CV_MT + CV_H + CV_MB;
 const N0 = 1.0, NS = 1.52; // air / glass substrate
 const RB_ML = 36, RB_MR = 10, RB_MT = 12, RB_MB = 24, RB_PW = 268, RB_PH = 108;
 const RB_CW = RB_ML + RB_PW + RB_MR, RB_CH = RB_MT + RB_PH + RB_MB;
-const DT_DYN = 0.22, HEAT_COLS = 150;
-const HM_ML = 46, HM_MR = 12, HM_MT = 14, HM_MB = 26, HM_PW = 470, HM_PH = 248;
-const HM_CW = HM_ML + HM_PW + HM_MR, HM_CH = HM_MT + HM_PH + HM_MB;
-const PP_ML = 46, PP_MR = 12, PP_MT = 12, PP_MB = 24, PP_PW = 470, PP_PH = 100;
+const DT_DYN = 0.22, HEAT_COLS = 200;
+const PP_ML = 50, PP_MR = 14, PP_MT = 16, PP_MB = 28, PP_PW = 466, PP_PH = 176;
 const PP_CW = PP_ML + PP_PW + PP_MR, PP_CH = PP_MT + PP_PH + PP_MB;
+const HP_ML = 78, HP_MR = 16, HP_MT = 18, HP_MB = 30, HP_PW = 426, HP_PH = 232;
+const HP_CW = HP_ML + HP_PW + HP_MR, HP_CH = HP_MT + HP_PH + HP_MB;
 
 const PANEL = "#0b101c", INK = "#e2e8f0", DIM = "#94a3b8", AXIS = "#475569";
 const COBALT = "#3b82f6", CRIMSON = "#ef4444", EMERALD = "#10b981", AMBER = "#f59e0b", SLATE = "#475569";
@@ -79,7 +79,7 @@ export function App() {
   const [tol, setTol] = useState({ atol: 1e-6, rtol: 1e-6 });
   const [sp, setSp] = useState({ m: 20, g: 0.05, sigma: 0.0, seed: 1 });
   const [cav, setCav] = useState({ lambda: 550, nHi: 2.5, nLo: 1.46, pairs: 4, nCav: 1.6, g: 1.6 });
-  const [dyn, setDyn] = useState({ m: 12, g: 0.06, sigma: 0.0, seed: 1, init: 0 });
+  const [dyn, setDyn] = useState({ m: 12, g: 0.06, sigma: 0.04, seed: 1, init: 0 });
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [playing, setPlaying] = useState(true);
   const [fixedScale, setFixedScale] = useState(true);
@@ -90,8 +90,8 @@ export function App() {
   const bridgeCanvas = useRef<HTMLCanvasElement>(null);
   const cavCanvas = useRef<HTMLCanvasElement>(null);
   const rabiCanvas = useRef<HTMLCanvasElement>(null);
-  const heatCanvas = useRef<HTMLCanvasElement>(null);
   const popCanvas = useRef<HTMLCanvasElement>(null);
+  const hopCanvas = useRef<HTMLCanvasElement>(null);
   const dynState = useRef<{ eigs: Float64Array; vecs: Float64Array; n: number; c: Float64Array; hist: Float64Array[] } | null>(null);
   const simT = useRef(0);
   const offscreen = useRef<HTMLCanvasElement | null>(null), husimiOff = useRef<HTMLCanvasElement | null>(null), bridgeOff = useRef<HTMLCanvasElement | null>(null);
@@ -169,9 +169,9 @@ export function App() {
       } else if (regimeRef.current === "dynamics" && dynState.current) {
         const ds = dynState.current;
         if (playingRef.current) simT.current += DT_DYN;
-        const pops = popsAt(simT.current);
-        if (playingRef.current) { ds.hist.push(pops); if (ds.hist.length > HEAT_COLS) ds.hist.shift(); }
-        drawSimHeat(); drawSimPlot(); updateSimReadouts(pops);
+        const d = decompAt(simT.current);
+        if (playingRef.current) { ds.hist.push(Float64Array.of(d.ph, d.br, d.dk)); if (ds.hist.length > HEAT_COLS) ds.hist.shift(); }
+        drawPopTraces(); drawHopfield(); updateSimReadouts(d);
       }
       raf.current = requestAnimationFrame(loop);
     };
@@ -456,72 +456,110 @@ export function App() {
     ctx.save(); ctx.translate(11, RB_MT + RB_PH / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top"; ctx.fillText("T", 0, 0); ctx.restore();
   }
 
-  // ── live single-excitation dynamics (N molecules + cavity) ──
-  function popsAt(t: number): Float64Array {
+  // ── live single-excitation dynamics: photon ⊕ N molecules in the dressed (polariton) basis ──
+  // ψ(t) = Σ_k c_k e^{−iE_k t} φ_k — complex site amplitudes ψ_i(t) (i=0 photon, i≥1 molecule i).
+  function ampsAt(t: number): { re: Float64Array; im: Float64Array } {
     const ds = dynState.current!;
     const { eigs, vecs, n, c } = ds;
-    const pops = new Float64Array(n);
+    const re = new Float64Array(n), im = new Float64Array(n);
     for (let i = 0; i < n; i++) {
-      let re = 0, im = 0; const row = i * n;
+      let r = 0, m = 0; const row = i * n;
       for (let k = 0; k < n; k++) {
         const amp = vecs[row + k]! * c[k]!, ph = eigs[k]! * t;
-        re += amp * Math.cos(ph); im -= amp * Math.sin(ph);
+        r += amp * Math.cos(ph); m -= amp * Math.sin(ph);
       }
-      pops[i] = re * re + im * im; // |ψ_i(t)|²
+      re[i] = r; im[i] = m;
     }
-    return pops;
+    return { re, im };
   }
 
-  function drawSimHeat() {
-    const cvEl = heatCanvas.current, ds = dynState.current; if (!cvEl || !ds) return;
-    const ctx = sized(cvEl, HM_CW, HM_CH);
-    ctx.fillStyle = PANEL; ctx.fillRect(0, 0, HM_CW, HM_CH);
-    const n = ds.n, H = ds.hist, cw = HM_PW / HEAT_COLS, rh = HM_PH / n;
-    for (let col = 0; col < H.length; col++) {
-      const pops = H[col]!, x = HM_ML + col * cw;
-      for (let i = 0; i < n; i++) {
-        const v = Math.min(1, Math.sqrt(pops[i]!));
-        ctx.fillStyle = i === 0
-          ? `rgb(${lin(11, 70, v)},${lin(16, 140, v)},${lin(28, 250, v)})`  // photon row → cobalt
-          : `rgb(${lin(11, 245, v)},${lin(16, 160, v)},${lin(28, 20, v)})`; // molecule rows → amber
-        ctx.fillRect(x, HM_MT + i * rh, cw + 0.6, rh + 0.6);
-      }
-    }
-    ctx.strokeStyle = "rgba(148,163,184,0.45)"; ctx.lineWidth = 0.75; seg(ctx, HM_ML, HM_MT + rh, HM_ML + HM_PW, HM_MT + rh);
-    ctx.lineWidth = 0.75; ctx.strokeStyle = AXIS; ctx.strokeRect(HM_ML, HM_MT, HM_PW, HM_PH);
-    ctx.fillStyle = DIM; ctx.font = "500 9px 'B612 Mono', monospace"; ctx.textAlign = "right"; ctx.textBaseline = "middle";
-    ctx.fillText("photon", HM_ML - 5, HM_MT + rh / 2);
-    ctx.fillText("mol 1", HM_ML - 5, HM_MT + rh * 1.5);
-    ctx.fillText(`mol ${n - 1}`, HM_ML - 5, HM_MT + HM_PH - rh / 2);
-    ctx.fillStyle = INK; ctx.font = "italic 12px 'B612', sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
-    ctx.fillText("time →", HM_ML + HM_PW / 2, HM_CH - 8);
+  // Project the matter part onto the symmetric BRIGHT mode |B⟩=Σ_i|i⟩/√M (the only one the photon
+  // couples to); the orthogonal remainder is the DARK manifold. Identical molecules ⇒ dark ≡ 0;
+  // disorder leaks population bright→dark (verified vs WASM, norm conserved). Uniform g ⇒ b_i=1/√M.
+  function decompAt(t: number): { ph: number; br: number; dk: number } {
+    const n = dynState.current!.n, M = n - 1, inv = 1 / Math.sqrt(M);
+    const { re, im } = ampsAt(t);
+    const ph = re[0]! * re[0]! + im[0]! * im[0]!;
+    let reB = 0, imB = 0, pm = 0;
+    for (let i = 1; i < n; i++) { reB += inv * re[i]!; imB += inv * im[i]!; pm += re[i]! * re[i]! + im[i]! * im[i]!; }
+    const br = reB * reB + imB * imB;
+    return { ph, br, dk: Math.max(0, pm - br) };
   }
 
-  function drawSimPlot() {
+  const DARKC = "#b08cf0"; // dark-manifold colour (distinct from photon-cobalt / bright-amber)
+
+  // P3 · Hopfield composition of every dressed eigenstate: each row is one eigenstate at its energy
+  // E_k, split into photon |v₀ₖ|² / bright (Σ bᵢvᵢₖ)² / dark remainder. Brightness ∝ how much the
+  // initial photon occupies that state |c_k|² — so the two ~50/50 polaritons light up and the M−1
+  // dark states sit dim at ω_a. This is the canonical polariton plot, recomputed from the live modes.
+  function drawHopfield() {
+    const cvEl = hopCanvas.current, ds = dynState.current; if (!cvEl || !ds) return;
+    const ctx = sized(cvEl, HP_CW, HP_CH);
+    ctx.fillStyle = PANEL; ctx.fillRect(0, 0, HP_CW, HP_CH);
+    const { eigs, vecs, n, c } = ds, M = n - 1, inv = 1 / Math.sqrt(M);
+    const rowH = HP_PH / n, barH = Math.min(13, rowH * 0.62);
+    for (const f of [0, 0.25, 0.5, 0.75, 1]) {
+      const x = HP_ML + f * HP_PW;
+      ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5; seg(ctx, x, HP_MT, x, HP_MT + HP_PH);
+      ctx.fillStyle = DIM; ctx.font = "500 8.5px 'B612 Mono', monospace"; ctx.textAlign = "center"; ctx.textBaseline = "top";
+      ctx.fillText(f.toFixed(2), x, HP_MT + HP_PH + 5);
+    }
+    for (let k = 0; k < n; k++) {
+      const yc = HP_MT + (k + 0.5) * rowH;
+      const phot = vecs[k]! * vecs[k]!; // |v₀ₖ|²
+      let bAmp = 0; for (let i = 1; i < n; i++) bAmp += inv * vecs[i * n + k]!;
+      const bright = Math.min(1, bAmp * bAmp), dark = Math.max(0, 1 - phot - bright);
+      const occ = c[k]! * c[k]!;
+      ctx.globalAlpha = 0.28 + 0.72 * Math.sqrt(Math.min(1, occ));
+      let x = HP_ML;
+      for (const [w, col] of [[phot, COBALT], [bright, AMBER], [dark, DARKC]] as [number, string][]) {
+        ctx.fillStyle = col; ctx.fillRect(x, yc - barH / 2, w * HP_PW, barH); x += w * HP_PW;
+      }
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = DIM; ctx.font = "500 8.5px 'B612 Mono', monospace"; ctx.textAlign = "right"; ctx.textBaseline = "middle";
+      ctx.fillText(fmt(eigs[k]!, 3), HP_ML - 7, yc);
+    }
+    // label the two polaritons (extreme energies are the bright LP/UP)
+    ctx.fillStyle = INK; ctx.font = "600 9px 'B612 Mono', monospace"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+    ctx.fillText("UP", HP_ML + HP_PW + 5, HP_MT + rowH * 0.5);
+    ctx.fillText("LP", HP_ML + HP_PW + 5, HP_MT + (n - 0.5) * rowH);
+    ctx.strokeStyle = AXIS; ctx.lineWidth = 0.75; ctx.strokeRect(HP_ML, HP_MT, HP_PW, HP_PH);
+    ctx.fillStyle = DIM; ctx.font = "italic 11px 'B612', sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top";
+    ctx.fillText("Hopfield fraction", HP_ML + HP_PW / 2, HP_MT + HP_PH + 16);
+    ctx.save(); ctx.translate(15, HP_MT + HP_PH / 2); ctx.rotate(-Math.PI / 2); ctx.fillText("energy  E_k", 0, 0); ctx.restore();
+  }
+
+  // P1 · the headline: photon ↔ bright vacuum-Rabi oscillation (Ω_R = 2g√M) with the dark band that
+  // stays flat at σ=0 and grows as disorder leaks population out of the bright mode. hist = [ph,br,dk].
+  function drawPopTraces() {
     const cvEl = popCanvas.current, ds = dynState.current; if (!cvEl || !ds) return;
     const ctx = sized(cvEl, PP_CW, PP_CH);
     ctx.fillStyle = PANEL; ctx.fillRect(0, 0, PP_CW, PP_CH);
     const yOf = (v: number) => PP_MT + (1 - v) * PP_PH;
     ctx.font = "500 9px 'B612 Mono', monospace";
-    for (const v of [0, 0.5, 1]) { ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5; seg(ctx, PP_ML, yOf(v), PP_ML + PP_PW, yOf(v)); ctx.fillStyle = DIM; ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(v.toFixed(1), PP_ML - 5, yOf(v)); }
+    for (const v of [0, 0.5, 1]) { ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5; seg(ctx, PP_ML, yOf(v), PP_ML + PP_PW, yOf(v)); ctx.fillStyle = DIM; ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(v.toFixed(1), PP_ML - 6, yOf(v)); }
     const H = ds.hist, cw = PP_PW / HEAT_COLS;
-    const trace = (fn: (p: Float64Array) => number, color: string) => {
-      ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.beginPath();
-      H.forEach((p, col) => { const x = PP_ML + col * cw, y = yOf(Math.min(1, fn(p))); col === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); });
-      ctx.stroke();
+    const trace = (idx: number, color: string, fill: boolean) => {
+      ctx.beginPath();
+      H.forEach((p, col) => { const x = PP_ML + col * cw, y = yOf(Math.min(1, p[idx]!)); col === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); });
+      if (fill && H.length) { ctx.lineTo(PP_ML + (H.length - 1) * cw, yOf(0)); ctx.lineTo(PP_ML, yOf(0)); ctx.closePath(); ctx.fillStyle = color + "22"; ctx.fill(); ctx.beginPath(); H.forEach((p, col) => { const x = PP_ML + col * cw, y = yOf(Math.min(1, p[idx]!)); col === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); }); }
+      ctx.strokeStyle = color; ctx.lineWidth = 1.6; ctx.stroke();
     };
-    trace((p) => p[0]!, COBALT); // photon
-    trace((p) => { let s = 0; for (let i = 1; i < p.length; i++) s += p[i]!; return s; }, "#f59e0b"); // total molecular
+    trace(2, DARKC, true);  // dark manifold (filled — the leakage you watch grow)
+    trace(0, COBALT, false); // photon
+    trace(1, AMBER, false);  // bright collective mode
     ctx.lineWidth = 0.75; ctx.strokeStyle = AXIS; ctx.strokeRect(PP_ML, PP_MT, PP_PW, PP_PH);
-    ctx.fillStyle = INK; ctx.font = "italic 12px 'B612', sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
-    ctx.fillText("population", PP_ML + PP_PW / 2, PP_CH - 5);
+    ctx.fillStyle = INK; ctx.font = "italic 11px 'B612', sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+    ctx.fillText("time →", PP_ML + PP_PW / 2, PP_CH - 8);
+    ctx.save(); ctx.translate(13, PP_MT + PP_PH / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top"; ctx.fillText("population", 0, 0); ctx.restore();
   }
 
-  function updateSimReadouts(pops: Float64Array) {
+  function updateSimReadouts(d: { ph: number; br: number; dk: number }) {
     const set = (k: string, v: string) => { const el = read.current[k]; if (el) el.textContent = v; };
-    let molTot = 0, molMax = 0; for (let i = 1; i < pops.length; i++) { molTot += pops[i]!; molMax = Math.max(molMax, pops[i]!); }
-    set("simT", simT.current.toFixed(2)); set("simPhot", pops[0]!.toFixed(4)); set("simMol", molTot.toFixed(4));
-    set("simMax", molMax.toFixed(4)); set("simNorm", (pops[0]! + molTot).toFixed(6));
+    const ds = dynState.current; if (!ds) return;
+    const split = ds.eigs[ds.n - 1]! - ds.eigs[0]!; // LP→UP polariton splitting (≈ 2g√M on resonance)
+    set("simT", simT.current.toFixed(2)); set("simPh", d.ph.toFixed(4)); set("simBr", d.br.toFixed(4));
+    set("simDk", d.dk.toFixed(4)); set("simRabi", fmt(split, 4)); set("simNorm", (d.ph + d.br + d.dk).toFixed(6));
   }
 
   function exportCSV() {
@@ -534,7 +572,7 @@ export function App() {
     else download("spectrum.json", "application/json", JSON.stringify({ detuning_over_g: sweep.current.map((s) => s.x), eigs: sweep.current.map((s) => Array.from(s.eigs)), photon_fraction: sweep.current.map((s) => Array.from(s.photon)) }));
   }
   function exportPNG() {
-    const cv = regime === "single" ? wigCanvas.current : regime === "cavity" ? cavCanvas.current : regime === "dynamics" ? heatCanvas.current : specCanvas.current;
+    const cv = regime === "single" ? wigCanvas.current : regime === "cavity" ? cavCanvas.current : regime === "dynamics" ? popCanvas.current : specCanvas.current;
     if (!cv) return;
     const a = document.createElement("a"); a.href = cv.toDataURL("image/png"); a.download = `${regime}.png`; a.click();
   }
@@ -681,13 +719,13 @@ export function App() {
                 <div className="live3d"><Suspense fallback={<div className="cv-loading">loading 3D…</div>}><LiveCavityScene stateRef={dynState} tRef={simT} m={dyn.m} /></Suspense></div>
               </div>
               <div className="dyn-2d">
-                <div className="pane grow">
-                  <div className="pane-head">Excitation heat map · photon row + one row per molecule · time →</div>
-                  <canvas ref={heatCanvas} className="cv" />
-                </div>
                 <div className="pane">
-                  <div className="pane-head">Population — photon <i style={{ color: COBALT, fontStyle: "normal" }}>━</i> total molecular <i style={{ color: "#f59e0b", fontStyle: "normal" }}>━</i></div>
+                  <div className="pane-head">Populations — photon <i style={{ color: COBALT, fontStyle: "normal" }}>━</i> bright mode <i style={{ color: AMBER, fontStyle: "normal" }}>━</i> dark manifold <i style={{ color: DARKC, fontStyle: "normal" }}>━</i></div>
                   <canvas ref={popCanvas} className="cv" />
+                </div>
+                <div className="pane grow">
+                  <div className="pane-head">Dressed states · Hopfield composition vs energy · photon <i style={{ color: COBALT, fontStyle: "normal" }}>▪</i> bright <i style={{ color: AMBER, fontStyle: "normal" }}>▪</i> dark <i style={{ color: DARKC, fontStyle: "normal" }}>▪</i> · opacity = initial occupation</div>
+                  <canvas ref={hopCanvas} className="cv" />
                 </div>
               </div>
             </div>
@@ -756,10 +794,11 @@ export function App() {
                 <div className="pane-head">Live observables</div>
                 <table className="metrics"><tbody>
                   <Row label={<>time <i>t</i></>} k="simT" r={read} unit="ω⁻¹" />
-                  <Row label={<>photon ⟨<i>a</i>†<i>a</i>⟩</>} k="simPhot" r={read} />
-                  <Row label={<>molecular Σ</>} k="simMol" r={read} />
-                  <Row label={<>brightest molecule</>} k="simMax" r={read} />
-                  <Row label={<>norm Σ<i>p</i></>} k="simNorm" r={read} />
+                  <Row label={<><i>P</i> photon</>} k="simPh" r={read} />
+                  <Row label={<><i>P</i> bright</>} k="simBr" r={read} />
+                  <Row label={<><i>P</i> dark</>} k="simDk" r={read} />
+                  <Row label={<>Ω<sub>R</sub> · LP→UP</>} k="simRabi" r={read} unit="ω" />
+                  <Row label={<>norm Σ<i>P</i></>} k="simNorm" r={read} />
                 </tbody></table>
               </div>
               {Hud}
