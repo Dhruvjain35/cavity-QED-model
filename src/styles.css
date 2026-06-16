@@ -46,6 +46,19 @@ body { background: var(--bg); color: var(--ink); font-family: var(--serif); -web
 .cv-loading { display: flex; align-items: center; justify-content: center; height: 100%; font-family: var(--mono); font-size: 11px; color: #cdbff0; }
 .phase-row { display: flex; gap: 10px; flex-wrap: wrap; }
 
+/* live dynamics: 3D cavity beside the 2D diagnostics */
+.dyn-split { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(360px, 1fr); }
+.dyn-3d { display: flex; flex-direction: column; min-width: 0; border-bottom: none; }
+.dyn-2d { display: flex; flex-direction: column; min-width: 0; border-left: 1px solid var(--rule); }
+.live3d { flex: 1; width: 100%; min-height: 360px; border-radius: 3px; overflow: hidden; background: radial-gradient(120% 120% at 50% 30%, #0f1828 0%, #0a0f1b 58%, #070b14 100%); }
+.cav-tag { position: absolute; font-family: var(--mono); font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; color: #9fb4d4; pointer-events: none; text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7); }
+.cav-tag sub { font-size: 0.74em; }
+.cav-tag-l { top: 14px; left: 16px; }
+.cav-tag-r { top: 14px; right: 16px; }
+.cav-tag-mode { top: 14px; left: 50%; transform: translateX(-50%); color: #6f9bdf; }
+.cav-tag-mol { bottom: 14px; left: 50%; transform: translateX(-50%); color: #d4a24a; }
+@media (max-width: 1180px) { .dyn-split { grid-template-columns: 1fr; } .dyn-2d { border-left: none; border-top: 1px solid var(--rule); } }
+
 /* legends */
 .legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; font-family: var(--mono); font-size: 9.5px; color: var(--dim); }
 .leg { display: inline-flex; align-items: center; gap: 6px; }

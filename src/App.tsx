@@ -3,6 +3,7 @@ import { loadWasm, Quantum, solveSpectrum, arrowheadModes, wignerRawOfRho, cavit
 
 // three.js is heavy and only used by the cavity regime — load it on demand
 const CavityScene = lazy(() => import("./cavity/CavityScene").then((m) => ({ default: m.CavityScene })));
+const LiveCavityScene = lazy(() => import("./cavity/LiveCavityScene").then((m) => ({ default: m.LiveCavityScene })));
 
 // ── Regime 1 (single emitter) ──
 const N_GRID = 100, X_RANGE = 5, DT_FRAME = 0.18, T_LOOP = 80, SERIES_MAX = 600, INV_PI = 1 / Math.PI;
@@ -674,16 +675,22 @@ export function App() {
               </div>
             </>
           ) : (
-            <>
-              <div className="pane grow">
-                <div className="pane-head">Live cavity dynamics · {dyn.m} molecules + 1 photon · excitation heat map (each row = one molecule)</div>
-                <canvas ref={heatCanvas} className="cv" />
+            <div className="dyn-split">
+              <div className="pane grow dyn-3d">
+                <div className="pane-head">Live cavity · {dyn.m} emitters + 1 photon · matter glows amber, field cobalt · drag to orbit</div>
+                <div className="live3d"><Suspense fallback={<div className="cv-loading">loading 3D…</div>}><LiveCavityScene stateRef={dynState} tRef={simT} m={dyn.m} /></Suspense></div>
               </div>
-              <div className="pane">
-                <div className="pane-head">Population — photon <i style={{ color: COBALT, fontStyle: "normal" }}>━</i> total molecular <i style={{ color: "#f59e0b", fontStyle: "normal" }}>━</i></div>
-                <canvas ref={popCanvas} className="cv" />
+              <div className="dyn-2d">
+                <div className="pane grow">
+                  <div className="pane-head">Excitation heat map · photon row + one row per molecule · time →</div>
+                  <canvas ref={heatCanvas} className="cv" />
+                </div>
+                <div className="pane">
+                  <div className="pane-head">Population — photon <i style={{ color: COBALT, fontStyle: "normal" }}>━</i> total molecular <i style={{ color: "#f59e0b", fontStyle: "normal" }}>━</i></div>
+                  <canvas ref={popCanvas} className="cv" />
+                </div>
               </div>
-            </>
+            </div>
           )}
         </main>
 
