@@ -13,8 +13,8 @@ import * as THREE from "three";
 type Dyn = { eigs: Float64Array; vecs: Float64Array; n: number; c: Float64Array; bright: Float64Array; modeAmp: Float64Array; hist: unknown } | null;
 
 const HALF = 4.3; // cavity half-length along x (mirror at ±HALF)
-// matter excitation: ground slate → coherent laser red → hot white. field: dim → stark cyan.
-const GROUND = new THREE.Color("#5a6470"), WARM = new THREE.Color("#ff3333"), HOT = new THREE.Color("#ffdcdc");
+// matter excitation: dim DARK-state purple → coherent laser red → hot white. field: dim → stark cyan.
+const GROUND = new THREE.Color("#5d4880"), WARM = new THREE.Color("#ff3333"), HOT = new THREE.Color("#ffe0e0");
 const COB_LO = new THREE.Color("#0a3a44"), COB_HI = new THREE.Color("#00ffff");
 
 // naphthalene carbon skeleton (two fused hexagons, bond-length units) + bonds — a real chromophore
@@ -60,7 +60,7 @@ function molValues(ds: NonNullable<Dyn>, inspK: number | null, t: number, m: num
   return out;
 }
 
-// excitation → glow colour: neutral carbon grey, mid amber, near-white hot. sqrt lifts small pops.
+// excitation → glow colour: dim dark-state purple, coherent laser red, near-white hot. sqrt lifts small pops.
 function heat(p: number, target: THREE.Color): THREE.Color {
   const v = Math.min(1, Math.sqrt(Math.max(0, p)));
   return v < 0.5 ? target.copy(GROUND).lerp(WARM, v / 0.5) : target.copy(WARM).lerp(HOT, (v - 0.5) / 0.5);
@@ -166,6 +166,35 @@ function Dipoles({ stateRef, tRef, inspectRef, m, film }: { stateRef: MutableRef
         <coneGeometry args={[0.058, 0.17, 10]} />
         <meshBasicMaterial toneMapped={false} />
       </instancedMesh>
+    </group>
+  );
+}
+
+// FIX 5/6 · volumetric TEM₀₀ standing wave: a stack of thin cyan disks along the cavity axis, each at
+// x_i with opacity ∝ |E(x_i)|² = sin²(qπ(x_i+H)/2H) — bright at the antinodes, dark at the nodes. The
+// overall brightness pulses with the live photon population √⟨a†a⟩, so the field disks brighten exactly
+// when the molecules go dark and vice-versa. Reads from the shared sim state only (no physics here).
+function FieldDisks({ stateRef, tRef, inspectRef, waist }: { stateRef: MutableRefObject<Dyn>; tRef: MutableRefObject<number>; inspectRef: MutableRefObject<number | null>; waist: number }) {
+  const N = 24, Q = 5;
+  const disks = useMemo(() => {
+    const out: { x: number; e2: number }[] = [];
+    for (let i = 0; i < N; i++) { const x = -HALF + (2 * HALF) * (i + 0.5) / N; out.push({ x, e2: Math.sin((Q * Math.PI * (x + HALF)) / (2 * HALF)) ** 2 }); }
+    return out;
+  }, []);
+  const mats = useRef<(THREE.MeshBasicMaterial | null)[]>([]);
+  useFrame(() => {
+    const ds = stateRef.current; if (!ds) return;
+    const amp = fieldAmp(ds, inspectRef.current, tRef.current); // P_photon amplitude
+    for (let i = 0; i < N; i++) { const m = mats.current[i]; if (m) m.opacity = 0.004 + 0.038 * disks[i]!.e2 * amp; }
+  });
+  return (
+    <group>
+      {disks.map((d, i) => (
+        <mesh key={i} position={[d.x, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+          <cylinderGeometry args={[waist * 0.82, waist * 0.82, 0.02, 40]} />
+          <meshBasicMaterial ref={(el) => { mats.current[i] = el; }} color="#00ffff" transparent opacity={0.02} side={THREE.DoubleSide} depthWrite={false} toneMapped={false} />
+        </mesh>
+      ))}
     </group>
   );
 }
@@ -283,6 +312,7 @@ export function LiveCavityScene({ stateRef, tRef, inspectRef, m, ensemble, waist
         <FieldLight stateRef={stateRef} tRef={tRef} inspectRef={inspectRef} />
         <Mirror side={-1} stateRef={stateRef} tRef={tRef} inspectRef={inspectRef} />
         <Mirror side={1} stateRef={stateRef} tRef={tRef} inspectRef={inspectRef} />
+        <FieldDisks stateRef={stateRef} tRef={tRef} inspectRef={inspectRef} waist={waist} />
         <PhotonMode stateRef={stateRef} tRef={tRef} inspectRef={inspectRef} waist={waist} />
         <PolarizationAxis theta={polTheta} />
         <Molecules stateRef={stateRef} tRef={tRef} inspectRef={inspectRef} m={m} film={film} />
