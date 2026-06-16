@@ -94,14 +94,18 @@ function Mode({ g }: { g: number }) {
 function Mirror({ side, g }: { side: 1 | -1; g: number }) {
   const amp = Math.min(1, 0.25 + 1.7 * Math.max(0, g));
   return (
-    <group position={[side * (HALF + 0.25), 0, 0]} rotation={[0, Math.PI / 2, 0]}>
-      <mesh castShadow receiveShadow>
-        <cylinderGeometry args={[1.9, 1.9, 0.34, 64]} />
-        <meshStandardMaterial color="#aeb9c9" metalness={0.92} roughness={0.06} envMapIntensity={1} emissive="#3b82f6" emissiveIntensity={0.08 + 0.7 * amp} />
+    <group position={[side * (HALF + 0.2), 0, 0]}>
+      <mesh castShadow receiveShadow rotation={[0, 0, Math.PI / 2]}>
+        <cylinderGeometry args={[1.95, 1.95, 0.2, 80]} />
+        <meshStandardMaterial color="#cdd6e1" metalness={1} roughness={0.045} envMapIntensity={1.35} />
       </mesh>
-      <mesh position={[0, side * 0.12, 0]}>
-        <torusGeometry args={[1.9, 0.12, 18, 72]} />
-        <meshStandardMaterial color="#caa36e" metalness={0.95} roughness={0.18} envMapIntensity={1} />
+      <mesh position={[-side * 0.11, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+        <cylinderGeometry args={[1.84, 1.84, 0.012, 64]} />
+        <meshStandardMaterial color="#16233e" metalness={0.5} roughness={0.3} emissive="#3b82f6" emissiveIntensity={0.04 + 0.6 * amp} transparent opacity={0.55} />
+      </mesh>
+      <mesh rotation={[0, Math.PI / 2, 0]}>
+        <torusGeometry args={[1.96, 0.085, 18, 84]} />
+        <meshStandardMaterial color="#39424f" metalness={0.85} roughness={0.32} envMapIntensity={0.9} />
       </mesh>
     </group>
   );
