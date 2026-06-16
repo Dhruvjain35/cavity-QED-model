@@ -280,6 +280,19 @@ pub fn htc_spectrum(w_c: f64, w_x: f64, w_v: f64, lambda: f64, g: f64, n_vib: us
     out
 }
 
+/// EXPLICIT N-molecule HTC absorption (exact, no 1/N shortcut) — flat [eigs (d), photon_frac (d),
+/// absorption (d)] with d = (n_mol+1)·n_vib^n_mol. Tractable for small n_mol only. See `htc::htc_multi`.
+#[wasm_bindgen]
+pub fn htc_spectrum_multi(w_c: f64, w_x: f64, w_v: f64, lambda: f64, g: f64, n_mol: usize, n_vib: usize) -> Vec<f64> {
+    let r = crate::htc::htc_multi(w_c, w_x, w_v, lambda, g, n_mol, n_vib);
+    let d = r.eigs.len();
+    let mut out = Vec::with_capacity(3 * d);
+    out.extend_from_slice(&r.eigs);
+    out.extend_from_slice(&r.photon_frac);
+    out.extend_from_slice(&r.absorption);
+    out
+}
+
 /// Analytic bare-molecule (g=0) Franck–Condon reference: flat [position (n_max), weight (n_max)].
 #[wasm_bindgen]
 pub fn htc_franck_condon(w_x: f64, w_v: f64, lambda: f64, n_max: usize) -> Vec<f64> {

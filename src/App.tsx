@@ -1,7 +1,9 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import katex from "katex";
 import "katex/dist/katex.min.css";
-import { loadWasm, Quantum, solveSpectrum, arrowheadModesGi, arrowheadMatrixGi, cavityPowerSpectrumGi, couplingSweepGi, htcSpectrum, htcFranckCondon, wignerRawOfRho, cavityLayers, cavityField, cavityReflectance, type SimParams } from "./quantum/engine";
+import { loadWasm, Quantum, solveSpectrum, arrowheadModesGi, arrowheadMatrixGi, cavityPowerSpectrumGi, couplingSweepGi, htcSpectrum, htcSpectrumMulti, htcFranckCondon, wignerRawOfRho, cavityLayers, cavityField, cavityReflectance, type SimParams } from "./quantum/engine";
+
+const HTC_EXPLICIT_CAP = 3; // N ≤ this → exact (N+1)·nv^N diagonalization; above → asymptotic 1/N decoupling
 import { buildEnsemble, brightWeights } from "./cavity/ensemble";
 
 const MODE_WAIST = 2.4; // TEM00 Gaussian mode waist w (length units of the molecular layout)
@@ -127,7 +129,7 @@ export function App() {
   const fftData = useRef<{ omega: Float64Array; power: Float64Array } | null>(null);
   const sweepData = useRef<{ gs: Float64Array; eigs: Float64Array[] } | null>(null);
   const htcCanvas = useRef<HTMLCanvasElement>(null);
-  const htcData = useRef<{ live: { eigs: Float64Array; photon: Float64Array; absorption: Float64Array }; fc: { pos: Float64Array; weight: Float64Array }; nVib: number } | null>(null);
+  const htcData = useRef<{ live: { eigs: Float64Array; photon: Float64Array; absorption: Float64Array }; fc: { pos: Float64Array; weight: Float64Array }; nVib: number; method: string } | null>(null);
   const offscreen = useRef<HTMLCanvasElement | null>(null), husimiOff = useRef<HTMLCanvasElement | null>(null), bridgeOff = useRef<HTMLCanvasElement | null>(null);
   const quantum = useRef<Quantum | null>(null);
   const raf = useRef<number>(0), dpr = useRef(1);
@@ -200,11 +202,20 @@ export function App() {
     if (regime !== "vibronic") return;
     loadWasm().then(() => {
       const S = htc.S, lambda = Math.sqrt(S), N = htc.N;
-      const nVib = Math.min(48, Math.max(10, Math.round(8 + 4 * S)));
-      // collective polaron decoupling: the bright polariton sees λ→λ/√N, g→g√N (Chem Rev §6.4)
-      const live = htcSpectrum(WA, WA, htc.wv, lambda / Math.sqrt(N), htc.g * Math.sqrt(N), nVib);
+      let live: { eigs: Float64Array; photon: Float64Array; absorption: Float64Array }, nVib: number, method: string;
+      if (N <= HTC_EXPLICIT_CAP) {
+        // EXACT N-body: build the full (N+1)·nv^N vibrational basis and diagonalize (no 1/N shortcut)
+        nVib = N === 1 ? Math.min(40, Math.max(10, Math.round(8 + 4 * S))) : N === 2 ? 12 : 6;
+        live = htcSpectrumMulti(WA, WA, htc.wv, lambda, htc.g, N, nVib);
+        method = `exact ${N}-body · dim ${(N + 1) * nVib ** N}`;
+      } else {
+        // asymptotic polaron decoupling for large N: bright polariton sees λ→λ/√N, g→g√N (Chem Rev §6.4)
+        nVib = Math.min(48, Math.max(10, Math.round(8 + 4 * S)));
+        live = htcSpectrum(WA, WA, htc.wv, lambda / Math.sqrt(N), htc.g * Math.sqrt(N), nVib);
+        method = `asymptotic 1/N (N>${HTC_EXPLICIT_CAP})`;
+      }
       const fc = htcFranckCondon(WA, htc.wv, lambda, 12);
-      htcData.current = { live, fc, nVib };
+      htcData.current = { live, fc, nVib, method };
       drawHtc(); updateHtcReadouts();
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -932,7 +943,7 @@ export function App() {
             </>
           ) : regime === "vibronic" ? (
             <div className="pane grow">
-              <div className="pane-head">Holstein-TC absorption · bare molecule <i style={{ color: "#94a3b8", fontStyle: "normal" }}>━</i> in-cavity / collective <i style={{ color: COBALT, fontStyle: "normal" }}>━</i> · vibronic sidebands at nω<sub>v</sub>; N→∞ collapses the bright sidebands (polaron decoupling)</div>
+              <div className="pane-head">Holstein-TC absorption · bare molecule <i style={{ color: "#94a3b8", fontStyle: "normal" }}>━</i> in-cavity / collective <i style={{ color: COBALT, fontStyle: "normal" }}>━</i> · solver: <i style={{ color: htc.N <= HTC_EXPLICIT_CAP ? EMERALD : AMBER, fontStyle: "normal" }}>{htc.N <= HTC_EXPLICIT_CAP ? `exact ${htc.N}-body diagonalization` : "asymptotic 1/N"}</i></div>
               <canvas ref={htcCanvas} className="cv" />
             </div>
           ) : dynSweep ? (

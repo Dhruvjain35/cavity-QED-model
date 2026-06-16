@@ -62,6 +62,70 @@ pub fn htc(w_c: f64, w_x: f64, w_v: f64, lambda: f64, g: f64, n_vib: usize) -> H
     Htc { eigs, photon_frac, absorption }
 }
 
+/// EXPLICIT N-molecule single-excitation HTC (identical molecules, uniform coupling g, one local
+/// vibration each). Basis: a photon sector (1 photon, all electronic ground) ⊕ N molecule-excited
+/// sectors, each tensored with nv^N vibrational configurations. Dim = (N+1)·nv^N — exact but only
+/// tractable for small N (the basis is exponential, NOT 28×28). The Holstein term displaces ONLY the
+/// excited molecule's own oscillator; the TC term is phonon-diagonal. Absorption is the COLLECTIVE
+/// in-phase bright transition |Σ_i⟨i,vib=0|ψ_k⟩|² from the cold ground, normalized. At N=1 this reduces
+/// exactly to `htc()`; at λ=0 the lower polariton sits at ω_c − g√N (collective vacuum Rabi).
+pub fn htc_multi(w_c: f64, w_x: f64, w_v: f64, lambda: f64, g: f64, n_mol: usize, n_vib: usize) -> Htc {
+    let nconf = n_vib.pow(n_mol as u32);
+    let dim = (n_mol + 1) * nconf;
+    let mut h = DMatrix::zeros(dim, dim);
+    let vib = |c: usize, i: usize| -> usize { (c / n_vib.pow(i as u32)) % n_vib };
+    let sum_vib = |c: usize| -> usize { (0..n_mol).map(|i| vib(c, i)).sum() };
+    // photon sector (s = 0): global index c
+    for c in 0..nconf {
+        h[(c, c)] = w_c + sum_vib(c) as f64 * w_v;
+    }
+    // molecule-excited sectors (s = 1..=N): global index s·nconf + c
+    for s in 1..=n_mol {
+        let mi = s - 1; // 0-based molecule index of this sector
+        let base = s * nconf;
+        let stride = n_vib.pow(mi as u32);
+        for c in 0..nconf {
+            h[(base + c, base + c)] = w_x + sum_vib(c) as f64 * w_v;
+            let v = vib(c, mi);
+            if v + 1 < n_vib {
+                let c2 = c + stride; // raise molecule mi's phonon by one
+                let el = lambda * w_v * ((v + 1) as f64).sqrt();
+                h[(base + c, base + c2)] = el;
+                h[(base + c2, base + c)] = el;
+            }
+            // Tavis–Cummings: photon sector ↔ this molecule sector, same vib config
+            h[(c, base + c)] = g;
+            h[(base + c, c)] = g;
+        }
+    }
+    let se = h.symmetric_eigen();
+    let mut idx: Vec<usize> = (0..dim).collect();
+    idx.sort_by(|&a, &b| se.eigenvalues[a].partial_cmp(&se.eigenvalues[b]).unwrap_or(std::cmp::Ordering::Equal));
+    let mut eigs = Vec::with_capacity(dim);
+    let mut photon_frac = Vec::with_capacity(dim);
+    let mut absorption = Vec::with_capacity(dim);
+    for &k in &idx {
+        eigs.push(se.eigenvalues[k]);
+        let mut pf = 0.0;
+        for c in 0..nconf {
+            pf += se.eigenvectors[(c, k)].powi(2);
+        }
+        photon_frac.push(pf);
+        let mut amp = 0.0;
+        for s in 1..=n_mol {
+            amp += se.eigenvectors[(s * nconf, k)]; // config 0 of each molecule sector, in-phase
+        }
+        absorption.push(amp * amp);
+    }
+    let tot: f64 = absorption.iter().sum();
+    if tot > 1e-12 {
+        for a in absorption.iter_mut() {
+            *a /= tot;
+        }
+    }
+    Htc { eigs, photon_frac, absorption }
+}
+
 /// Analytic bare-molecule (g=0) Franck–Condon progression — the validation oracle. Peaks at
 /// ω_x − Sω_v + nω_v with Poisson weights I_n = e^{−S}S^n/n! (S = λ²), computed iteratively.
 pub fn franck_condon(w_x: f64, w_v: f64, lambda: f64, n_max: usize) -> (Vec<f64>, Vec<f64>) {
