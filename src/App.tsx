@@ -1,5 +1,13 @@
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import katex from "katex";
+import "katex/dist/katex.min.css";
 import { loadWasm, Quantum, solveSpectrum, arrowheadModes, wignerRawOfRho, cavityLayers, cavityField, cavityReflectance, type SimParams } from "./quantum/engine";
+
+// Inline LaTeX via KaTeX — proper math symbols across the lab UI (no plain-text physics variables).
+function Tex({ t }: { t: string }) {
+  const html = useMemo(() => katex.renderToString(t, { throwOnError: false, displayMode: false }), [t]);
+  return <span className="tex" dangerouslySetInnerHTML={{ __html: html }} />;
+}
 
 // three.js is heavy and only used by the cavity regime — load it on demand
 const CavityScene = lazy(() => import("./cavity/CavityScene").then((m) => ({ default: m.CavityScene })));
@@ -563,15 +571,16 @@ export function App() {
     trace(1, AMBER, false);  // bright collective mode
     ctx.lineWidth = 0.75; ctx.strokeStyle = AXIS; ctx.strokeRect(PP_ML, PP_MT, PP_PW, PP_PH);
     ctx.fillStyle = INK; ctx.font = "italic 11px 'B612', sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
-    ctx.fillText("time →", PP_ML + PP_PW / 2, PP_CH - 8);
+    ctx.fillText("Rabi cycles  Ω_R t / 2π →", PP_ML + PP_PW / 2, PP_CH - 8);
     ctx.save(); ctx.translate(13, PP_MT + PP_PH / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top"; ctx.fillText("population", 0, 0); ctx.restore();
   }
 
   function updateSimReadouts(d: { ph: number; br: number; dk: number }) {
     const set = (k: string, v: string) => { const el = read.current[k]; if (el) el.textContent = v; };
     const ds = dynState.current; if (!ds) return;
-    const split = ds.eigs[ds.n - 1]! - ds.eigs[0]!; // LP→UP polariton splitting (≈ 2g√M on resonance)
-    set("simT", simT.current.toFixed(2)); set("simPh", d.ph.toFixed(4)); set("simBr", d.br.toFixed(4));
+    const split = ds.eigs[ds.n - 1]! - ds.eigs[0]!; // LP→UP polariton splitting Ω_R (≈ 2g√M on resonance)
+    const cycles = split * simT.current / (2 * Math.PI); // dimensionless time in vacuum-Rabi periods
+    set("simTau", cycles.toFixed(2)); set("simPh", d.ph.toFixed(4)); set("simBr", d.br.toFixed(4));
     set("simDk", d.dk.toFixed(4)); set("simRabi", fmt(split, 4)); set("simNorm", (d.ph + d.br + d.dk).toFixed(6));
   }
 
@@ -656,9 +665,9 @@ export function App() {
             </Group>
           ) : (
             <Group title="MOLECULAR ENSEMBLE" k="dyn" c={collapsed} t={toggle}>
-              <Field sym="N" label="molecules" value={dyn.m} min={2} max={40} step={1} unit="" int onChange={(m) => setDyn((s) => ({ ...s, m: Math.round(m) }))} />
-              <Field sym="g" label="coupling" value={dyn.g} min={0.01} max={0.2} step={0.005} unit="ω" onChange={(g) => setDyn((s) => ({ ...s, g }))} />
-              <Field sym="σ" label="energy disorder" value={dyn.sigma} min={0} max={0.25} step={0.005} unit="ω" onChange={(sigma) => setDyn((s) => ({ ...s, sigma }))} />
+              <Field sym="N" texSym="N" label="molecules" value={dyn.m} min={2} max={40} step={1} unit="" int onChange={(m) => setDyn((s) => ({ ...s, m: Math.round(m) }))} />
+              <Field sym="g" texSym="g" label="coupling" value={dyn.g} min={0.01} max={0.2} step={0.005} unit="ω" onChange={(g) => setDyn((s) => ({ ...s, g }))} />
+              <Field sym="σ" texSym="\sigma_\omega" label="inhomog. disorder" value={dyn.sigma} min={0} max={0.25} step={0.005} unit="ω" onChange={(sigma) => setDyn((s) => ({ ...s, sigma }))} />
               <div className="knob-top" style={{ marginBottom: 6 }}><span className="knob-name">initial excitation</span></div>
               <div className="btn-row">
                 <button className={dyn.init === 0 ? "on" : ""} onClick={() => setDyn((s) => ({ ...s, init: 0 }))}>PHOTON</button>
@@ -806,12 +815,12 @@ export function App() {
               <div className="pane">
                 <div className="pane-head">Live observables</div>
                 <table className="metrics"><tbody>
-                  <Row label={<>time <i>t</i></>} k="simT" r={read} unit="ω⁻¹" />
-                  <Row label={<><i>P</i> photon</>} k="simPh" r={read} />
-                  <Row label={<><i>P</i> bright</>} k="simBr" r={read} />
-                  <Row label={<><i>P</i> dark</>} k="simDk" r={read} />
-                  <Row label={<>Ω<sub>R</sub> · LP→UP</>} k="simRabi" r={read} unit="ω" />
-                  <Row label={<>norm Σ<i>P</i></>} k="simNorm" r={read} />
+                  <Row label={<Tex t="\tau = \Omega_R\,t/2\pi" />} k="simTau" r={read} unit="cyc" />
+                  <Row label={<Tex t="P_{\mathrm{photon}}" />} k="simPh" r={read} />
+                  <Row label={<Tex t="P_{\mathrm{bright}}" />} k="simBr" r={read} />
+                  <Row label={<Tex t="P_{\mathrm{dark}}" />} k="simDk" r={read} />
+                  <Row label={<Tex t="\Omega_R\;(\mathrm{LP}\!\to\!\mathrm{UP})" />} k="simRabi" r={read} unit="ω" />
+                  <Row label={<Tex t="\textstyle\sum_k P_k" />} k="simNorm" r={read} />
                 </tbody></table>
               </div>
               {Hud}
@@ -861,12 +870,12 @@ function Group({ title, k, c, t, children }: { title: string; k: string; c: Reco
     </div>
   );
 }
-function Field(props: { sym: string; label: string; value: number; min: number; max: number; step: number; unit: string; int?: boolean; onChange: (v: number) => void }) {
+function Field(props: { sym: string; texSym?: string; label: string; value: number; min: number; max: number; step: number; unit: string; int?: boolean; onChange: (v: number) => void }) {
   const show = props.int ? `${Math.round(props.value)}` : `${props.value}`;
   return (
     <div className="knob">
       <div className="knob-top">
-        <span className="knob-name"><i>{props.sym}</i> {props.label}</span>
+        <span className="knob-name">{props.texSym ? <Tex t={props.texSym} /> : <i>{props.sym}</i>} {props.label}</span>
         <span className="knob-entry">
           <input className="knob-input" type="number" min={props.min} max={props.max} step={props.step} value={show}
             onChange={(e) => { const v = Number(e.target.value); if (!Number.isNaN(v) && e.target.value !== "") props.onChange(clamp(v, props.min, props.max)); }} />
