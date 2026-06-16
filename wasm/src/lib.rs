@@ -9,6 +9,7 @@
 
 pub mod entropy;
 pub mod operators;
+pub mod optics;
 pub mod solver;
 pub mod spectrum;
 pub mod wigner;
