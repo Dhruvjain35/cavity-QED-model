@@ -1,6 +1,6 @@
 // Thin TS wrapper over the QuTiP-validated Rust→WASM core (sim/wasm/pkg-web).
 // All physics is computed in WASM; this only marshals parameters and the RGBA buffer.
-import init, { Sim, spectrum, arrowhead_modes, cavity_power_spectrum, coupling_sweep, wigner_rgba_of_rho, wigner_of_rho, cavity_layers, cavity_field, cavity_reflectance } from "../../wasm/pkg-web/cqed_core.js";
+import init, { Sim, spectrum, arrowhead_modes, arrowhead_modes_gi, cavity_power_spectrum, cavity_power_spectrum_gi, coupling_sweep, coupling_sweep_gi, wigner_rgba_of_rho, wigner_of_rho, cavity_layers, cavity_field, cavity_reflectance } from "../../wasm/pkg-web/cqed_core.js";
 
 let initPromise: Promise<unknown> | null = null;
 export function loadWasm(): Promise<unknown> {
@@ -83,6 +83,29 @@ export function couplingSweep(
     gs[s] = steps <= 1 ? g0 : g0 + (g1 - g0) * s / (steps - 1);
     eigs.push(flat.slice(s * k, s * k + k));
   }
+  return { gs, eigs };
+}
+
+/** Modes for explicit per-molecule couplings g_i (orientation/position-dependent), site energies from
+ *  (σ, seed). Returns eigenvalues + the (M+1)² eigenvector matrix. */
+export function arrowheadModesGi(wc: number, wa: number, sigma: number, seed: number, gi: Float64Array): { eigs: Float64Array; vecs: Float64Array; n: number } {
+  const flat = arrowhead_modes_gi(wc, wa, sigma, seed, gi);
+  const n = gi.length + 1;
+  return { eigs: flat.slice(0, n), vecs: flat.slice(n), n };
+}
+
+/** Power spectrum for per-molecule couplings g_i. */
+export function cavityPowerSpectrumGi(wc: number, wa: number, sigma: number, seed: number, gi: Float64Array, nFft: number, dt: number): { omega: Float64Array; power: Float64Array } {
+  const flat = cavity_power_spectrum_gi(wc, wa, sigma, seed, gi, nFft, dt);
+  const h = flat.length / 2;
+  return { omega: flat.slice(0, h), power: flat.slice(h) };
+}
+
+/** Coupling sweep for per-molecule geometry factors (g_i = g_0·factor_i). */
+export function couplingSweepGi(wc: number, wa: number, sigma: number, seed: number, factors: Float64Array, g0: number, g1: number, steps: number): { gs: Float64Array; eigs: Float64Array[] } {
+  const flat = coupling_sweep_gi(wc, wa, sigma, seed, factors, g0, g1, steps);
+  const k = factors.length + 1, eigs: Float64Array[] = [], gs = new Float64Array(steps);
+  for (let s = 0; s < steps; s++) { gs[s] = steps <= 1 ? g0 : g0 + (g1 - g0) * s / (steps - 1); eigs.push(flat.slice(s * k, s * k + k)); }
   return { gs, eigs };
 }
 

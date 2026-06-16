@@ -1,7 +1,10 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import katex from "katex";
 import "katex/dist/katex.min.css";
-import { loadWasm, Quantum, solveSpectrum, arrowheadModes, cavityPowerSpectrum, couplingSweep, wignerRawOfRho, cavityLayers, cavityField, cavityReflectance, type SimParams } from "./quantum/engine";
+import { loadWasm, Quantum, solveSpectrum, arrowheadModesGi, cavityPowerSpectrumGi, couplingSweepGi, wignerRawOfRho, cavityLayers, cavityField, cavityReflectance, type SimParams } from "./quantum/engine";
+import { buildEnsemble, brightWeights } from "./cavity/ensemble";
+
+const MODE_WAIST = 2.4; // TEM00 Gaussian mode waist w (length units of the molecular layout)
 
 // Inline LaTeX via KaTeX — proper math symbols across the lab UI (no plain-text physics variables).
 function Tex({ t }: { t: string }) {
@@ -93,10 +96,13 @@ export function App() {
   const [tol, setTol] = useState({ atol: 1e-6, rtol: 1e-6 });
   const [sp, setSp] = useState({ m: 20, g: 0.05, sigma: 0.0, seed: 1 });
   const [cav, setCav] = useState({ lambda: 550, nHi: 2.5, nLo: 1.46, pairs: 4, nCav: 1.6, g: 1.6 });
-  const [dyn, setDyn] = useState({ m: 12, g: 0.06, sigma: 0.04, seed: 1, init: 0 });
+  const [dyn, setDyn] = useState({ m: 12, g: 0.06, sigma: 0.04, seed: 1, init: 0, order: 0.7 });
   const [inspect, setInspect] = useState<number | null>(null); // clicked dressed eigenstate (UI badge)
   const [dynSweep, setDynSweep] = useState(false); // coupling-sweep dispersion mode (replaces the 3D)
   const [wcEv, setWcEv] = useState(2.0); // physical cavity-photon energy ℏω_c in eV (display scale only)
+  // the shared molecular ensemble (positions, dipoles, coupling factors) — feeds BOTH the WASM
+  // arrowhead and the 3D view, so orientation/position physics and visuals never diverge.
+  const ensemble = useMemo(() => buildEnsemble(dyn.m, dyn.seed, dyn.order, MODE_WAIST), [dyn.m, dyn.seed, dyn.order]);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [playing, setPlaying] = useState(true);
   const [fixedScale, setFixedScale] = useState(true);
@@ -109,7 +115,7 @@ export function App() {
   const rabiCanvas = useRef<HTMLCanvasElement>(null);
   const popCanvas = useRef<HTMLCanvasElement>(null);
   const hopCanvas = useRef<HTMLCanvasElement>(null);
-  const dynState = useRef<{ eigs: Float64Array; vecs: Float64Array; n: number; c: Float64Array; hist: Float64Array[] } | null>(null);
+  const dynState = useRef<{ eigs: Float64Array; vecs: Float64Array; n: number; c: Float64Array; bright: Float64Array; hist: Float64Array[] } | null>(null);
   const simT = useRef(0);
   const hopMarks = useRef<{ x: number; y: number; k: number }[]>([]);
   const inspectRef = useRef<number | null>(null); // dressed eigenstate frozen onto the 3D (null = live)
@@ -171,14 +177,15 @@ export function App() {
   useEffect(() => {
     if (regime !== "dynamics") return;
     loadWasm().then(() => {
-      const { eigs, vecs, n } = arrowheadModes(WA, WA, dyn.g, dyn.m, dyn.sigma, dyn.seed);
+      const gi = Float64Array.from(ensemble.factors, (f) => f * dyn.g); // g_i = g_0·(μ̂_i·ε̂)·f(r_i)
+      const { eigs, vecs, n } = arrowheadModesGi(WA, WA, dyn.sigma, dyn.seed, gi);
       const c = new Float64Array(n);
       for (let k = 0; k < n; k++) c[k] = vecs[dyn.init * n + k]!; // ⟨φ_k|ψ0⟩ for the chosen initial site
-      dynState.current = { eigs, vecs, n, c, hist: [] };
+      dynState.current = { eigs, vecs, n, c, bright: brightWeights(ensemble.factors), hist: [] };
       simT.current = 0;
       inspectRef.current = null; setInspect(null); // a new ensemble invalidates the inspected state
-      fftData.current = cavityPowerSpectrum(WA, WA, dyn.g, dyn.m, dyn.sigma, dyn.seed, FFT_N, FFT_DT);
-      sweepData.current = couplingSweep(WA, WA, dyn.m, dyn.sigma, dyn.seed, 0, SWEEP_GMAX, SWEEP_STEPS);
+      fftData.current = cavityPowerSpectrumGi(WA, WA, dyn.sigma, dyn.seed, gi, FFT_N, FFT_DT);
+      sweepData.current = couplingSweepGi(WA, WA, dyn.sigma, dyn.seed, ensemble.factors, 0, SWEEP_GMAX, SWEEP_STEPS);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [regime, dyn]);
@@ -508,11 +515,11 @@ export function App() {
   // couples to); the orthogonal remainder is the DARK manifold. Identical molecules ⇒ dark ≡ 0;
   // disorder leaks population bright→dark (verified vs WASM, norm conserved). Uniform g ⇒ b_i=1/√M.
   function decompAt(t: number): { ph: number; br: number; dk: number } {
-    const n = dynState.current!.n, M = n - 1, inv = 1 / Math.sqrt(M);
+    const ds = dynState.current!, n = ds.n, b = ds.bright; // b = g_i/‖g‖ (the true bright direction)
     const { re, im } = ampsAt(t);
     const ph = re[0]! * re[0]! + im[0]! * im[0]!;
     let reB = 0, imB = 0, pm = 0;
-    for (let i = 1; i < n; i++) { reB += inv * re[i]!; imB += inv * im[i]!; pm += re[i]! * re[i]! + im[i]! * im[i]!; }
+    for (let i = 1; i < n; i++) { const w = b[i - 1]!; reB += w * re[i]!; imB += w * im[i]!; pm += re[i]! * re[i]! + im[i]! * im[i]!; }
     const br = reB * reB + imB * imB;
     return { ph, br, dk: Math.max(0, pm - br) };
   }
@@ -744,6 +751,11 @@ export function App() {
               <Field sym="g" texSym="g_0" label="coupling" value={dyn.g} min={0.01} max={0.2} step={0.005} unit="ω_c" onChange={(g) => setDyn((s) => ({ ...s, g }))} />
               <Field sym="σ" texSym="\sigma_\omega" label="inhomog. disorder" value={dyn.sigma} min={0} max={0.25} step={0.005} unit="ω_c" onChange={(sigma) => setDyn((s) => ({ ...s, sigma }))} />
               <Field sym="ω" texSym="\hbar\omega_c" label="cavity energy" value={wcEv} min={0.5} max={4} step={0.05} unit="eV" onChange={setWcEv} />
+              <Field sym="η" texSym="\eta" label="dipole order" value={dyn.order} min={0} max={1} step={0.02} unit="" onChange={(order) => setDyn((s) => ({ ...s, order }))} />
+              <div className="btn-row">
+                <button className={dyn.order >= 0.999 ? "on" : ""} onClick={() => setDyn((s) => ({ ...s, order: 1 }))}>CRYSTAL</button>
+                <button className={dyn.order <= 0.15 ? "on" : ""} onClick={() => setDyn((s) => ({ ...s, order: 0.1 }))}>AMORPHOUS</button>
+              </div>
               <div className="knob-top" style={{ marginBottom: 6 }}><span className="knob-name">initial excitation</span></div>
               <div className="btn-row">
                 <button className={dyn.init === 0 ? "on" : ""} onClick={() => setDyn((s) => ({ ...s, init: 0 }))}>PHOTON</button>
@@ -822,7 +834,7 @@ export function App() {
             <div className="dyn-bento">
               <div className="pane bento-3d">
                 <div className="pane-head">Live cavity · {dyn.m} naphthalene emitters + 1 photon{inspect != null ? <> · <i style={{ color: "#fff", fontStyle: "normal" }}>inspecting eigenstate #{inspect}</i></> : <> · matter amber · field cobalt · dipoles <i style={{ color: "#4fcabe", fontStyle: "normal" }}>μ</i></>}</div>
-                <div className="live3d"><Suspense fallback={<div className="cv-loading">loading 3D…</div>}><LiveCavityScene stateRef={dynState} tRef={simT} m={dyn.m} inspectRef={inspectRef} sigma={dyn.sigma} /></Suspense></div>
+                <div className="live3d"><Suspense fallback={<div className="cv-loading">loading 3D…</div>}><LiveCavityScene stateRef={dynState} tRef={simT} m={dyn.m} inspectRef={inspectRef} ensemble={ensemble} waist={MODE_WAIST} /></Suspense></div>
               </div>
               <div className="pane">
                 <div className="pane-head">Populations — photon <i style={{ color: COBALT, fontStyle: "normal" }}>━</i> bright <i style={{ color: AMBER, fontStyle: "normal" }}>━</i> dark <i style={{ color: DARKC, fontStyle: "normal" }}>━</i></div>

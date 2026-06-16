@@ -10,7 +10,7 @@ import { Bloom, EffectComposer } from "@react-three/postprocessing";
 import { MutableRefObject, useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 
-type Dyn = { eigs: Float64Array; vecs: Float64Array; n: number; c: Float64Array; hist: unknown } | null;
+type Dyn = { eigs: Float64Array; vecs: Float64Array; n: number; c: Float64Array; bright: Float64Array; hist: unknown } | null;
 
 const HALF = 4.3; // cavity half-length along x (mirror at ±HALF)
 const GROUND = new THREE.Color("#828c9b"), WARM = new THREE.Color("#f7a516"), HOT = new THREE.Color("#fff4d4");
@@ -65,42 +65,31 @@ function heat(p: number, target: THREE.Color): THREE.Color {
   return v < 0.5 ? target.copy(GROUND).lerp(WARM, v / 0.5) : target.copy(WARM).lerp(HOT, (v - 0.5) / 0.5);
 }
 
-// Lay out M naphthalene molecules as a film on the cavity mid-plane (x≈0 antinode): a tidy grid with a
-// deterministic random orientation + jitter per molecule, so it reads as a real molecular layer.
-// Returns flat instance transforms for every atom and bond, tagged with their parent molecule index.
-function buildFilm(m: number) {
-  const S = 0.18, gap = 1.1, jit = 0.4;
-  const cols = Math.max(1, Math.ceil(Math.sqrt(m))), rows = Math.ceil(m / cols);
-  const up = new THREE.Vector3(0, 1, 0);
+type Ens = { m: number; centers: [number, number, number][]; dipoles: [number, number, number][]; factors: Float64Array };
+
+// Build the ball-and-stick geometry from the SHARED ensemble: each molecule sits at its real position
+// and is oriented so its long molecular axis lies along its transition dipole μ̂_i — so a dipole that
+// the engine sees as decoupled (μ̂ ⟂ field) is literally drawn turned sideways to the cavity mode.
+function buildFilm(ens: Ens) {
+  const S = 0.18, xaxis = new THREE.Vector3(1, 0, 0), up = new THREE.Vector3(0, 1, 0);
   const atoms: { p: THREE.Vector3; mol: number }[] = [];
   const bonds: { p: THREE.Vector3; q: THREE.Quaternion; len: number; mol: number }[] = [];
-  const mols: { center: THREE.Vector3; rand: THREE.Vector3 }[] = [];
-  for (let mi = 0; mi < m; mi++) {
-    const r = Math.floor(mi / cols), col = mi % cols, h = ((mi + 1) * 2654435761) >>> 0;
-    const center = new THREE.Vector3(
-      ((h % 1000) / 1000 - 0.5) * jit,
-      (r - (rows - 1) / 2) * gap,
-      (col - (cols - 1) / 2) * gap,
-    );
-    const rot = new THREE.Matrix4().makeRotationFromEuler(
-      new THREE.Euler((h % 628) / 100, ((h >> 4) % 628) / 100, ((h >> 8) % 628) / 100),
-    );
-    const w = CARB.map(([x, y]) => new THREE.Vector3(x * S, y * S, 0).applyMatrix4(rot).add(center));
+  const mols: { center: THREE.Vector3; dir: THREE.Vector3 }[] = [];
+  for (let mi = 0; mi < ens.m; mi++) {
+    const center = new THREE.Vector3(...ens.centers[mi]!);
+    const dir = new THREE.Vector3(...ens.dipoles[mi]!).normalize();
+    const rot = new THREE.Quaternion().setFromUnitVectors(xaxis, dir); // long axis → μ̂_i
+    const w = CARB.map(([x, y]) => new THREE.Vector3(x * S, y * S, 0).applyQuaternion(rot).add(center));
     w.forEach((p) => atoms.push({ p, mol: mi }));
     BONDS.forEach(([a, b]) => {
-      const pa = w[a]!, pb = w[b]!, dir = new THREE.Vector3().subVectors(pb, pa), len = dir.length();
-      bonds.push({
-        p: new THREE.Vector3().addVectors(pa, pb).multiplyScalar(0.5),
-        q: new THREE.Quaternion().setFromUnitVectors(up, dir.clone().normalize()),
-        len, mol: mi,
-      });
+      const pa = w[a]!, pb = w[b]!, d = new THREE.Vector3().subVectors(pb, pa), len = d.length();
+      bonds.push({ p: new THREE.Vector3().addVectors(pa, pb).multiplyScalar(0.5), q: new THREE.Quaternion().setFromUnitVectors(up, d.clone().normalize()), len, mol: mi });
     });
-    const a1 = ((h >> 12) % 628) / 100, a2 = ((h >> 18) % 314) / 100; // deterministic random unit vector
-    mols.push({ center: center.clone(), rand: new THREE.Vector3(Math.sin(a2) * Math.cos(a1), Math.cos(a2), Math.sin(a2) * Math.sin(a1)) });
+    mols.push({ center, dir });
   }
   return { atoms, bonds, mols };
 }
-const DIP = new THREE.Color("#4fcabe"), DIP_HOT = new THREE.Color("#eafff6"), POLAR = new THREE.Vector3(0, 1, 0);
+const DIP = new THREE.Color("#4fcabe"), DIP_HOT = new THREE.Color("#eafff6");
 
 type Film = ReturnType<typeof buildFilm>;
 
@@ -139,21 +128,17 @@ function Molecules({ stateRef, tRef, inspectRef, m, film }: { stateRef: MutableR
   );
 }
 
-// Transition-dipole moments μᵢ as glowing cyan arrows on each molecule. At σ=0 the engine's coupling
-// is uniform → all dipoles align with the cavity field polarization (ŷ, the standing-wave axis):
-// crisp parallel arrows, the cooperative limit. As energy disorder σ rises the arrows fan toward each
-// molecule's random orientation — the visual of an orientationally disordered film. Arrows brighten
-// with the molecule's live excitation.
-function Dipoles({ stateRef, tRef, inspectRef, m, film, spread }: { stateRef: MutableRefObject<Dyn>; tRef: MutableRefObject<number>; inspectRef: MutableRefObject<number | null>; m: number; film: Film; spread: number }) {
+// Transition-dipole moments μ̂ᵢ as glowing cyan arrows — the SAME vectors that set each molecule's
+// coupling g_i = g_0(μ̂_i·ε̂)f(r_i) in the Hamiltonian. At η=1 (crystal) all arrows point along the
+// field polarization ŷ (max coupling); as η→0 (amorphous) they tip toward random 3D orientations and
+// those molecules decouple — you watch the bright ensemble shed members into the dark manifold.
+function Dipoles({ stateRef, tRef, inspectRef, m, film }: { stateRef: MutableRefObject<Dyn>; tRef: MutableRefObject<number>; inspectRef: MutableRefObject<number | null>; m: number; film: Film }) {
   const shaftRef = useRef<THREE.InstancedMesh>(null), headRef = useRef<THREE.InstancedMesh>(null);
   const cc = useMemo(() => new THREE.Color(), []);
   const tf = useMemo(() => {
     const up = new THREE.Vector3(0, 1, 0), L = 0.82;
-    return film.mols.map((mol) => {
-      const dir = POLAR.clone().lerp(mol.rand, spread).normalize();
-      return { dir, q: new THREE.Quaternion().setFromUnitVectors(up, dir), center: mol.center, shaft: L * 0.72, tip: L * 0.72 + 0.085 };
-    });
-  }, [film, spread]);
+    return film.mols.map((mol) => ({ dir: mol.dir, q: new THREE.Quaternion().setFromUnitVectors(up, mol.dir), center: mol.center, shaft: L * 0.72, tip: L * 0.72 + 0.085 }));
+  }, [film]);
   useLayoutEffect(() => {
     const sM = shaftRef.current, hM = headRef.current; if (!sM || !hM) return;
     const d = new THREE.Object3D();
@@ -189,7 +174,7 @@ function Dipoles({ stateRef, tRef, inspectRef, m, film, spread }: { stateRef: Mu
 // Cavity photon mode: two crossed standing-wave tubes sin(qπ(x+H)/2H). Built once; each frame the
 // emissive cobalt brightness AND the transverse amplitude scale with √⟨a†a⟩ — full sine when the
 // photon is in the field, flat on the axis as it empties into the molecules.
-function PhotonMode({ stateRef, tRef, inspectRef }: { stateRef: MutableRefObject<Dyn>; tRef: MutableRefObject<number>; inspectRef: MutableRefObject<number | null> }) {
+function PhotonMode({ stateRef, tRef, inspectRef, waist }: { stateRef: MutableRefObject<Dyn>; tRef: MutableRefObject<number>; inspectRef: MutableRefObject<number | null>; waist: number }) {
   const geom = useMemo(() => {
     const SEG = 150, Q = 5, pts: THREE.Vector3[] = [];
     for (let i = 0; i <= SEG; i++) { const x = -HALF + (2 * HALF * i) / SEG; pts.push(new THREE.Vector3(x, Math.sin((Q * Math.PI * (x + HALF)) / (2 * HALF)), 0)); }
@@ -197,6 +182,7 @@ function PhotonMode({ stateRef, tRef, inspectRef }: { stateRef: MutableRefObject
   }, []);
   const gY = useRef<THREE.Mesh>(null), gZ = useRef<THREE.Mesh>(null);
   const mY = useRef<THREE.MeshStandardMaterial>(null), mZ = useRef<THREE.MeshStandardMaterial>(null);
+  const halo = useRef<THREE.MeshBasicMaterial>(null), haloIn = useRef<THREE.MeshBasicMaterial>(null);
   const col = useMemo(() => new THREE.Color(), []);
   useFrame(() => {
     const ds = stateRef.current; if (!ds) return;
@@ -206,9 +192,14 @@ function PhotonMode({ stateRef, tRef, inspectRef }: { stateRef: MutableRefObject
     for (const mr of [mY, mZ]) { const mt = mr.current; if (mt) { mt.color.copy(col); mt.emissive.copy(col); mt.emissiveIntensity = 0.04 + 1.7 * amp; } }
     if (gY.current) gY.current.scale.y = 0.012 + 0.99 * amp;
     if (gZ.current) gZ.current.scale.y = 0.012 + 0.99 * amp;
+    if (halo.current) halo.current.opacity = 0.015 + 0.05 * amp;
+    if (haloIn.current) haloIn.current.opacity = 0.03 + 0.1 * amp;
   });
   return (
     <group>
+      {/* TEM00 Gaussian mode volume — nested translucent shells (1/e radius = waist) brightening with the field */}
+      <mesh rotation={[0, 0, Math.PI / 2]}><cylinderGeometry args={[waist, waist, 2 * HALF, 40, 1, true]} /><meshBasicMaterial ref={halo} color="#3b82f6" transparent opacity={0.02} side={THREE.DoubleSide} depthWrite={false} toneMapped={false} /></mesh>
+      <mesh rotation={[0, 0, Math.PI / 2]}><cylinderGeometry args={[waist * 0.55, waist * 0.55, 2 * HALF, 36, 1, true]} /><meshBasicMaterial ref={haloIn} color="#5b9bff" transparent opacity={0.04} side={THREE.DoubleSide} depthWrite={false} toneMapped={false} /></mesh>
       <mesh ref={gY} geometry={geom}><meshStandardMaterial ref={mY} emissive="#3b82f6" emissiveIntensity={0.6} roughness={0.4} toneMapped={false} /></mesh>
       <mesh ref={gZ} geometry={geom} rotation={[Math.PI / 2, 0, 0]}><meshStandardMaterial ref={mZ} emissive="#3b82f6" emissiveIntensity={0.6} roughness={0.4} toneMapped={false} /></mesh>
     </group>
@@ -262,15 +253,14 @@ function Studio() {
   );
 }
 
-export function LiveCavityScene({ stateRef, tRef, inspectRef, m, sigma }: { stateRef: MutableRefObject<Dyn>; tRef: MutableRefObject<number>; inspectRef: MutableRefObject<number | null>; m: number; sigma: number }) {
-  const film = useMemo(() => buildFilm(m), [m]);
-  const spread = Math.min(1, sigma / 0.18); // σ=0 → dipoles aligned to field; σ≳0.18 → fully random
+export function LiveCavityScene({ stateRef, tRef, inspectRef, m, ensemble, waist }: { stateRef: MutableRefObject<Dyn>; tRef: MutableRefObject<number>; inspectRef: MutableRefObject<number | null>; m: number; ensemble: Ens; waist: number }) {
+  const film = useMemo(() => buildFilm(ensemble), [ensemble]);
   return (
     <div className="cav-stage">
       <div className="cav-tag cav-tag-l">mirror</div>
       <div className="cav-tag cav-tag-r">mirror</div>
-      <div className="cav-tag cav-tag-mode">ω<sub>c</sub> photon mode</div>
-      <div className="cav-tag cav-tag-mol">{m} naphthalene emitters</div>
+      <div className="cav-tag cav-tag-mode">ω<sub>c</sub> TEM₀₀ mode</div>
+      <div className="cav-tag cav-tag-mol">{m} naphthalene emitters · μ̂ → g<sub>i</sub></div>
       <Canvas shadows dpr={[1, 2]} gl={{ antialias: true, alpha: true }} camera={{ position: [9.2, 4.3, 10.4], fov: 33 }}>
         <PerspectiveCamera makeDefault fov={33} position={[9.2, 4.3, 10.4]} />
         <Studio />
@@ -279,9 +269,9 @@ export function LiveCavityScene({ stateRef, tRef, inspectRef, m, sigma }: { stat
         <FieldLight stateRef={stateRef} tRef={tRef} inspectRef={inspectRef} />
         <Mirror side={-1} stateRef={stateRef} tRef={tRef} inspectRef={inspectRef} />
         <Mirror side={1} stateRef={stateRef} tRef={tRef} inspectRef={inspectRef} />
-        <PhotonMode stateRef={stateRef} tRef={tRef} inspectRef={inspectRef} />
+        <PhotonMode stateRef={stateRef} tRef={tRef} inspectRef={inspectRef} waist={waist} />
         <Molecules stateRef={stateRef} tRef={tRef} inspectRef={inspectRef} m={m} film={film} />
-        <Dipoles stateRef={stateRef} tRef={tRef} inspectRef={inspectRef} m={m} film={film} spread={spread} />
+        <Dipoles stateRef={stateRef} tRef={tRef} inspectRef={inspectRef} m={m} film={film} />
         <ContactShadows position={[0, -2.7, 0]} scale={26} blur={2.8} far={6} opacity={0.42} resolution={1024} color="#02040a" />
         <Grid position={[0, -2.7, 0]} args={[28, 28]} cellSize={0.9} cellThickness={0.4} cellColor="#0f1825" sectionSize={4.5} sectionThickness={0.7} sectionColor="#223247" fadeDistance={34} fadeStrength={1.6} infiniteGrid />
         <EffectComposer>

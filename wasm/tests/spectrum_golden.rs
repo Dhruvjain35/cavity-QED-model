@@ -65,6 +65,22 @@ fn identical_resonant_gives_2g_sqrt_m_split_and_m_minus_1_dark() {
 }
 
 #[test]
+fn perpendicular_dipole_decouples_into_dark_manifold() {
+    // 4 resonant molecules with orientation/position-weighted couplings; molecule 2 has g=0 (dipole
+    // ⟂ field, or at a mode node) → it must decouple. The bright splitting is 2‖g‖, and there are
+    // exactly M−1 zero-photon dark states pinned at the bare energy.
+    let w0 = 1.0;
+    let g = vec![0.10, 0.08, 0.0, 0.12];
+    let s = solve(w0, &vec![w0; 4], &g);
+    let norm = g.iter().map(|x| x * x).sum::<f64>().sqrt();
+    let split = s.eigs[s.eigs.len() - 1] - s.eigs[0];
+    println!("split = {split:.6}   2‖g‖ = {:.6}", 2.0 * norm);
+    assert!((split - 2.0 * norm).abs() < 1e-12, "bright splitting {split} != 2‖g‖ {}", 2.0 * norm);
+    let dark = (0..s.eigs.len()).filter(|&k| (s.eigs[k] - w0).abs() < 1e-9 && s.photon_frac[k] < 1e-9).count();
+    assert_eq!(dark, 3, "expected M−1=3 zero-photon dark states (incl. the decoupled molecule), got {dark}");
+}
+
+#[test]
 fn vacuum_rabi_oscillation_matches_analytic() {
     // 1 photon into M identical resonant molecules → the cavity population is the exact
     // single-excitation vacuum-Rabi law pop_cav(t) = cos²(g√M·t). Reconstruct ψ(t) from the modes.

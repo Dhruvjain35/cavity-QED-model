@@ -166,6 +166,55 @@ pub fn arrowhead_modes(w_c: f64, w_a: f64, g: f64, m: usize, sigma: f64, seed: f
     out
 }
 
+/// Eigen-modes for PER-MOLECULE couplings g_i (orientation- and position-dependent). Site energies
+/// w_i come from Gaussian energy disorder (w_a + σ·N(0,1)); the couplings g_i are passed in directly
+/// (g_i = g_0·(μ̂_i·ε̂)·f(r_i), computed in the UI from the shared ensemble). Returns the same flat
+/// [eigs(M+1), then (M+1)² eigenvectors] as `arrowhead_modes`. A perpendicular dipole (g_i=0) yields a
+/// dark eigenstate localized on that molecule — the physics is identical to the validated arrowhead.
+#[wasm_bindgen]
+pub fn arrowhead_modes_gi(w_c: f64, w_a: f64, sigma: f64, seed: f64, gi: &[f64]) -> Vec<f64> {
+    let m = gi.len();
+    let z = crate::spectrum::gaussians(seed as u64, m);
+    let w: Vec<f64> = z.iter().map(|zi| w_a + sigma * zi).collect();
+    let md = crate::spectrum::modes(w_c, &w, gi);
+    let mut out = Vec::with_capacity(md.eigs.len() + md.vecs.len());
+    out.extend_from_slice(&md.eigs);
+    out.extend_from_slice(&md.vecs);
+    out
+}
+
+/// Cavity power spectrum for per-molecule couplings g_i — flat [ω (n/2), power (n/2)]. As above, w_i
+/// from (σ, seed); the doublet collapses as orientational/spatial disorder weakens the bright coupling.
+#[wasm_bindgen]
+pub fn cavity_power_spectrum_gi(w_c: f64, w_a: f64, sigma: f64, seed: f64, gi: &[f64], n_fft: usize, dt: f64) -> Vec<f64> {
+    let m = gi.len();
+    let z = crate::spectrum::gaussians(seed as u64, m);
+    let w: Vec<f64> = z.iter().map(|zi| w_a + sigma * zi).collect();
+    let s = crate::spectrum::solve(w_c, &w, gi);
+    let (freqs, power) = crate::fft::power_spectrum(&s.eigs, &s.photon_frac, n_fft, dt);
+    let mut out = Vec::with_capacity(freqs.len() + power.len());
+    out.extend_from_slice(&freqs);
+    out.extend_from_slice(&power);
+    out
+}
+
+/// Coupling sweep for per-molecule geometry: g_i(g_0) = g_0·`factors[i]`. Returns the (M+1) energies
+/// at each of `steps` values of g_0 in [g0, g1], flat row-major. The dispersion fan with realistic
+/// (orientation/position-weighted) collective coupling.
+#[wasm_bindgen]
+pub fn coupling_sweep_gi(w_c: f64, w_a: f64, sigma: f64, seed: f64, factors: &[f64], g0: f64, g1: f64, steps: usize) -> Vec<f64> {
+    let m = factors.len();
+    let z = crate::spectrum::gaussians(seed as u64, m);
+    let w: Vec<f64> = z.iter().map(|zi| w_a + sigma * zi).collect();
+    let mut out = Vec::with_capacity(steps * (m + 1));
+    for sidx in 0..steps {
+        let g = if steps <= 1 { g0 } else { g0 + (g1 - g0) * sidx as f64 / (steps as f64 - 1.0) };
+        let gi: Vec<f64> = factors.iter().map(|f| g * f).collect();
+        out.extend_from_slice(&crate::spectrum::solve(w_c, &w, &gi).eigs);
+    }
+    out
+}
+
 /// Single-excitation arrowhead spectrum (Regime 2) for M emitters with Gaussian energy disorder.
 /// Returns a flat `Float64Array` of length 2·(M+1): the (M+1) eigenvalues (ascending), then the
 /// (M+1) Hopfield photon fractions in the same order. `seed` fixes the disorder realization so a
