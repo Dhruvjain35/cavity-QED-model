@@ -1,6 +1,6 @@
 // Thin TS wrapper over the QuTiP-validated Rust→WASM core (sim/wasm/pkg-web).
 // All physics is computed in WASM; this only marshals parameters and the RGBA buffer.
-import init, { Sim, spectrum, wigner_rgba_of_rho, wigner_of_rho } from "../../wasm/pkg-web/cqed_core.js";
+import init, { Sim, spectrum, wigner_rgba_of_rho, wigner_of_rho, cavity_layers, cavity_field, cavity_reflectance } from "../../wasm/pkg-web/cqed_core.js";
 
 let initPromise: Promise<unknown> | null = null;
 export function loadWasm(): Promise<unknown> {
@@ -20,6 +20,25 @@ export function wignerRgbaOfRho(
  *  mapping is left to the caller (the dark-theme colormap lives in the UI). */
 export function wignerRawOfRho(re: Float64Array, im: Float64Array, dim: number, n: number): Float64Array {
   return wigner_of_rho(re, im, dim, -5, 5, n);
+}
+
+// ── Cavity cross-section (transfer-matrix optics) ──
+/** DBR-cavity layer stack as [{n, d_nm}, …] (index + thickness in nm). */
+export function cavityLayers(lambda: number, nHi: number, nLo: number, pairs: number, nCav: number): { n: number; d: number }[] {
+  const flat = cavity_layers(lambda, nHi, nLo, pairs, nCav);
+  const out: { n: number; d: number }[] = [];
+  for (let k = 0; k < flat.length; k += 2) out.push({ n: flat[k]!, d: flat[k + 1]! });
+  return out;
+}
+/** |E(z)|² standing-wave field across the stack. */
+export function cavityField(lambda: number, nHi: number, nLo: number, pairs: number, nCav: number, n0: number, ns: number, perLayer: number): { z: Float64Array; intensity: Float64Array } {
+  const f = cavity_field(lambda, nHi, nLo, pairs, nCav, n0, ns, perLayer);
+  const n = f.length / 2;
+  return { z: f.slice(0, n), intensity: f.slice(n) };
+}
+/** Power reflectance R(λ) of the DBR cavity. */
+export function cavityReflectance(lambda: number, nHi: number, nLo: number, pairs: number, nCav: number, n0: number, ns: number): number {
+  return cavity_reflectance(lambda, nHi, nLo, pairs, nCav, n0, ns);
 }
 
 /** One arrowhead diagonalization (Regime 2): M emitters at w_a with Gaussian disorder σ, coupling g,

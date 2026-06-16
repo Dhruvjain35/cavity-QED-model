@@ -38,6 +38,20 @@ body { background: var(--bg); color: var(--ink); font-family: var(--serif); -web
 .cv.click { cursor: crosshair; }
 .phase-row { display: flex; gap: 10px; flex-wrap: wrap; }
 
+/* legends */
+.legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; font-family: var(--mono); font-size: 9.5px; color: var(--dim); }
+.leg { display: inline-flex; align-items: center; gap: 6px; }
+.leg::before { content: ""; width: 13px; height: 2px; display: inline-block; }
+.leg-n::before { background: var(--cobalt); }
+.leg-pe::before { background: var(--crimson); }
+.leg-dark::before { background: #475569; }
+.leg-pol::before { background: var(--cobalt); }
+.leg-dash::before { background: none; height: 0; border-top: 1.5px dashed var(--axis); }
+.leg-sel::before { background: none; width: 10px; height: 10px; border: 1.6px solid var(--amber); border-radius: 50%; }
+.leg-band::before { background: #3a5a8c; }
+.leg-field::before { background: var(--amber); }
+.leg-mol::before { width: 8px; height: 8px; border-radius: 50%; background: #e2e8f0; }
+
 /* rail — configuration tree */
 .rail-head { font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.12em; color: var(--faint); padding: 11px 13px 8px; border-bottom: 1px solid var(--rule); }
 .regime-toggle { display: flex; margin: 10px 13px; border: 1px solid var(--rule); }

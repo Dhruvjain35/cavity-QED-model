@@ -166,6 +166,36 @@ pub fn spectrum(w_c: f64, w_a: f64, g: f64, m: usize, sigma: f64, seed: f64) -> 
     out
 }
 
+// ── Cavity cross-section (transfer-matrix optics) ──────────────────────────────
+/// DBR-cavity layer stack as a flat [n_0, d_0, n_1, d_1, …] array (index, thickness in nm).
+#[wasm_bindgen]
+pub fn cavity_layers(lambda: f64, n_hi: f64, n_lo: f64, pairs: usize, n_cav: f64) -> Vec<f64> {
+    let mut out = Vec::new();
+    for l in crate::optics::dbr_cavity(lambda, n_hi, n_lo, pairs, n_cav) {
+        out.push(l.n);
+        out.push(l.d_nm);
+    }
+    out
+}
+
+/// |E(z)|² standing-wave field across the stack as a flat [z_0…z_{N-1}, i_0…i_{N-1}] array
+/// (`per_layer` samples per layer), with incident index `n0` and substrate `ns`.
+#[wasm_bindgen]
+pub fn cavity_field(lambda: f64, n_hi: f64, n_lo: f64, pairs: usize, n_cav: f64, n0: f64, ns: f64, per_layer: usize) -> Vec<f64> {
+    let stack = crate::optics::dbr_cavity(lambda, n_hi, n_lo, pairs, n_cav);
+    let (z, i) = crate::optics::field_profile(&stack, lambda, n0, ns, per_layer);
+    let mut out = Vec::with_capacity(z.len() + i.len());
+    out.extend_from_slice(&z);
+    out.extend_from_slice(&i);
+    out
+}
+
+/// Power reflectance R(λ) of the DBR cavity at wavelength `lambda` (nm).
+#[wasm_bindgen]
+pub fn cavity_reflectance(lambda: f64, n_hi: f64, n_lo: f64, pairs: usize, n_cav: f64, n0: f64, ns: f64) -> f64 {
+    crate::optics::reflectance(&crate::optics::dbr_cavity(lambda, n_hi, n_lo, pairs, n_cav), lambda, n0, ns)
+}
+
 fn linspace(a: f64, b: f64, n: usize) -> Vec<f64> {
     if n < 2 {
         return vec![a];
