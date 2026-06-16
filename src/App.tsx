@@ -107,6 +107,7 @@ export function App() {
   const [inspect, setInspect] = useState<number | null>(null); // clicked dressed eigenstate (UI badge)
   const [dynSweep, setDynSweep] = useState(false); // coupling-sweep dispersion mode (replaces the 3D)
   const [wcEv, setWcEv] = useState(2.0); // physical cavity-photon energy ℏω_c in eV (display scale only)
+  const [regLog, setRegLog] = useState<string[]>([]); // in-browser regression console output
   // the shared molecular ensemble (positions, dipoles, coupling factors) — feeds BOTH the WASM
   // arrowhead and the 3D view, so orientation/position physics and visuals never diverge.
   const ensemble = useMemo(() => buildEnsemble(dyn.m, dyn.seed, dyn.order, MODE_WAIST, dyn.theta * Math.PI / 180), [dyn.m, dyn.seed, dyn.order, dyn.theta]);
@@ -801,6 +802,31 @@ export function App() {
     const a = document.createElement("a"); a.href = cv.toDataURL("image/png"); a.download = `${regime}.png`; a.click();
   }
 
+  // Upgrade IV · live regression suite: recompute known closed-form results across the WASM boundary
+  // and report the variance vs the analytic reference. Validation as code, run on demand in-browser.
+  function runRegression() {
+    setRegLog(["running…"]);
+    loadWasm().then(() => {
+      const lines: string[] = []; let pass = 0, tot = 0;
+      const check = (name: string, val: number, ref: number, tol: number) => {
+        const err = Math.abs(val - ref), ok = err < tol; tot++; if (ok) pass++;
+        lines.push(`${String(tot).padStart(2, "0")} ${name}  Δ=${err.toExponential(1)}  ${ok ? "PASS" : "FAIL"}`);
+      };
+      const M = 8, g = 0.05, gi = new Float64Array(M).fill(g); // identical resonant aligned emitters
+      const md = arrowheadModesGi(WA, WA, 0, 1, gi);
+      check("Rabi split Ω_R=2g√M", md.eigs[md.n - 1]! - md.eigs[0]!, 2 * g * Math.sqrt(M), 1e-9);
+      let nd = 0; for (let k = 0; k < md.n; k++) if (Math.abs(md.eigs[k]! - WA) < 1e-9 && md.vecs[k]! ** 2 < 1e-9) nd++;
+      check("dark states = M−1", nd, M - 1, 0.5);
+      const S = 1, wv = 0.2, h0 = htcSpectrum(WA, WA, wv, Math.sqrt(S), 0, 28);
+      let bi = 0, asum = 0; for (let i = 0; i < h0.eigs.length; i++) { asum += h0.absorption[i]!; if (h0.absorption[i]! > h0.absorption[bi]!) bi = i; }
+      check("HTC 0–0 = ω_x−Sω_v", h0.eigs[bi]!, WA - S * wv, 1e-3);
+      check("HTC Σ Aₖ = 1 (sum rule)", asum, 1, 1e-6);
+      const hm = htcSpectrumMulti(WA, WA, wv, 0, g, 3, 6);
+      check("HTC collective LP = ω_c−g√N", hm.eigs[0]!, WA - g * Math.sqrt(3), 1e-9);
+      setRegLog([`${pass}/${tot} PASSED · live WASM vs analytic`, ...lines]);
+    });
+  }
+
   function exportHamiltonian() {
     const gi = Float64Array.from(ensemble.factors, (f) => f * dyn.g);
     const { h, n } = arrowheadMatrixGi(WA, WA, dyn.sigma, dyn.seed, gi);
@@ -814,6 +840,10 @@ export function App() {
         <Row label={<>operators</>} v="1e−16" /><Row label={<>mesolve ⟨·⟩</>} v="7e−9" />
         <Row label={<>Wigner</>} v="2e−16" /><Row label={<>arrowhead</>} v="1e−10" />
       </tbody></table>
+      <div className="btn-row">
+        <button onClick={runRegression} title="recompute closed-form results across the WASM boundary">RUN REGRESSION</button>
+      </div>
+      {regLog.length ? <div className="reg-console">{regLog.map((l, i) => <div key={i} className={l.includes("FAIL") ? "reg-fail" : l.includes("PASS") ? "reg-pass" : "reg-head"}>{l}</div>)}</div> : null}
       <div className="btn-row">
         <button onClick={exportCSV}>CSV</button><button onClick={exportJSON}>JSON</button><button onClick={exportPNG}>PNG</button>
         {regime === "dynamics" ? <button onClick={exportHamiltonian} title="exact (N+1)×(N+1) Hamiltonian → np.load()">Ĥ.npy</button> : null}

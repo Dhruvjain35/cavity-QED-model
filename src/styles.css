@@ -132,6 +132,10 @@ table.metrics { width: 100%; border-collapse: collapse; }
 
 /* validation HUD */
 .hud .hud-pass { font-family: var(--mono); font-size: 10px; color: var(--emerald); margin-top: 8px; }
+.reg-console { font-family: var(--mono); font-size: 9px; line-height: 1.5; background: #05080f; border: 1px solid var(--rule); border-radius: 2px; padding: 6px 7px; margin: 6px 0; max-height: 132px; overflow-y: auto; white-space: pre; }
+.reg-console .reg-head { color: var(--ink); font-weight: 600; margin-bottom: 2px; }
+.reg-console .reg-pass { color: var(--emerald); }
+.reg-console .reg-fail { color: var(--crimson); }
 
 /* dark scrollbars */
 .rail::-webkit-scrollbar, .dock::-webkit-scrollbar, .center::-webkit-scrollbar { width: 8px; }
