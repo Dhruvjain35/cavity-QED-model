@@ -14,7 +14,7 @@ type Dyn = { eigs: Float64Array; vecs: Float64Array; n: number; c: Float64Array;
 
 const HALF = 4.3; // cavity half-length along x (mirror at ±HALF)
 const GROUND = new THREE.Color("#828c9b"), WARM = new THREE.Color("#f7a516"), HOT = new THREE.Color("#fff4d4");
-const COB_LO = new THREE.Color("#162a4a"), COB_HI = new THREE.Color("#6fa8ff");
+const COB_LO = new THREE.Color("#1c3358"), COB_HI = new THREE.Color("#8fd0ff");
 
 // naphthalene carbon skeleton (two fused hexagons, bond-length units) + bonds — a real chromophore
 const CARB = [
@@ -178,7 +178,7 @@ function PhotonMode({ stateRef, tRef, inspectRef, waist }: { stateRef: MutableRe
   const geom = useMemo(() => {
     const SEG = 150, Q = 5, pts: THREE.Vector3[] = [];
     for (let i = 0; i <= SEG; i++) { const x = -HALF + (2 * HALF * i) / SEG; pts.push(new THREE.Vector3(x, Math.sin((Q * Math.PI * (x + HALF)) / (2 * HALF)), 0)); }
-    return new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), SEG, 0.034, 8, false);
+    return new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), SEG, 0.05, 10, false);
   }, []);
   const gY = useRef<THREE.Mesh>(null), gZ = useRef<THREE.Mesh>(null);
   const mY = useRef<THREE.MeshStandardMaterial>(null), mZ = useRef<THREE.MeshStandardMaterial>(null);
@@ -189,7 +189,7 @@ function PhotonMode({ stateRef, tRef, inspectRef, waist }: { stateRef: MutableRe
     // amplitude AND brightness are the real field √⟨a†a⟩ — when the photon empties into the matter
     // (or a dark state is inspected) the standing wave collapses to a flat line on the cavity axis.
     const amp = fieldAmp(ds, inspectRef.current, tRef.current); col.copy(COB_LO).lerp(COB_HI, amp);
-    for (const mr of [mY, mZ]) { const mt = mr.current; if (mt) { mt.color.copy(col); mt.emissive.copy(col); mt.emissiveIntensity = 0.04 + 1.7 * amp; } }
+    for (const mr of [mY, mZ]) { const mt = mr.current; if (mt) { mt.color.copy(col); mt.emissive.copy(col); mt.emissiveIntensity = 0.1 + 2.4 * amp; } }
     if (gY.current) gY.current.scale.y = 0.012 + 0.99 * amp;
     if (gZ.current) gZ.current.scale.y = 0.012 + 0.99 * amp;
     if (halo.current) halo.current.opacity = 0.015 + 0.05 * amp;
@@ -261,8 +261,8 @@ export function LiveCavityScene({ stateRef, tRef, inspectRef, m, ensemble, waist
       <div className="cav-tag cav-tag-r">mirror</div>
       <div className="cav-tag cav-tag-mode">ω<sub>c</sub> TEM₀₀ mode</div>
       <div className="cav-tag cav-tag-mol">{m} naphthalene emitters · μ̂ → g<sub>i</sub></div>
-      <Canvas shadows dpr={[1, 2]} gl={{ antialias: true, alpha: true }} camera={{ position: [9.2, 4.3, 10.4], fov: 33 }}>
-        <PerspectiveCamera makeDefault fov={33} position={[9.2, 4.3, 10.4]} />
+      <Canvas shadows dpr={[1, 2]} gl={{ antialias: true, alpha: true }} camera={{ position: [8.3, 3.9, 9.4], fov: 33 }}>
+        <PerspectiveCamera makeDefault fov={33} position={[8.3, 3.9, 9.4]} />
         <Studio />
         <ambientLight intensity={0.26} />
         <directionalLight castShadow intensity={0.5} position={[5, 8, 6]} shadow-mapSize={[1024, 1024]} shadow-bias={-0.0001} />

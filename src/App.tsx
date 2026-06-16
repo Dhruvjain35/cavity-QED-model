@@ -761,7 +761,6 @@ export function App() {
         <Row label={<>operators</>} v="1e−16" /><Row label={<>mesolve ⟨·⟩</>} v="7e−9" />
         <Row label={<>Wigner</>} v="2e−16" /><Row label={<>arrowhead</>} v="1e−10" />
       </tbody></table>
-      <div className="hud-pass">✓ physics survives the WASM boundary</div>
       <div className="btn-row">
         <button onClick={exportCSV}>CSV</button><button onClick={exportJSON}>JSON</button><button onClick={exportPNG}>PNG</button>
         {regime === "dynamics" ? <button onClick={exportHamiltonian} title="exact (N+1)×(N+1) Hamiltonian → np.load()">Ĥ.npy</button> : null}
@@ -822,11 +821,11 @@ export function App() {
             </Group>
           ) : regime === "dynamics" ? (
             <Group title="MOLECULAR ENSEMBLE" k="dyn" c={collapsed} t={toggle}>
-              <Field sym="N" texSym="N" label="molecules" value={dyn.m} min={2} max={40} step={1} unit="" int onChange={(m) => setDyn((s) => ({ ...s, m: Math.round(m) }))} />
-              <Field sym="g" texSym="g_0" label="coupling" value={dyn.g} min={0.01} max={0.2} step={0.005} unit="ω_c" onChange={(g) => setDyn((s) => ({ ...s, g }))} />
-              <Field sym="σ" texSym="\sigma_\omega" label="inhomog. disorder" value={dyn.sigma} min={0} max={0.25} step={0.005} unit="ω_c" onChange={(sigma) => setDyn((s) => ({ ...s, sigma }))} />
-              <Field sym="ω" texSym="\hbar\omega_c" label="cavity energy" value={wcEv} min={0.5} max={4} step={0.05} unit="eV" onChange={setWcEv} />
-              <Field sym="η" texSym="\eta" label="dipole order" value={dyn.order} min={0} max={1} step={0.02} unit="" onChange={(order) => setDyn((s) => ({ ...s, order }))} />
+              <Field sym="N" texSym="N" label="Ensemble size" value={dyn.m} min={2} max={40} step={1} unit="" int onChange={(m) => setDyn((s) => ({ ...s, m: Math.round(m) }))} />
+              <Field sym="g" texSym="g_0/\omega_c" label="Bare coupling" value={dyn.g} min={0.01} max={0.2} step={0.005} unit="" onChange={(g) => setDyn((s) => ({ ...s, g }))} />
+              <Field sym="σ" texSym="\sigma_\omega/\omega_c" label="Inhomog. linewidth" value={dyn.sigma} min={0} max={0.25} step={0.005} unit="" onChange={(sigma) => setDyn((s) => ({ ...s, sigma }))} />
+              <Field sym="ω" texSym="\hbar\omega_c" label="Cavity energy" value={wcEv} min={0.5} max={4} step={0.05} unit="eV" onChange={setWcEv} />
+              <Field sym="η" texSym="\eta" label="Orientational order" value={dyn.order} min={0} max={1} step={0.02} unit="" onChange={(order) => setDyn((s) => ({ ...s, order }))} />
               <div className="btn-row">
                 <button className={dyn.order >= 0.999 ? "on" : ""} onClick={() => setDyn((s) => ({ ...s, order: 1 }))}>CRYSTAL</button>
                 <button className={dyn.order <= 0.15 ? "on" : ""} onClick={() => setDyn((s) => ({ ...s, order: 0.1 }))}>AMORPHOUS</button>
@@ -847,11 +846,11 @@ export function App() {
             </Group>
           ) : (
             <Group title="VIBRONIC · HOLSTEIN-TC" k="htc" c={collapsed} t={toggle}>
-              <Field sym="ω" texSym="\omega_v" label="vibration" value={htc.wv} min={0.04} max={0.4} step={0.005} unit="ω_c" onChange={(wv) => setHtc((s) => ({ ...s, wv }))} />
-              <Field sym="S" texSym="S=\lambda^2" label="Huang-Rhys" value={htc.S} min={0} max={3} step={0.05} unit="" onChange={(S) => setHtc((s) => ({ ...s, S }))} />
-              <Field sym="g" texSym="g" label="cavity coupling" value={htc.g} min={0} max={0.25} step={0.005} unit="ω_c" onChange={(g) => setHtc((s) => ({ ...s, g }))} />
-              <Field sym="N" texSym="N" label="molecules (decouple)" value={htc.N} min={1} max={400} step={1} unit="" int onChange={(N) => setHtc((s) => ({ ...s, N: Math.round(N) }))} />
-              <Field sym="γ" texSym="\gamma" label="linewidth" value={htc.gamma} min={0.004} max={0.04} step={0.002} unit="ω_c" onChange={(gamma) => setHtc((s) => ({ ...s, gamma }))} />
+              <Field sym="ω" texSym="\omega_v/\omega_c" label="Vibrational mode" value={htc.wv} min={0.04} max={0.4} step={0.005} unit="" onChange={(wv) => setHtc((s) => ({ ...s, wv }))} />
+              <Field sym="S" texSym="S=\lambda^2" label="Huang-Rhys factor" value={htc.S} min={0} max={3} step={0.05} unit="" onChange={(S) => setHtc((s) => ({ ...s, S }))} />
+              <Field sym="g" texSym="g/\omega_c" label="Cavity coupling" value={htc.g} min={0} max={0.25} step={0.005} unit="" onChange={(g) => setHtc((s) => ({ ...s, g }))} />
+              <Field sym="N" texSym="N" label="Ensemble size" value={htc.N} min={1} max={400} step={1} unit="" int onChange={(N) => setHtc((s) => ({ ...s, N: Math.round(N) }))} />
+              <Field sym="γ" texSym="\gamma/\omega_c" label="Linewidth (FWHM)" value={htc.gamma} min={0.004} max={0.04} step={0.002} unit="" onChange={(gamma) => setHtc((s) => ({ ...s, gamma }))} />
               <div className="btn-row">
                 <button className={htc.N <= 1 ? "on" : ""} onClick={() => setHtc((s) => ({ ...s, N: 1 }))}>N = 1</button>
                 <button className={htc.N >= 100 ? "on" : ""} onClick={() => setHtc((s) => ({ ...s, N: 200 }))}>N = 200 · decouple</button>
@@ -1095,7 +1094,7 @@ function Field(props: { sym: string; texSym?: string; label: string; value: numb
   return (
     <div className="knob">
       <div className="knob-top">
-        <span className="knob-name">{props.texSym ? <Tex t={props.texSym} /> : <i>{props.sym}</i>} {props.label}</span>
+        <span className="knob-name">{props.label} {props.texSym ? <span className="knob-sym"><Tex t={props.texSym} /></span> : <i>{props.sym}</i>}</span>
         <span className="knob-entry">
           <input className="knob-input" type="number" min={props.min} max={props.max} step={props.step} value={show}
             onChange={(e) => { const v = Number(e.target.value); if (!Number.isNaN(v) && e.target.value !== "") props.onChange(clamp(v, props.min, props.max)); }} />
