@@ -47,6 +47,30 @@ pub fn solve(w_c: f64, w: &[f64], g: &[f64]) -> Spectrum {
     }
 }
 
+/// Eigen-decomposition of the arrowhead for real-time dynamics: ascending eigenvalues + the full
+/// eigenvector matrix (row-major, `vecs[i*n + k]` = i-th component of the k-th eigenvector, n=M+1).
+/// A state ψ(t) = Σ_k c_k e^{-iE_k t} φ_k is then cheap to evolve in the UI for the live simulation.
+pub struct Modes {
+    pub eigs: Vec<f64>,
+    pub vecs: Vec<f64>,
+}
+
+pub fn modes(w_c: f64, w: &[f64], g: &[f64]) -> Modes {
+    let n = w.len() + 1;
+    let se = arrowhead(w_c, w, g).symmetric_eigen();
+    let mut idx: Vec<usize> = (0..n).collect();
+    idx.sort_by(|&a, &b| se.eigenvalues[a].partial_cmp(&se.eigenvalues[b]).unwrap_or(std::cmp::Ordering::Equal));
+    let mut eigs = Vec::with_capacity(n);
+    let mut vecs = vec![0.0; n * n];
+    for (col, &k) in idx.iter().enumerate() {
+        eigs.push(se.eigenvalues[k]);
+        for i in 0..n {
+            vecs[i * n + col] = se.eigenvectors[(i, k)];
+        }
+    }
+    Modes { eigs, vecs }
+}
+
 /// Deterministic standard normals from a u64 seed (splitmix64 + Box–Muller). Pure Rust — keeps the
 /// wasm build dependency-free; used only to draw the live disorder realization (not validation).
 pub fn gaussians(seed: u64, n: usize) -> Vec<f64> {

@@ -153,6 +153,19 @@ pub fn wigner_rgba_of_rho(
     wigner_to_rgba(&w, w_max)
 }
 
+/// Eigen-modes of the single-excitation arrowhead for real-time dynamics: a flat array
+/// [eigs (M+1), then the (M+1)² row-major eigenvector matrix]. The UI evolves ψ(t) from these.
+#[wasm_bindgen]
+pub fn arrowhead_modes(w_c: f64, w_a: f64, g: f64, m: usize, sigma: f64, seed: f64) -> Vec<f64> {
+    let z = crate::spectrum::gaussians(seed as u64, m);
+    let w: Vec<f64> = z.iter().map(|zi| w_a + sigma * zi).collect();
+    let md = crate::spectrum::modes(w_c, &w, &vec![g; m]);
+    let mut out = Vec::with_capacity(md.eigs.len() + md.vecs.len());
+    out.extend_from_slice(&md.eigs);
+    out.extend_from_slice(&md.vecs);
+    out
+}
+
 /// Single-excitation arrowhead spectrum (Regime 2) for M emitters with Gaussian energy disorder.
 /// Returns a flat `Float64Array` of length 2·(M+1): the (M+1) eigenvalues (ascending), then the
 /// (M+1) Hopfield photon fractions in the same order. `seed` fixes the disorder realization so a

@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
-import { loadWasm, Quantum, solveSpectrum, wignerRawOfRho, cavityLayers, cavityField, cavityReflectance, type SimParams } from "./quantum/engine";
+import { loadWasm, Quantum, solveSpectrum, arrowheadModes, wignerRawOfRho, cavityLayers, cavityField, cavityReflectance, type SimParams } from "./quantum/engine";
 
 // three.js is heavy and only used by the cavity regime — load it on demand
 const CavityScene = lazy(() => import("./cavity/CavityScene").then((m) => ({ default: m.CavityScene })));
@@ -27,6 +27,11 @@ const CV_CW = CV_ML + CV_W + CV_MR, CV_CH = CV_MT + CV_H + CV_MB;
 const N0 = 1.0, NS = 1.52; // air / glass substrate
 const RB_ML = 36, RB_MR = 10, RB_MT = 12, RB_MB = 24, RB_PW = 268, RB_PH = 108;
 const RB_CW = RB_ML + RB_PW + RB_MR, RB_CH = RB_MT + RB_PH + RB_MB;
+const DT_DYN = 0.22, HEAT_COLS = 150;
+const HM_ML = 46, HM_MR = 12, HM_MT = 14, HM_MB = 26, HM_PW = 470, HM_PH = 248;
+const HM_CW = HM_ML + HM_PW + HM_MR, HM_CH = HM_MT + HM_PH + HM_MB;
+const PP_ML = 46, PP_MR = 12, PP_MT = 12, PP_MB = 24, PP_PW = 470, PP_PH = 100;
+const PP_CW = PP_ML + PP_PW + PP_MR, PP_CH = PP_MT + PP_PH + PP_MB;
 
 const PANEL = "#0b101c", INK = "#e2e8f0", DIM = "#94a3b8", AXIS = "#475569";
 const COBALT = "#3b82f6", CRIMSON = "#ef4444", EMERALD = "#10b981", AMBER = "#f59e0b", SLATE = "#475569";
@@ -64,7 +69,7 @@ function husimiImage(q: Float64Array, n: number, qmax: number): ImageData {
 }
 
 type SweepCol = { x: number; eigs: Float64Array; photon: Float64Array };
-type Regime = "single" | "collective" | "cavity";
+type Regime = "single" | "collective" | "cavity" | "dynamics";
 type Pt = { t: number; n: number; pe: number; pur: number };
 
 export function App() {
@@ -73,6 +78,7 @@ export function App() {
   const [tol, setTol] = useState({ atol: 1e-6, rtol: 1e-6 });
   const [sp, setSp] = useState({ m: 20, g: 0.05, sigma: 0.0, seed: 1 });
   const [cav, setCav] = useState({ lambda: 550, nHi: 2.5, nLo: 1.46, pairs: 4, nCav: 1.6, g: 1.6 });
+  const [dyn, setDyn] = useState({ m: 12, g: 0.06, sigma: 0.0, seed: 1, init: 0 });
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [playing, setPlaying] = useState(true);
   const [fixedScale, setFixedScale] = useState(true);
@@ -83,6 +89,10 @@ export function App() {
   const bridgeCanvas = useRef<HTMLCanvasElement>(null);
   const cavCanvas = useRef<HTMLCanvasElement>(null);
   const rabiCanvas = useRef<HTMLCanvasElement>(null);
+  const heatCanvas = useRef<HTMLCanvasElement>(null);
+  const popCanvas = useRef<HTMLCanvasElement>(null);
+  const dynState = useRef<{ eigs: Float64Array; vecs: Float64Array; n: number; c: Float64Array; hist: Float64Array[] } | null>(null);
+  const simT = useRef(0);
   const offscreen = useRef<HTMLCanvasElement | null>(null), husimiOff = useRef<HTMLCanvasElement | null>(null), bridgeOff = useRef<HTMLCanvasElement | null>(null);
   const quantum = useRef<Quantum | null>(null);
   const raf = useRef<number>(0), dpr = useRef(1);
@@ -131,6 +141,18 @@ export function App() {
   }, [regime, cav]);
 
   useEffect(() => {
+    if (regime !== "dynamics") return;
+    loadWasm().then(() => {
+      const { eigs, vecs, n } = arrowheadModes(WA, WA, dyn.g, dyn.m, dyn.sigma, dyn.seed);
+      const c = new Float64Array(n);
+      for (let k = 0; k < n; k++) c[k] = vecs[dyn.init * n + k]!; // ⟨φ_k|ψ0⟩ for the chosen initial site
+      dynState.current = { eigs, vecs, n, c, hist: [] };
+      simT.current = 0;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [regime, dyn]);
+
+  useEffect(() => {
     dpr.current = Math.min(window.devicePixelRatio || 1, 2);
     offscreen.current = mkCanvas(N_GRID); husimiOff.current = mkCanvas(NHG); bridgeOff.current = mkCanvas(NB);
     const loop = () => {
@@ -143,6 +165,12 @@ export function App() {
           if (q.time > T_LOOP) { q.reset(); series.current = []; }
         }
         drawWigner(q); drawHusimi(q); drawSeries(); drawRho(q); updateReadouts(q);
+      } else if (regimeRef.current === "dynamics" && dynState.current) {
+        const ds = dynState.current;
+        if (playingRef.current) simT.current += DT_DYN;
+        const pops = popsAt(simT.current);
+        if (playingRef.current) { ds.hist.push(pops); if (ds.hist.length > HEAT_COLS) ds.hist.shift(); }
+        drawSimHeat(); drawSimPlot(); updateSimReadouts(pops);
       }
       raf.current = requestAnimationFrame(loop);
     };
@@ -427,6 +455,74 @@ export function App() {
     ctx.save(); ctx.translate(11, RB_MT + RB_PH / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top"; ctx.fillText("T", 0, 0); ctx.restore();
   }
 
+  // ── live single-excitation dynamics (N molecules + cavity) ──
+  function popsAt(t: number): Float64Array {
+    const ds = dynState.current!;
+    const { eigs, vecs, n, c } = ds;
+    const pops = new Float64Array(n);
+    for (let i = 0; i < n; i++) {
+      let re = 0, im = 0; const row = i * n;
+      for (let k = 0; k < n; k++) {
+        const amp = vecs[row + k]! * c[k]!, ph = eigs[k]! * t;
+        re += amp * Math.cos(ph); im -= amp * Math.sin(ph);
+      }
+      pops[i] = re * re + im * im; // |ψ_i(t)|²
+    }
+    return pops;
+  }
+
+  function drawSimHeat() {
+    const cvEl = heatCanvas.current, ds = dynState.current; if (!cvEl || !ds) return;
+    const ctx = sized(cvEl, HM_CW, HM_CH);
+    ctx.fillStyle = PANEL; ctx.fillRect(0, 0, HM_CW, HM_CH);
+    const n = ds.n, H = ds.hist, cw = HM_PW / HEAT_COLS, rh = HM_PH / n;
+    for (let col = 0; col < H.length; col++) {
+      const pops = H[col]!, x = HM_ML + col * cw;
+      for (let i = 0; i < n; i++) {
+        const v = Math.min(1, Math.sqrt(pops[i]!));
+        ctx.fillStyle = i === 0
+          ? `rgb(${lin(11, 70, v)},${lin(16, 140, v)},${lin(28, 250, v)})`  // photon row → cobalt
+          : `rgb(${lin(11, 245, v)},${lin(16, 160, v)},${lin(28, 20, v)})`; // molecule rows → amber
+        ctx.fillRect(x, HM_MT + i * rh, cw + 0.6, rh + 0.6);
+      }
+    }
+    ctx.strokeStyle = "rgba(148,163,184,0.45)"; ctx.lineWidth = 0.75; seg(ctx, HM_ML, HM_MT + rh, HM_ML + HM_PW, HM_MT + rh);
+    ctx.lineWidth = 0.75; ctx.strokeStyle = AXIS; ctx.strokeRect(HM_ML, HM_MT, HM_PW, HM_PH);
+    ctx.fillStyle = DIM; ctx.font = "500 9px 'B612 Mono', monospace"; ctx.textAlign = "right"; ctx.textBaseline = "middle";
+    ctx.fillText("photon", HM_ML - 5, HM_MT + rh / 2);
+    ctx.fillText("mol 1", HM_ML - 5, HM_MT + rh * 1.5);
+    ctx.fillText(`mol ${n - 1}`, HM_ML - 5, HM_MT + HM_PH - rh / 2);
+    ctx.fillStyle = INK; ctx.font = "italic 12px 'B612', sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+    ctx.fillText("time →", HM_ML + HM_PW / 2, HM_CH - 8);
+  }
+
+  function drawSimPlot() {
+    const cvEl = popCanvas.current, ds = dynState.current; if (!cvEl || !ds) return;
+    const ctx = sized(cvEl, PP_CW, PP_CH);
+    ctx.fillStyle = PANEL; ctx.fillRect(0, 0, PP_CW, PP_CH);
+    const yOf = (v: number) => PP_MT + (1 - v) * PP_PH;
+    ctx.font = "500 9px 'B612 Mono', monospace";
+    for (const v of [0, 0.5, 1]) { ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5; seg(ctx, PP_ML, yOf(v), PP_ML + PP_PW, yOf(v)); ctx.fillStyle = DIM; ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(v.toFixed(1), PP_ML - 5, yOf(v)); }
+    const H = ds.hist, cw = PP_PW / HEAT_COLS;
+    const trace = (fn: (p: Float64Array) => number, color: string) => {
+      ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.beginPath();
+      H.forEach((p, col) => { const x = PP_ML + col * cw, y = yOf(Math.min(1, fn(p))); col === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); });
+      ctx.stroke();
+    };
+    trace((p) => p[0]!, COBALT); // photon
+    trace((p) => { let s = 0; for (let i = 1; i < p.length; i++) s += p[i]!; return s; }, "#f59e0b"); // total molecular
+    ctx.lineWidth = 0.75; ctx.strokeStyle = AXIS; ctx.strokeRect(PP_ML, PP_MT, PP_PW, PP_PH);
+    ctx.fillStyle = INK; ctx.font = "italic 12px 'B612', sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+    ctx.fillText("population", PP_ML + PP_PW / 2, PP_CH - 5);
+  }
+
+  function updateSimReadouts(pops: Float64Array) {
+    const set = (k: string, v: string) => { const el = read.current[k]; if (el) el.textContent = v; };
+    let molTot = 0, molMax = 0; for (let i = 1; i < pops.length; i++) { molTot += pops[i]!; molMax = Math.max(molMax, pops[i]!); }
+    set("simT", simT.current.toFixed(2)); set("simPhot", pops[0]!.toFixed(4)); set("simMol", molTot.toFixed(4));
+    set("simMax", molMax.toFixed(4)); set("simNorm", (pops[0]! + molTot).toFixed(6));
+  }
+
   function exportCSV() {
     if (regime === "single") download("phase_timeseries.csv", "text/csv", csv([["t", "photon", "excited", "purity"], ...series.current.map((p) => [p.t, p.n, p.pe, p.pur])]));
     else { const rows: (string | number)[][] = [["detuning_over_g", "energy", "photon_fraction"]]; for (const s of sweep.current) for (let k = 0; k < s.eigs.length; k++) rows.push([s.x, s.eigs[k]!, s.photon[k]!]); download("spectrum_sweep.csv", "text/csv", csv(rows)); }
@@ -437,7 +533,7 @@ export function App() {
     else download("spectrum.json", "application/json", JSON.stringify({ detuning_over_g: sweep.current.map((s) => s.x), eigs: sweep.current.map((s) => Array.from(s.eigs)), photon_fraction: sweep.current.map((s) => Array.from(s.photon)) }));
   }
   function exportPNG() {
-    const cv = regime === "single" ? wigCanvas.current : regime === "cavity" ? cavCanvas.current : specCanvas.current;
+    const cv = regime === "single" ? wigCanvas.current : regime === "cavity" ? cavCanvas.current : regime === "dynamics" ? heatCanvas.current : specCanvas.current;
     if (!cv) return;
     const a = document.createElement("a"); a.href = cv.toDataURL("image/png"); a.download = `${regime}.png`; a.click();
   }
@@ -471,6 +567,7 @@ export function App() {
             <button className={regime === "single" ? "on" : ""} onClick={() => setRegime("single")}>SINGLE EMITTER</button>
             <button className={regime === "collective" ? "on" : ""} onClick={() => setRegime("collective")}>COLLECTIVE</button>
             <button className={regime === "cavity" ? "on" : ""} onClick={() => setRegime("cavity")}>CAVITY FIELD</button>
+            <button className={regime === "dynamics" ? "on" : ""} onClick={() => setRegime("dynamics")}>DYNAMICS</button>
           </div>
           {regime === "single" ? (
             <>
@@ -496,7 +593,7 @@ export function App() {
               <Field sym="σ" label="disorder" value={sp.sigma} min={0} max={0.2} step={0.005} unit="ω_a" onChange={(sigma) => setSp((s) => ({ ...s, sigma }))} />
               <div className="btn-row"><button onClick={() => setSp((s) => ({ ...s, seed: s.seed + 1 }))}>RE-ROLL σ</button></div>
             </Group>
-          ) : (
+          ) : regime === "cavity" ? (
             <Group title="CAVITY HARDWARE" k="cavh" c={collapsed} t={toggle}>
               <Field sym="λ" label="design wavelength" value={cav.lambda} min={400} max={800} step={5} unit="nm" onChange={(lambda) => setCav((s) => ({ ...s, lambda }))} />
               <Field sym="n_H" label="DBR high index" value={cav.nHi} min={1.6} max={3.0} step={0.05} unit="" onChange={(nHi) => setCav((s) => ({ ...s, nHi }))} />
@@ -504,6 +601,22 @@ export function App() {
               <Field sym="N" label="mirror pairs" value={cav.pairs} min={2} max={16} step={1} unit="" int onChange={(pairs) => setCav((s) => ({ ...s, pairs: Math.round(pairs) }))} />
               <Field sym="n_c" label="cavity index" value={cav.nCav} min={1.3} max={2.5} step={0.05} unit="" onChange={(nCav) => setCav((s) => ({ ...s, nCav }))} />
               <Field sym="g" label="atom–cavity coupling" value={cav.g} min={0} max={5} step={0.1} unit="κ" onChange={(g) => setCav((s) => ({ ...s, g }))} />
+            </Group>
+          ) : (
+            <Group title="MOLECULAR ENSEMBLE" k="dyn" c={collapsed} t={toggle}>
+              <Field sym="N" label="molecules" value={dyn.m} min={2} max={40} step={1} unit="" int onChange={(m) => setDyn((s) => ({ ...s, m: Math.round(m) }))} />
+              <Field sym="g" label="coupling" value={dyn.g} min={0.01} max={0.2} step={0.005} unit="ω" onChange={(g) => setDyn((s) => ({ ...s, g }))} />
+              <Field sym="σ" label="energy disorder" value={dyn.sigma} min={0} max={0.25} step={0.005} unit="ω" onChange={(sigma) => setDyn((s) => ({ ...s, sigma }))} />
+              <div className="knob-top" style={{ marginBottom: 6 }}><span className="knob-name">initial excitation</span></div>
+              <div className="btn-row">
+                <button className={dyn.init === 0 ? "on" : ""} onClick={() => setDyn((s) => ({ ...s, init: 0 }))}>PHOTON</button>
+                <button className={dyn.init === 1 ? "on" : ""} onClick={() => setDyn((s) => ({ ...s, init: 1 }))}>MOLECULE</button>
+              </div>
+              <div className="btn-row">
+                <button onClick={() => setPlaying((p) => !p)}>{playing ? "PAUSE" : "PLAY"}</button>
+                <button onClick={() => { simT.current = 0; if (dynState.current) dynState.current.hist = []; }}>RESET</button>
+                <button onClick={() => setDyn((s) => ({ ...s, seed: s.seed + 1 }))}>RE-ROLL σ</button>
+              </div>
             </Group>
           )}
         </aside>
@@ -544,7 +657,7 @@ export function App() {
                 </div>
               </div>
             </>
-          ) : (
+          ) : regime === "cavity" ? (
             <>
               <div className="pane grow">
                 <div className="pane-head">Panel F · Fabry–Pérot cavity-QED schematic · drag to orbit · field brightens with g</div>
@@ -558,6 +671,17 @@ export function App() {
                   <span className="leg leg-field">|E(z)|² mode</span>
                   <span className="leg leg-mol">emitters in gap</span>
                 </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="pane grow">
+                <div className="pane-head">Live cavity dynamics · {dyn.m} molecules + 1 photon · excitation heat map (each row = one molecule)</div>
+                <canvas ref={heatCanvas} className="cv" />
+              </div>
+              <div className="pane">
+                <div className="pane-head">Population — photon <i style={{ color: COBALT, fontStyle: "normal" }}>━</i> total molecular <i style={{ color: "#f59e0b", fontStyle: "normal" }}>━</i></div>
+                <canvas ref={popCanvas} className="cv" />
               </div>
             </>
           )}
@@ -599,7 +723,7 @@ export function App() {
               </div>
               {Hud}
             </>
-          ) : (
+          ) : regime === "cavity" ? (
             <>
               <div className="pane">
                 <div className="pane-head">Vacuum-Rabi spectrum · peaks split by 2g</div>
@@ -615,6 +739,20 @@ export function App() {
                   <Row label={<>reflectance <i>R</i></>} k="cavR" r={read} />
                   <Row label={<>finesse <i>F</i></>} k="cavF" r={read} />
                   <Row label={<>Rabi split 2<i>g</i></>} k="cav2g" r={read} unit="κ" />
+                </tbody></table>
+              </div>
+              {Hud}
+            </>
+          ) : (
+            <>
+              <div className="pane">
+                <div className="pane-head">Live observables</div>
+                <table className="metrics"><tbody>
+                  <Row label={<>time <i>t</i></>} k="simT" r={read} unit="ω⁻¹" />
+                  <Row label={<>photon ⟨<i>a</i>†<i>a</i>⟩</>} k="simPhot" r={read} />
+                  <Row label={<>molecular Σ</>} k="simMol" r={read} />
+                  <Row label={<>brightest molecule</>} k="simMax" r={read} />
+                  <Row label={<>norm Σ<i>p</i></>} k="simNorm" r={read} />
                 </tbody></table>
               </div>
               {Hud}

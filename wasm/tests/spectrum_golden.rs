@@ -2,7 +2,7 @@
 //!   - eigenvalues + photon fractions match numpy element-wise for identical/detuned/disordered cases
 //!   - identical resonant emitters give the 2g√M splitting and exactly M−1 zero-photon dark states
 
-use cqed_core::spectrum::solve;
+use cqed_core::spectrum::{modes, solve};
 use serde::Deserialize;
 use std::fs;
 
@@ -62,4 +62,25 @@ fn identical_resonant_gives_2g_sqrt_m_split_and_m_minus_1_dark() {
     }
     // the two bright polaritons are 50/50 photon/matter on resonance
     assert!((s.photon_frac[0] - 0.5).abs() < 1e-9 && (s.photon_frac[m] - 0.5).abs() < 1e-9);
+}
+
+#[test]
+fn vacuum_rabi_oscillation_matches_analytic() {
+    // 1 photon into M identical resonant molecules → the cavity population is the exact
+    // single-excitation vacuum-Rabi law pop_cav(t) = cos²(g√M·t). Reconstruct ψ(t) from the modes.
+    let (m, g, w0) = (6usize, 0.08, 1.0);
+    let md = modes(w0, &vec![w0; m], &vec![g; m]);
+    let n = m + 1;
+    for &t in &[0.0, 1.0, 2.5, 5.0, 9.3, 14.7] {
+        let (mut re, mut im) = (0.0_f64, 0.0_f64);
+        for k in 0..n {
+            let v0 = md.vecs[k]; // V[0][k] = cavity component of eigenvector k (row 0)
+            let amp = v0 * v0; // c_k·V[0][k], with c_k = ⟨φ_k|ψ0⟩ = V[0][k] for ψ0 = |cavity⟩
+            re += amp * (md.eigs[k] * t).cos();
+            im -= amp * (md.eigs[k] * t).sin();
+        }
+        let pop = re * re + im * im;
+        let analytic = (g * (m as f64).sqrt() * t).cos().powi(2);
+        assert!((pop - analytic).abs() < 1e-9, "Rabi pop_cav {pop:.6} != cos²(g√M·t) {analytic:.6} at t={t}");
+    }
 }

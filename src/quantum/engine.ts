@@ -1,6 +1,6 @@
 // Thin TS wrapper over the QuTiP-validated Rust→WASM core (sim/wasm/pkg-web).
 // All physics is computed in WASM; this only marshals parameters and the RGBA buffer.
-import init, { Sim, spectrum, wigner_rgba_of_rho, wigner_of_rho, cavity_layers, cavity_field, cavity_reflectance } from "../../wasm/pkg-web/cqed_core.js";
+import init, { Sim, spectrum, arrowhead_modes, wigner_rgba_of_rho, wigner_of_rho, cavity_layers, cavity_field, cavity_reflectance } from "../../wasm/pkg-web/cqed_core.js";
 
 let initPromise: Promise<unknown> | null = null;
 export function loadWasm(): Promise<unknown> {
@@ -50,6 +50,15 @@ export function solveSpectrum(
   const flat = spectrum(wc, wa, g, m, sigma, seed); // length 2·(M+1): [eigs…, photon…]
   const k = m + 1;
   return { eigs: flat.slice(0, k), photon: flat.slice(k, 2 * k) };
+}
+
+/** Eigen-modes of the single-excitation arrowhead for real-time dynamics: eigenvalues + the (M+1)²
+ *  row-major eigenvector matrix (V[i][k] = vecs[i·n + k], n = M+1). The UI evolves
+ *  ψ(t) = Σ_k c_k e^{−iE_k t} φ_k from these (c_k from the chosen initial state). */
+export function arrowheadModes(wc: number, wa: number, g: number, m: number, sigma: number, seed: number): { eigs: Float64Array; vecs: Float64Array; n: number } {
+  const flat = arrowhead_modes(wc, wa, g, m, sigma, seed);
+  const n = m + 1;
+  return { eigs: flat.slice(0, n), vecs: flat.slice(n), n };
 }
 
 export interface SimParams {
