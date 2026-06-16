@@ -65,9 +65,9 @@ export function arrowheadModes(wc: number, wa: number, g: number, m: number, sig
  *  vacuum-Rabi doublet at the polariton energies, broadening with disorder. Validated in
  *  wasm/tests/fft_spectrum.rs (two peaks split by 2g√M, centred on ω_a). */
 export function cavityPowerSpectrum(
-  wc: number, wa: number, g: number, m: number, sigma: number, seed: number, nFft: number, dt: number,
+  wc: number, wa: number, g: number, m: number, sigma: number, seed: number, nFft: number, dt: number, gamma = 0,
 ): { omega: Float64Array; power: Float64Array } {
-  const flat = cavity_power_spectrum(wc, wa, g, m, sigma, seed, nFft, dt); // [ω(n/2), power(n/2)]
+  const flat = cavity_power_spectrum(wc, wa, g, m, sigma, seed, nFft, dt, gamma); // [ω(n/2), power(n/2)]
   const h = flat.length / 2;
   return { omega: flat.slice(0, h), power: flat.slice(h) };
 }
@@ -101,8 +101,8 @@ export function arrowheadMatrixGi(wc: number, wa: number, sigma: number, seed: n
 }
 
 /** Power spectrum for per-molecule couplings g_i. */
-export function cavityPowerSpectrumGi(wc: number, wa: number, sigma: number, seed: number, gi: Float64Array, nFft: number, dt: number): { omega: Float64Array; power: Float64Array } {
-  const flat = cavity_power_spectrum_gi(wc, wa, sigma, seed, gi, nFft, dt);
+export function cavityPowerSpectrumGi(wc: number, wa: number, sigma: number, seed: number, gi: Float64Array, nFft: number, dt: number, gamma: number): { omega: Float64Array; power: Float64Array } {
+  const flat = cavity_power_spectrum_gi(wc, wa, sigma, seed, gi, nFft, dt, gamma);
   const h = flat.length / 2;
   return { omega: flat.slice(0, h), power: flat.slice(h) };
 }

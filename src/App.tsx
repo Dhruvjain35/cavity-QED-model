@@ -100,7 +100,7 @@ export function App() {
   const [sp, setSp] = useState({ m: 20, g: 0.05, sigma: 0.0, seed: 1 });
   const [cav, setCav] = useState({ lambda: 550, nHi: 2.5, nLo: 1.46, pairs: 4, nCav: 1.6, g: 1.6 });
   const [htc, setHtc] = useState({ wv: 0.15, S: 1.0, g: 0.05, N: 1, gamma: 0.012 }); // HTC: ω_v, Huang-Rhys S, cavity g, collective N, broadening γ (units of ω_c)
-  const [dyn, setDyn] = useState({ m: 12, g: 0.06, sigma: 0.04, seed: 1, init: 0, order: 0.7 });
+  const [dyn, setDyn] = useState({ m: 12, g: 0.06, sigma: 0.04, seed: 1, init: 0, order: 0.7, gamma: 0.018 });
   const [inspect, setInspect] = useState<number | null>(null); // clicked dressed eigenstate (UI badge)
   const [dynSweep, setDynSweep] = useState(false); // coupling-sweep dispersion mode (replaces the 3D)
   const [wcEv, setWcEv] = useState(2.0); // physical cavity-photon energy ℏω_c in eV (display scale only)
@@ -119,7 +119,7 @@ export function App() {
   const rabiCanvas = useRef<HTMLCanvasElement>(null);
   const popCanvas = useRef<HTMLCanvasElement>(null);
   const hopCanvas = useRef<HTMLCanvasElement>(null);
-  const dynState = useRef<{ eigs: Float64Array; vecs: Float64Array; n: number; c: Float64Array; bright: Float64Array; hist: Float64Array[] } | null>(null);
+  const dynState = useRef<{ eigs: Float64Array; vecs: Float64Array; n: number; c: Float64Array; bright: Float64Array; modeAmp: Float64Array; hist: Float64Array[] } | null>(null);
   const simT = useRef(0);
   const hopMarks = useRef<{ x: number; y: number; k: number }[]>([]);
   const inspectRef = useRef<number | null>(null); // dressed eigenstate frozen onto the 3D (null = live)
@@ -187,10 +187,10 @@ export function App() {
       const { eigs, vecs, n } = arrowheadModesGi(WA, WA, dyn.sigma, dyn.seed, gi);
       const c = new Float64Array(n);
       for (let k = 0; k < n; k++) c[k] = vecs[dyn.init * n + k]!; // ⟨φ_k|ψ0⟩ for the chosen initial site
-      dynState.current = { eigs, vecs, n, c, bright: brightWeights(ensemble.factors), hist: [] };
+      dynState.current = { eigs, vecs, n, c, bright: brightWeights(ensemble.factors), modeAmp: ensemble.modeAmp, hist: [] };
       simT.current = 0;
       inspectRef.current = null; setInspect(null); // a new ensemble invalidates the inspected state
-      fftData.current = cavityPowerSpectrumGi(WA, WA, dyn.sigma, dyn.seed, gi, FFT_N, FFT_DT);
+      fftData.current = cavityPowerSpectrumGi(WA, WA, dyn.sigma, dyn.seed, gi, FFT_N, FFT_DT, dyn.gamma);
       sweepData.current = couplingSweepGi(WA, WA, dyn.sigma, dyn.seed, ensemble.factors, 0, SWEEP_GMAX, SWEEP_STEPS);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -565,21 +565,39 @@ export function App() {
     }
     ctx.textAlign = "right"; ctx.textBaseline = "middle";
     for (let t = 0; t <= 4; t++) { const e = elo + (ehi - elo) * t / 4, y = yOf(e); ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5; seg(ctx, HP_ML, y, HP_ML + HP_PW, y); ctx.fillStyle = DIM; ctx.fillText(fmt(e, 3), HP_ML - 7, y); }
+    // dark-state reservoir band: the eigenstates with negligible photon weight (the excitonic
+    // reservoir) clustered near ω_a. Shade and bracket it so the N-body structure is unmistakable.
+    const md = ds.modeAmp, dark: number[] = [];
+    for (let k = 0; k < n; k++) if (vecs[k]! * vecs[k]! < 0.02) dark.push(k);
+    if (dark.length) {
+      let dlo = Infinity, dhi = -Infinity; for (const k of dark) { dlo = Math.min(dlo, eigs[k]!); dhi = Math.max(dhi, eigs[k]!); }
+      const yb = yOf(dhi), yt = yOf(dlo), bw = xOf(0.06) - HP_ML;
+      ctx.fillStyle = "rgba(176,140,240,0.10)"; ctx.fillRect(HP_ML, yb - 3, bw, (yt - yb) + 6);
+      ctx.strokeStyle = "rgba(176,140,240,0.45)"; ctx.lineWidth = 0.75; ctx.strokeRect(HP_ML, yb - 3, bw, (yt - yb) + 6);
+      ctx.fillStyle = DARKC; ctx.font = "600 8.5px 'B612 Mono', monospace"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+      ctx.fillText(`${dark.length} dark`, HP_ML + bw + 5, (yb + yt) / 2 - 5);
+      ctx.fillStyle = DIM; ctx.font = "500 8px 'B612 Mono', monospace"; ctx.fillText("reservoir", HP_ML + bw + 5, (yb + yt) / 2 + 5);
+    }
     const yA = yOf(WA); // bare emitter line
     ctx.strokeStyle = "rgba(148,163,184,0.4)"; ctx.setLineDash([4, 3]); ctx.lineWidth = 0.75; seg(ctx, HP_ML, yA, HP_ML + HP_PW, yA); ctx.setLineDash([]);
-    ctx.fillStyle = DIM; ctx.font = "italic 9px 'B612', sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "bottom"; ctx.fillText("ω_a", HP_ML + 3, yA - 2);
+    ctx.fillStyle = DIM; ctx.font = "italic 9px 'B612', sans-serif"; ctx.textAlign = "right"; ctx.textBaseline = "bottom"; ctx.fillText("ω_a", HP_ML + HP_PW - 3, yA - 2);
+    // marker radius ∝ spatial mode-weight Σ|v_ik|²f(r_i) (Upgrade I): states on center molecules read
+    // large, edge-localized states small — so shrinking the waist visibly shrinks edge dark states.
     const marks: { x: number; y: number; k: number }[] = [], inspK = inspectRef.current;
     for (let k = 0; k < n; k++) {
-      const phot = vecs[k]! * vecs[k]!, occ = c[k]! * c[k]!, x = xOf(phot), y = yOf(eigs[k]!), rad = 2.6 + 5.5 * Math.sqrt(Math.min(1, occ));
+      const phot = vecs[k]! * vecs[k]!, occ = c[k]! * c[k]!;
+      let mw = 0, mt = 0; for (let i = 1; i < n; i++) { const w = vecs[i * n + k]! * vecs[i * n + k]!; mw += w * md[i - 1]!; mt += w; }
+      const modeW = mt > 1e-9 ? mw / mt : 1; // mean mode amplitude of the molecules in this state
+      const x = xOf(phot), y = yOf(eigs[k]!), rad = 2.4 + 4.6 * modeW + 2.2 * Math.sqrt(Math.min(1, occ));
       marks.push({ x, y, k });
       ctx.beginPath(); ctx.arc(x, y, rad, 0, 2 * Math.PI);
-      ctx.fillStyle = lerpHex(DARKC, COBALT, Math.min(1, phot * 2)); ctx.globalAlpha = 0.45 + 0.55 * Math.sqrt(Math.min(1, occ)); ctx.fill(); ctx.globalAlpha = 1;
+      ctx.fillStyle = lerpHex(DARKC, COBALT, Math.min(1, phot * 2)); ctx.globalAlpha = 0.55 + 0.45 * Math.sqrt(Math.min(1, occ)); ctx.fill(); ctx.globalAlpha = 1;
       if (k === inspK) { ctx.strokeStyle = "#fff"; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.arc(x, y, rad + 3.5, 0, 2 * Math.PI); ctx.stroke(); }
     }
     hopMarks.current = marks;
     ctx.fillStyle = INK; ctx.font = "600 9px 'B612 Mono', monospace"; ctx.textAlign = "center"; ctx.textBaseline = "bottom";
-    ctx.fillText("LP", xOf(vecs[0]! * vecs[0]!), yOf(eigs[0]!) - 8);
-    ctx.fillText("UP", xOf(vecs[n - 1]! * vecs[n - 1]!), yOf(eigs[n - 1]!) - 8);
+    ctx.fillText("LP", xOf(vecs[0]! * vecs[0]!), yOf(eigs[0]!) - 9);
+    ctx.fillText("UP", xOf(vecs[n - 1]! * vecs[n - 1]!), yOf(eigs[n - 1]!) - 9);
     ctx.strokeStyle = AXIS; ctx.lineWidth = 0.75; ctx.strokeRect(HP_ML, HP_MT, HP_PW, HP_PH);
     ctx.fillStyle = DIM; ctx.font = "italic 11px 'B612', sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top";
     ctx.fillText("photon fraction  |⟨a|ψ_k⟩|²", HP_ML + HP_PW / 2, HP_MT + HP_PH + 16);
@@ -826,6 +844,7 @@ export function App() {
               <Field sym="σ" texSym="\sigma_\omega/\omega_c" label="Inhomog. linewidth" value={dyn.sigma} min={0} max={0.25} step={0.005} unit="" onChange={(sigma) => setDyn((s) => ({ ...s, sigma }))} />
               <Field sym="ω" texSym="\hbar\omega_c" label="Cavity energy" value={wcEv} min={0.5} max={4} step={0.05} unit="eV" onChange={setWcEv} />
               <Field sym="η" texSym="\eta" label="Orientational order" value={dyn.order} min={0} max={1} step={0.02} unit="" onChange={(order) => setDyn((s) => ({ ...s, order }))} />
+              <Field sym="Γ" texSym="\Gamma/\omega_c" label="Linewidth (κ+γ)" value={dyn.gamma} min={0.003} max={0.06} step={0.002} unit="" onChange={(gamma) => setDyn((s) => ({ ...s, gamma }))} />
               <div className="btn-row">
                 <button className={dyn.order >= 0.999 ? "on" : ""} onClick={() => setDyn((s) => ({ ...s, order: 1 }))}>CRYSTAL</button>
                 <button className={dyn.order <= 0.15 ? "on" : ""} onClick={() => setDyn((s) => ({ ...s, order: 0.1 }))}>AMORPHOUS</button>
@@ -936,7 +955,7 @@ export function App() {
                 <canvas ref={hopCanvas} className="cv click" onClick={onHopClick} />
               </div>
               <div className="pane">
-                <div className="pane-head">Transmission S(ω) · FFT of the photon field · vacuum-Rabi doublet</div>
+                <div className="pane-head">Transmission S(ω) · FFT of ⟨a†(t)a(0)⟩ with e<sup>−Γt</sup> damping · Lorentzian vacuum-Rabi doublet</div>
                 <canvas ref={fftCanvas} className="cv" />
               </div>
             </div>

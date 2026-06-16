@@ -50,14 +50,17 @@ pub fn fft(x: &mut [Complex<f64>]) {
     }
 }
 
-/// Cavity power spectrum S(ω) from the eigen-energies + photon fractions: synthesize the Hann-windowed
-/// photon amplitude ψ₀(t) on an `n`-point grid (step `dt`), FFT, return the positive-frequency half as
-/// `(energy axis ω, power normalized to peak 1)`. `n` must be a power of two.
-pub fn power_spectrum(eigs: &[f64], photon_frac: &[f64], n: usize, dt: f64) -> (Vec<f64>, Vec<f64>) {
+/// Cavity power spectrum S(ω) from the eigen-energies + photon fractions: synthesize the photon
+/// amplitude ψ₀(t) on an `n`-point grid (step `dt`), apply phenomenological damping e^{−Γt} (cavity
+/// leakage κ + molecular decay γ) which broadens each line into a Lorentzian of HWHM `gamma`, FFT, and
+/// return the positive-frequency half as `(energy axis ω, power normalized to peak 1)`. A light Hann
+/// edge taper guards the finite-time truncation. `n` must be a power of two.
+pub fn power_spectrum(eigs: &[f64], photon_frac: &[f64], n: usize, dt: f64, gamma: f64) -> (Vec<f64>, Vec<f64>) {
     let mut x = vec![Complex::new(0.0, 0.0); n];
     for (j, xj) in x.iter_mut().enumerate() {
         let t = j as f64 * dt;
         let hann = 0.5 - 0.5 * (2.0 * PI * j as f64 / (n as f64 - 1.0)).cos();
+        let damp = (-gamma * t).exp(); // Lorentzian lineshape of half-width gamma
         let mut s = Complex::new(0.0, 0.0);
         for (k, &e) in eigs.iter().enumerate() {
             // +iE_k t so each eigen-frequency lands in the positive (lower) half of the FFT bins,
@@ -65,7 +68,7 @@ pub fn power_spectrum(eigs: &[f64], photon_frac: &[f64], n: usize, dt: f64) -> (
             let ph = e * t;
             s += Complex::new(ph.cos(), ph.sin()) * photon_frac[k];
         }
-        *xj = s * hann;
+        *xj = s * (hann * damp);
     }
     fft(&mut x);
     let half = n / 2;

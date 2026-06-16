@@ -10,7 +10,7 @@ import { Bloom, EffectComposer } from "@react-three/postprocessing";
 import { MutableRefObject, useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 
-type Dyn = { eigs: Float64Array; vecs: Float64Array; n: number; c: Float64Array; bright: Float64Array; hist: unknown } | null;
+type Dyn = { eigs: Float64Array; vecs: Float64Array; n: number; c: Float64Array; bright: Float64Array; modeAmp: Float64Array; hist: unknown } | null;
 
 const HALF = 4.3; // cavity half-length along x (mirror at ±HALF)
 const GROUND = new THREE.Color("#828c9b"), WARM = new THREE.Color("#f7a516"), HOT = new THREE.Color("#fff4d4");

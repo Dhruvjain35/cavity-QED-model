@@ -10,7 +10,7 @@ fn power_spectrum_shows_rabi_doublet() {
     let (m, g, w0) = (6usize, 0.08, 1.0);
     let s = disordered_spectrum(w0, w0, g, m, 0.0, 1); // no disorder
     let (n, dt) = (2048usize, 0.12);
-    let (freqs, power) = power_spectrum(&s.eigs, &s.photon_frac, n, dt);
+    let (freqs, power) = power_spectrum(&s.eigs, &s.photon_frac, n, dt, 0.0); // γ=0 → sharp doublet
     let res = 2.0 * PI / (n as f64 * dt);
 
     // strongest bin = one polariton; strongest bin ≥ 8 cells away = the other

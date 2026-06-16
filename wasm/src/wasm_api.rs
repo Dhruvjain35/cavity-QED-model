@@ -206,12 +206,12 @@ pub fn arrowhead_matrix_gi(w_c: f64, w_a: f64, sigma: f64, seed: f64, gi: &[f64]
 /// Cavity power spectrum for per-molecule couplings g_i — flat [ω (n/2), power (n/2)]. As above, w_i
 /// from (σ, seed); the doublet collapses as orientational/spatial disorder weakens the bright coupling.
 #[wasm_bindgen]
-pub fn cavity_power_spectrum_gi(w_c: f64, w_a: f64, sigma: f64, seed: f64, gi: &[f64], n_fft: usize, dt: f64) -> Vec<f64> {
+pub fn cavity_power_spectrum_gi(w_c: f64, w_a: f64, sigma: f64, seed: f64, gi: &[f64], n_fft: usize, dt: f64, gamma: f64) -> Vec<f64> {
     let m = gi.len();
     let z = crate::spectrum::gaussians(seed as u64, m);
     let w: Vec<f64> = z.iter().map(|zi| w_a + sigma * zi).collect();
     let s = crate::spectrum::solve(w_c, &w, gi);
-    let (freqs, power) = crate::fft::power_spectrum(&s.eigs, &s.photon_frac, n_fft, dt);
+    let (freqs, power) = crate::fft::power_spectrum(&s.eigs, &s.photon_frac, n_fft, dt, gamma);
     let mut out = Vec::with_capacity(freqs.len() + power.len());
     out.extend_from_slice(&freqs);
     out.extend_from_slice(&power);
@@ -252,9 +252,9 @@ pub fn spectrum(w_c: f64, w_a: f64, g: f64, m: usize, sigma: f64, seed: f64) -> 
 /// `n_fft` must be a power of two. Peaks land at the polariton energies (the vacuum-Rabi doublet);
 /// disorder σ splits and broadens them. See `fft::power_spectrum`.
 #[wasm_bindgen]
-pub fn cavity_power_spectrum(w_c: f64, w_a: f64, g: f64, m: usize, sigma: f64, seed: f64, n_fft: usize, dt: f64) -> Vec<f64> {
+pub fn cavity_power_spectrum(w_c: f64, w_a: f64, g: f64, m: usize, sigma: f64, seed: f64, n_fft: usize, dt: f64, gamma: f64) -> Vec<f64> {
     let s = disordered_spectrum(w_c, w_a, g, m, sigma, seed as u64);
-    let (freqs, power) = crate::fft::power_spectrum(&s.eigs, &s.photon_frac, n_fft, dt);
+    let (freqs, power) = crate::fft::power_spectrum(&s.eigs, &s.photon_frac, n_fft, dt, gamma);
     let mut out = Vec::with_capacity(freqs.len() + power.len());
     out.extend_from_slice(&freqs);
     out.extend_from_slice(&power);

@@ -14,6 +14,7 @@ export interface Ensemble {
   centers: [number, number, number][]; // molecule positions (cavity mid-plane, x ≈ 0 antinode)
   dipoles: [number, number, number][]; // unit transition-dipole vectors μ̂_i
   factors: Float64Array;               // g_i/g_0 = (μ̂_i·ε̂)·f(r_i), signed
+  modeAmp: Float64Array;               // f(r_i) = exp(−r²/w²) — the spatial mode amplitude alone
 }
 
 // deterministic PRNG (mulberry32) — pure JS, fixed by seed
@@ -35,6 +36,7 @@ export function buildEnsemble(m: number, seed: number, order: number, waist: num
   const centers: [number, number, number][] = [];
   const dipoles: [number, number, number][] = [];
   const factors = new Float64Array(m);
+  const modeAmp = new Float64Array(m);
   const w2 = waist * waist;
   for (let i = 0; i < m; i++) {
     const r = Math.floor(i / cols), c = i % cols;
@@ -49,9 +51,10 @@ export function buildEnsemble(m: number, seed: number, order: number, waist: num
     const dn = Math.hypot(dx, dy, dz) || 1; dx /= dn; dy /= dn; dz /= dn;
     dipoles.push([dx, dy, dz]);
     const f = Math.exp(-(y * y + z * z) / w2); // transverse Gaussian mode amplitude
+    modeAmp[i] = f;
     factors[i] = dy * f; // (μ̂·ε̂)·f(r), ε̂=ŷ ⇒ μ̂·ε̂ = dy
   }
-  return { m, centers, dipoles, factors };
+  return { m, centers, dipoles, factors, modeAmp };
 }
 
 /** Collective bright-mode weights b_i = g_i/‖g‖ (the only matter direction the photon couples to).
