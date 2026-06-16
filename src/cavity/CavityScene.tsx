@@ -2,7 +2,7 @@
 // live dynamics view. Two mirrors, a cobalt standing-wave cavity mode whose brightness tracks the
 // light–matter coupling g, and a single molecular emitter at the antinode, on a fading grid floor.
 // Structural (not a live state); g drives the field strength so the coupling is legible at a glance.
-import { Grid, OrbitControls, PerspectiveCamera } from "@react-three/drei";
+import { ContactShadows, Environment, Grid, Lightformer, OrbitControls, PerspectiveCamera } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
 import { Bloom, EffectComposer } from "@react-three/postprocessing";
 import { useMemo } from "react";
@@ -97,11 +97,11 @@ function Mirror({ side, g }: { side: 1 | -1; g: number }) {
     <group position={[side * (HALF + 0.25), 0, 0]} rotation={[0, Math.PI / 2, 0]}>
       <mesh castShadow receiveShadow>
         <cylinderGeometry args={[1.9, 1.9, 0.34, 64]} />
-        <meshStandardMaterial color="#3a4a63" metalness={0.55} roughness={0.32} emissive="#3b82f6" emissiveIntensity={0.15 + 1.2 * amp} />
+        <meshStandardMaterial color="#aeb9c9" metalness={0.92} roughness={0.06} envMapIntensity={1} emissive="#3b82f6" emissiveIntensity={0.08 + 0.7 * amp} />
       </mesh>
-      <mesh position={[0, side * 0.18, 0]}>
-        <torusGeometry args={[1.9, 0.05, 12, 80]} />
-        <meshStandardMaterial color="#7f9bc4" metalness={0.7} roughness={0.25} />
+      <mesh position={[0, side * 0.12, 0]}>
+        <torusGeometry args={[1.9, 0.12, 18, 72]} />
+        <meshStandardMaterial color="#caa36e" metalness={0.95} roughness={0.18} envMapIntensity={1} />
       </mesh>
     </group>
   );
@@ -116,18 +116,25 @@ export function CavityScene({ g }: { g: number }) {
       <div className="cav-tag cav-tag-mol">molecular emitter</div>
       <Canvas shadows dpr={[1, 2]} gl={{ antialias: true, alpha: true }} camera={{ position: [7.5, 4.4, 9.5], fov: 34 }}>
         <PerspectiveCamera makeDefault fov={34} position={[7.5, 4.4, 9.5]} />
-        <ambientLight intensity={0.55} />
-        <directionalLight castShadow intensity={0.9} position={[5, 8, 6]} shadow-mapSize={[1024, 1024]} />
-        <pointLight position={[0, 0, 0]} intensity={2 + 12 * Math.min(1, Math.max(0, g) * 1.7)} distance={11} color="#5b9bff" />
+        <Environment resolution={256}>
+          <color attach="background" args={["#05080f"]} />
+          <Lightformer intensity={1.3} form="rect" position={[0, 6, -3]} scale={[10, 5, 1]} color="#e3ecff" />
+          <Lightformer intensity={0.7} form="rect" position={[-7, 1, 3]} scale={[3, 7, 1]} color="#9fb0cc" />
+          <Lightformer intensity={0.7} form="rect" position={[7, 1, 3]} scale={[3, 7, 1]} color="#9fb0cc" />
+        </Environment>
+        <ambientLight intensity={0.28} />
+        <directionalLight castShadow intensity={0.55} position={[5, 8, 6]} shadow-mapSize={[1024, 1024]} shadow-bias={-0.0001} />
+        <pointLight position={[0, 0, 0]} intensity={6 * Math.min(1, Math.max(0, g) * 1.7)} distance={12} color="#6aa6ff" />
         <Mirror side={-1} g={g} />
         <Mirror side={1} g={g} />
         <Mode g={g} />
         <Naphthalene />
-        <Grid position={[0, -3.1, 0]} args={[26, 26]} cellSize={0.9} cellThickness={0.5} cellColor="#1c2942" sectionSize={4.5} sectionThickness={0.9} sectionColor="#2b3d5e" fadeDistance={30} fadeStrength={1.4} infiniteGrid />
+        <ContactShadows position={[0, -3.1, 0]} scale={26} blur={2.6} far={6} opacity={0.4} resolution={1024} color="#02040a" />
+        <Grid position={[0, -3.1, 0]} args={[28, 28]} cellSize={0.9} cellThickness={0.4} cellColor="#0f1825" sectionSize={4.5} sectionThickness={0.7} sectionColor="#223247" fadeDistance={34} fadeStrength={1.6} infiniteGrid />
         <EffectComposer>
-          <Bloom intensity={0.6} luminanceThreshold={0.55} luminanceSmoothing={0.3} mipmapBlur radius={0.55} />
+          <Bloom intensity={0.14} luminanceThreshold={0.8} luminanceSmoothing={0.3} mipmapBlur radius={0.3} />
         </EffectComposer>
-        <OrbitControls makeDefault enablePan={false} minDistance={6} maxDistance={26} target={[0, 0, 0]} />
+        <OrbitControls makeDefault enablePan={false} minDistance={6} maxDistance={26} target={[0, 0.3, 0]} />
       </Canvas>
     </div>
   );
