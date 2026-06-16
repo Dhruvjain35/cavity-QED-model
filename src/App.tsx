@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import katex from "katex";
 import "katex/dist/katex.min.css";
-import { loadWasm, Quantum, solveSpectrum, arrowheadModesGi, arrowheadMatrixGi, cavityPowerSpectrumGi, couplingSweepGi, wignerRawOfRho, cavityLayers, cavityField, cavityReflectance, type SimParams } from "./quantum/engine";
+import { loadWasm, Quantum, solveSpectrum, arrowheadModesGi, arrowheadMatrixGi, cavityPowerSpectrumGi, couplingSweepGi, htcSpectrum, htcFranckCondon, wignerRawOfRho, cavityLayers, cavityField, cavityReflectance, type SimParams } from "./quantum/engine";
 import { buildEnsemble, brightWeights } from "./cavity/ensemble";
 
 const MODE_WAIST = 2.4; // TEM00 Gaussian mode waist w (length units of the molecular layout)
@@ -50,6 +50,9 @@ const FFT_N = 1024, FFT_DT = 0.12; // power-spectrum FFT length + sample step
 const SW_ML = 60, SW_MR = 18, SW_MT = 18, SW_MB = 32, SW_PW = 560, SW_PH = 408;
 const SW_CW = SW_ML + SW_PW + SW_MR, SW_CH = SW_MT + SW_PH + SW_MB;
 const SWEEP_GMAX = 0.2, SWEEP_STEPS = 90;
+const HT_ML = 58, HT_MR = 18, HT_MT = 18, HT_MB = 32, HT_PW = 720, HT_PH = 372;
+const HT_CW = HT_ML + HT_PW + HT_MR, HT_CH = HT_MT + HT_PH + HT_MB;
+const HTC_GRID = 760; // absorption-spectrum sampling points
 
 const PANEL = "#0b101c", INK = "#e2e8f0", DIM = "#94a3b8", AXIS = "#475569";
 const COBALT = "#3b82f6", CRIMSON = "#ef4444", EMERALD = "#10b981", AMBER = "#f59e0b", SLATE = "#475569";
@@ -87,7 +90,7 @@ function husimiImage(q: Float64Array, n: number, qmax: number): ImageData {
 }
 
 type SweepCol = { x: number; eigs: Float64Array; photon: Float64Array };
-type Regime = "single" | "collective" | "cavity" | "dynamics";
+type Regime = "single" | "collective" | "cavity" | "dynamics" | "vibronic";
 type Pt = { t: number; n: number; pe: number; pur: number };
 
 export function App() {
@@ -96,6 +99,7 @@ export function App() {
   const [tol, setTol] = useState({ atol: 1e-6, rtol: 1e-6 });
   const [sp, setSp] = useState({ m: 20, g: 0.05, sigma: 0.0, seed: 1 });
   const [cav, setCav] = useState({ lambda: 550, nHi: 2.5, nLo: 1.46, pairs: 4, nCav: 1.6, g: 1.6 });
+  const [htc, setHtc] = useState({ wv: 0.15, S: 1.0, g: 0.05, N: 1, gamma: 0.012 }); // HTC: ω_v, Huang-Rhys S, cavity g, collective N, broadening γ (units of ω_c)
   const [dyn, setDyn] = useState({ m: 12, g: 0.06, sigma: 0.04, seed: 1, init: 0, order: 0.7 });
   const [inspect, setInspect] = useState<number | null>(null); // clicked dressed eigenstate (UI badge)
   const [dynSweep, setDynSweep] = useState(false); // coupling-sweep dispersion mode (replaces the 3D)
@@ -122,6 +126,8 @@ export function App() {
   const fftCanvas = useRef<HTMLCanvasElement>(null), sweepCanvas = useRef<HTMLCanvasElement>(null);
   const fftData = useRef<{ omega: Float64Array; power: Float64Array } | null>(null);
   const sweepData = useRef<{ gs: Float64Array; eigs: Float64Array[] } | null>(null);
+  const htcCanvas = useRef<HTMLCanvasElement>(null);
+  const htcData = useRef<{ live: { eigs: Float64Array; photon: Float64Array; absorption: Float64Array }; fc: { pos: Float64Array; weight: Float64Array }; nVib: number } | null>(null);
   const offscreen = useRef<HTMLCanvasElement | null>(null), husimiOff = useRef<HTMLCanvasElement | null>(null), bridgeOff = useRef<HTMLCanvasElement | null>(null);
   const quantum = useRef<Quantum | null>(null);
   const raf = useRef<number>(0), dpr = useRef(1);
@@ -189,6 +195,20 @@ export function App() {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [regime, dyn]);
+
+  useEffect(() => {
+    if (regime !== "vibronic") return;
+    loadWasm().then(() => {
+      const S = htc.S, lambda = Math.sqrt(S), N = htc.N;
+      const nVib = Math.min(48, Math.max(10, Math.round(8 + 4 * S)));
+      // collective polaron decoupling: the bright polariton sees λ→λ/√N, g→g√N (Chem Rev §6.4)
+      const live = htcSpectrum(WA, WA, htc.wv, lambda / Math.sqrt(N), htc.g * Math.sqrt(N), nVib);
+      const fc = htcFranckCondon(WA, htc.wv, lambda, 12);
+      htcData.current = { live, fc, nVib };
+      drawHtc(); updateHtcReadouts();
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [regime, htc, wcEv]);
 
   useEffect(() => {
     dpr.current = Math.min(window.devicePixelRatio || 1, 2);
@@ -630,6 +650,53 @@ export function App() {
     ctx.fillStyle = DARKC; ctx.fillText("dark", SW_ML + SW_PW + 5, yOf(sw.eigs[steps - 1]![Math.floor(K / 2)]!));
   }
 
+  // Feature A · single-molecule HTC absorption: bare-molecule Franck–Condon progression (grey) vs the
+  // in-cavity / collective spectrum (cobalt). At N=1, g>0 the 0-0 line splits into vibronic polaritons;
+  // as N grows the bright sidebands collapse toward 0-0 (polaron decoupling, λ→λ/√N).
+  function drawHtc() {
+    const cvEl = htcCanvas.current, hd = htcData.current; if (!cvEl || !hd) return;
+    const ctx = sized(cvEl, HT_CW, HT_CH);
+    ctx.fillStyle = PANEL; ctx.fillRect(0, 0, HT_CW, HT_CH);
+    const N = htc.N, gamma = htc.gamma, split = 2 * htc.g * Math.sqrt(N);
+    const wlo = WA - htc.S * htc.wv - split * 0.7 - 0.12, whi = WA + 7 * htc.wv + 0.12;
+    const xOf = (w: number) => HT_ML + (w - wlo) / (whi - wlo) * HT_PW, yOf = (a: number) => HT_MT + (1 - a) * HT_PH;
+    const curve = (pos: Float64Array, wt: Float64Array) => {
+      const ys = new Float64Array(HTC_GRID);
+      for (let i = 0; i < HTC_GRID; i++) {
+        const w = wlo + (whi - wlo) * i / (HTC_GRID - 1); let s = 0;
+        for (let k = 0; k < pos.length; k++) { const wk = wt[k]!; if (wk < 1e-9) continue; const d = w - pos[k]!; s += wk * gamma * gamma / (d * d + gamma * gamma); }
+        ys[i] = s;
+      }
+      return ys;
+    };
+    const bare = curve(hd.fc.pos, hd.fc.weight), live = curve(hd.live.eigs, hd.live.absorption);
+    let norm = 1e-9; for (let i = 0; i < HTC_GRID; i++) { if (bare[i]! > norm) norm = bare[i]!; if (live[i]! > norm) norm = live[i]!; }
+    ctx.font = "500 9px 'B612 Mono', monospace";
+    for (const a of [0, 0.5, 1]) { ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5; seg(ctx, HT_ML, yOf(a), HT_ML + HT_PW, yOf(a)); ctx.fillStyle = DIM; ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(a.toFixed(1), HT_ML - 6, yOf(a)); }
+    for (let t = 0; t <= 6; t++) { const w = wlo + (whi - wlo) * t / 6; ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5; seg(ctx, xOf(w), HT_MT, xOf(w), HT_MT + HT_PH); ctx.fillStyle = DIM; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText(fmt(w, 2), xOf(w), HT_MT + HT_PH + 5); }
+    const drawArea = (ys: Float64Array, line: string, fill: string) => {
+      ctx.beginPath(); for (let i = 0; i < HTC_GRID; i++) { const w = wlo + (whi - wlo) * i / (HTC_GRID - 1); const x = xOf(w), y = yOf(ys[i]! / norm); i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); }
+      ctx.lineTo(xOf(whi), yOf(0)); ctx.lineTo(xOf(wlo), yOf(0)); ctx.closePath(); ctx.fillStyle = fill; ctx.fill();
+      ctx.beginPath(); for (let i = 0; i < HTC_GRID; i++) { const w = wlo + (whi - wlo) * i / (HTC_GRID - 1); const x = xOf(w), y = yOf(ys[i]! / norm); i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); } ctx.strokeStyle = line; ctx.lineWidth = 1.7; ctx.stroke();
+    };
+    drawArea(bare, "rgba(148,163,184,0.5)", "rgba(148,163,184,0.07)"); // bare molecule (Franck–Condon)
+    drawArea(live, COBALT, "rgba(59,130,246,0.15)"); // in-cavity / collective
+    // bare 0-0 origin marker (polaron-shifted)
+    const x00 = xOf(WA - htc.S * htc.wv); ctx.strokeStyle = "rgba(245,158,11,0.5)"; ctx.setLineDash([3, 3]); ctx.lineWidth = 0.75; seg(ctx, x00, HT_MT, x00, HT_MT + HT_PH); ctx.setLineDash([]);
+    ctx.fillStyle = AMBER; ctx.font = "italic 9px 'B612', sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "top"; ctx.fillText("0–0", x00 + 3, HT_MT + 2);
+    ctx.strokeStyle = AXIS; ctx.lineWidth = 0.75; ctx.strokeRect(HT_ML, HT_MT, HT_PW, HT_PH);
+    ctx.fillStyle = INK; ctx.font = "italic 12px 'B612', sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText("frequency  ω / ω_c", HT_ML + HT_PW / 2, HT_MT + HT_PH + 18);
+    ctx.save(); ctx.translate(15, HT_MT + HT_PH / 2); ctx.rotate(-Math.PI / 2); ctx.fillText("absorption  A(ω)", 0, 0); ctx.restore();
+  }
+
+  function updateHtcReadouts() {
+    const set = (k: string, v: string) => { const el = read.current[k]; if (el) el.textContent = v; };
+    const Er = htc.S * htc.wv;
+    set("htS", htc.S.toFixed(3)); set("htEr", Math.round(toMeV(Er)).toString());
+    set("htSbright", (htc.S / htc.N).toFixed(3)); set("htRabi", Math.round(toMeV(2 * htc.g * Math.sqrt(htc.N))).toString());
+    set("htNvib", String(htcData.current?.nVib ?? 0));
+  }
+
   // P1 · the headline: photon ↔ bright vacuum-Rabi oscillation (Ω_R = 2g√M) with the dark band that
   // stays flat at σ=0 and grows as disorder leaks population out of the bright mode. hist = [ph,br,dk].
   function drawPopTraces() {
@@ -718,6 +785,7 @@ export function App() {
             <button className={regime === "collective" ? "on" : ""} onClick={() => setRegime("collective")}>COLLECTIVE</button>
             <button className={regime === "cavity" ? "on" : ""} onClick={() => setRegime("cavity")}>CAVITY FIELD</button>
             <button className={regime === "dynamics" ? "on" : ""} onClick={() => setRegime("dynamics")}>DYNAMICS</button>
+            <button className={regime === "vibronic" ? "on" : ""} onClick={() => setRegime("vibronic")}>VIBRONIC</button>
           </div>
           {regime === "single" ? (
             <>
@@ -752,7 +820,7 @@ export function App() {
               <Field sym="n_c" label="cavity index" value={cav.nCav} min={1.3} max={2.5} step={0.05} unit="" onChange={(nCav) => setCav((s) => ({ ...s, nCav }))} />
               <Field sym="g" label="atom–cavity coupling" value={cav.g} min={0} max={5} step={0.1} unit="κ" onChange={(g) => setCav((s) => ({ ...s, g }))} />
             </Group>
-          ) : (
+          ) : regime === "dynamics" ? (
             <Group title="MOLECULAR ENSEMBLE" k="dyn" c={collapsed} t={toggle}>
               <Field sym="N" texSym="N" label="molecules" value={dyn.m} min={2} max={40} step={1} unit="" int onChange={(m) => setDyn((s) => ({ ...s, m: Math.round(m) }))} />
               <Field sym="g" texSym="g_0" label="coupling" value={dyn.g} min={0.01} max={0.2} step={0.005} unit="ω_c" onChange={(g) => setDyn((s) => ({ ...s, g }))} />
@@ -775,6 +843,18 @@ export function App() {
               </div>
               <div className="btn-row">
                 <button className={dynSweep ? "on" : ""} onClick={() => setDynSweep((v) => !v)}>{dynSweep ? "● SWEEP g vs Ω_R" : "SWEEP g vs Ω_R"}</button>
+              </div>
+            </Group>
+          ) : (
+            <Group title="VIBRONIC · HOLSTEIN-TC" k="htc" c={collapsed} t={toggle}>
+              <Field sym="ω" texSym="\omega_v" label="vibration" value={htc.wv} min={0.04} max={0.4} step={0.005} unit="ω_c" onChange={(wv) => setHtc((s) => ({ ...s, wv }))} />
+              <Field sym="S" texSym="S=\lambda^2" label="Huang-Rhys" value={htc.S} min={0} max={3} step={0.05} unit="" onChange={(S) => setHtc((s) => ({ ...s, S }))} />
+              <Field sym="g" texSym="g" label="cavity coupling" value={htc.g} min={0} max={0.25} step={0.005} unit="ω_c" onChange={(g) => setHtc((s) => ({ ...s, g }))} />
+              <Field sym="N" texSym="N" label="molecules (decouple)" value={htc.N} min={1} max={400} step={1} unit="" int onChange={(N) => setHtc((s) => ({ ...s, N: Math.round(N) }))} />
+              <Field sym="γ" texSym="\gamma" label="linewidth" value={htc.gamma} min={0.004} max={0.04} step={0.002} unit="ω_c" onChange={(gamma) => setHtc((s) => ({ ...s, gamma }))} />
+              <div className="btn-row">
+                <button className={htc.N <= 1 ? "on" : ""} onClick={() => setHtc((s) => ({ ...s, N: 1 }))}>N = 1</button>
+                <button className={htc.N >= 100 ? "on" : ""} onClick={() => setHtc((s) => ({ ...s, N: 200 }))}>N = 200 · decouple</button>
               </div>
             </Group>
           )}
@@ -832,6 +912,11 @@ export function App() {
                 </div>
               </div>
             </>
+          ) : regime === "vibronic" ? (
+            <div className="pane grow">
+              <div className="pane-head">Holstein-TC absorption · bare molecule <i style={{ color: "#94a3b8", fontStyle: "normal" }}>━</i> in-cavity / collective <i style={{ color: COBALT, fontStyle: "normal" }}>━</i> · vibronic sidebands at nω<sub>v</sub>; N→∞ collapses the bright sidebands (polaron decoupling)</div>
+              <canvas ref={htcCanvas} className="cv" />
+            </div>
           ) : dynSweep ? (
             <div className="pane grow">
               <div className="pane-head">Coupling sweep · polariton dispersion E(g) · {SWEEP_STEPS} diagonalizations · bright split as 2g√M, dark flat at ω_a · amber = live g</div>
@@ -915,7 +1000,7 @@ export function App() {
               </div>
               {Hud}
             </>
-          ) : (
+          ) : regime === "dynamics" ? (
             <>
               <div className="pane">
                 <div className="pane-head">Live observables</div>
@@ -928,6 +1013,20 @@ export function App() {
                   <Row label={<Tex t="\Omega_R" />} k="simRabi" r={read} unit="ω_c" />
                   <Row label={<Tex t="\Omega_R" />} k="simRabiMeV" r={read} unit="meV" />
                   <Row label={<Tex t="\textstyle\sum_k P_k" />} k="simNorm" r={read} />
+                </tbody></table>
+              </div>
+              {Hud}
+            </>
+          ) : (
+            <>
+              <div className="pane">
+                <div className="pane-head">Vibronic observables</div>
+                <table className="metrics"><tbody>
+                  <Row label={<Tex t="S\;(\text{Huang-Rhys})" />} k="htS" r={read} />
+                  <Row label={<Tex t="E_r = S\omega_v" />} k="htEr" r={read} unit="meV" />
+                  <Row label={<Tex t="S_{\mathrm{bright}} = S/N" />} k="htSbright" r={read} />
+                  <Row label={<Tex t="\Omega_R = 2g\sqrt{N}" />} k="htRabi" r={read} unit="meV" />
+                  <Row label={<Tex t="n_{\mathrm{vib}}" />} k="htNvib" r={read} />
                 </tbody></table>
               </div>
               {Hud}
