@@ -80,6 +80,7 @@ export function App() {
   const [sp, setSp] = useState({ m: 20, g: 0.05, sigma: 0.0, seed: 1 });
   const [cav, setCav] = useState({ lambda: 550, nHi: 2.5, nLo: 1.46, pairs: 4, nCav: 1.6, g: 1.6 });
   const [dyn, setDyn] = useState({ m: 12, g: 0.06, sigma: 0.04, seed: 1, init: 0 });
+  const [inspect, setInspect] = useState<number | null>(null); // clicked dressed eigenstate (UI badge)
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [playing, setPlaying] = useState(true);
   const [fixedScale, setFixedScale] = useState(true);
@@ -94,6 +95,8 @@ export function App() {
   const hopCanvas = useRef<HTMLCanvasElement>(null);
   const dynState = useRef<{ eigs: Float64Array; vecs: Float64Array; n: number; c: Float64Array; hist: Float64Array[] } | null>(null);
   const simT = useRef(0);
+  const hopMarks = useRef<{ x: number; y: number; k: number }[]>([]);
+  const inspectRef = useRef<number | null>(null); // dressed eigenstate frozen onto the 3D (null = live)
   const offscreen = useRef<HTMLCanvasElement | null>(null), husimiOff = useRef<HTMLCanvasElement | null>(null), bridgeOff = useRef<HTMLCanvasElement | null>(null);
   const quantum = useRef<Quantum | null>(null);
   const raf = useRef<number>(0), dpr = useRef(1);
@@ -149,6 +152,7 @@ export function App() {
       for (let k = 0; k < n; k++) c[k] = vecs[dyn.init * n + k]!; // ⟨φ_k|ψ0⟩ for the chosen initial site
       dynState.current = { eigs, vecs, n, c, hist: [] };
       simT.current = 0;
+      inspectRef.current = null; setInspect(null); // a new ensemble invalidates the inspected state
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [regime, dyn]);
@@ -171,7 +175,7 @@ export function App() {
         if (playingRef.current) simT.current += DT_DYN;
         const d = decompAt(simT.current);
         if (playingRef.current) { ds.hist.push(Float64Array.of(d.ph, d.br, d.dk)); if (ds.hist.length > HEAT_COLS) ds.hist.shift(); }
-        drawPopTraces(); drawHopfield(); updateSimReadouts(d);
+        drawPopTraces(); drawDressed(); updateSimReadouts(d);
       }
       raf.current = requestAnimationFrame(loop);
     };
@@ -488,45 +492,54 @@ export function App() {
 
   const DARKC = "#b08cf0"; // dark-manifold colour (distinct from photon-cobalt / bright-amber)
 
-  // P3 · Hopfield composition of every dressed eigenstate: each row is one eigenstate at its energy
-  // E_k, split into photon |v₀ₖ|² / bright (Σ bᵢvᵢₖ)² / dark remainder. Brightness ∝ how much the
-  // initial photon occupies that state |c_k|² — so the two ~50/50 polaritons light up and the M−1
-  // dark states sit dim at ω_a. This is the canonical polariton plot, recomputed from the live modes.
-  function drawHopfield() {
+  // P3 · dressed-state spectrum: each eigenstate is a marker at (photon fraction |v₀ₖ|², energy E_k).
+  // The two polaritons sit at the energy extremes near 50% photon; the M−1 dark states stack in a
+  // vertical line at photon≈0, pinned at ω_a. Marker size ∝ initial occupation |c_k|². Click a marker
+  // to freeze the 3D onto that eigenstate's molecular weights |vᵢₖ|² (→ dark states localize on a few
+  // molecules; polaritons glow collectively). Recomputed live from the WASM eigen-decomposition.
+  function drawDressed() {
     const cvEl = hopCanvas.current, ds = dynState.current; if (!cvEl || !ds) return;
     const ctx = sized(cvEl, HP_CW, HP_CH);
     ctx.fillStyle = PANEL; ctx.fillRect(0, 0, HP_CW, HP_CH);
-    const { eigs, vecs, n, c } = ds, M = n - 1, inv = 1 / Math.sqrt(M);
-    const rowH = HP_PH / n, barH = Math.min(13, rowH * 0.62);
+    const { eigs, vecs, n, c } = ds;
+    const emin = eigs[0]!, emax = eigs[n - 1]!, pad = (emax - emin) * 0.14 + 1e-4, elo = emin - pad, ehi = emax + pad;
+    const xOf = (f: number) => HP_ML + f * HP_PW, yOf = (e: number) => HP_MT + (1 - (e - elo) / (ehi - elo)) * HP_PH;
+    ctx.font = "500 8.5px 'B612 Mono', monospace";
     for (const f of [0, 0.25, 0.5, 0.75, 1]) {
-      const x = HP_ML + f * HP_PW;
-      ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5; seg(ctx, x, HP_MT, x, HP_MT + HP_PH);
-      ctx.fillStyle = DIM; ctx.font = "500 8.5px 'B612 Mono', monospace"; ctx.textAlign = "center"; ctx.textBaseline = "top";
-      ctx.fillText(f.toFixed(2), x, HP_MT + HP_PH + 5);
+      ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5; seg(ctx, xOf(f), HP_MT, xOf(f), HP_MT + HP_PH);
+      ctx.fillStyle = DIM; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText(f.toFixed(2), xOf(f), HP_MT + HP_PH + 5);
     }
+    ctx.textAlign = "right"; ctx.textBaseline = "middle";
+    for (let t = 0; t <= 4; t++) { const e = elo + (ehi - elo) * t / 4, y = yOf(e); ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5; seg(ctx, HP_ML, y, HP_ML + HP_PW, y); ctx.fillStyle = DIM; ctx.fillText(fmt(e, 3), HP_ML - 7, y); }
+    const yA = yOf(WA); // bare emitter line
+    ctx.strokeStyle = "rgba(148,163,184,0.4)"; ctx.setLineDash([4, 3]); ctx.lineWidth = 0.75; seg(ctx, HP_ML, yA, HP_ML + HP_PW, yA); ctx.setLineDash([]);
+    ctx.fillStyle = DIM; ctx.font = "italic 9px 'B612', sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "bottom"; ctx.fillText("ω_a", HP_ML + 3, yA - 2);
+    const marks: { x: number; y: number; k: number }[] = [], inspK = inspectRef.current;
     for (let k = 0; k < n; k++) {
-      const yc = HP_MT + (k + 0.5) * rowH;
-      const phot = vecs[k]! * vecs[k]!; // |v₀ₖ|²
-      let bAmp = 0; for (let i = 1; i < n; i++) bAmp += inv * vecs[i * n + k]!;
-      const bright = Math.min(1, bAmp * bAmp), dark = Math.max(0, 1 - phot - bright);
-      const occ = c[k]! * c[k]!;
-      ctx.globalAlpha = 0.28 + 0.72 * Math.sqrt(Math.min(1, occ));
-      let x = HP_ML;
-      for (const [w, col] of [[phot, COBALT], [bright, AMBER], [dark, DARKC]] as [number, string][]) {
-        ctx.fillStyle = col; ctx.fillRect(x, yc - barH / 2, w * HP_PW, barH); x += w * HP_PW;
-      }
-      ctx.globalAlpha = 1;
-      ctx.fillStyle = DIM; ctx.font = "500 8.5px 'B612 Mono', monospace"; ctx.textAlign = "right"; ctx.textBaseline = "middle";
-      ctx.fillText(fmt(eigs[k]!, 3), HP_ML - 7, yc);
+      const phot = vecs[k]! * vecs[k]!, occ = c[k]! * c[k]!, x = xOf(phot), y = yOf(eigs[k]!), rad = 2.6 + 5.5 * Math.sqrt(Math.min(1, occ));
+      marks.push({ x, y, k });
+      ctx.beginPath(); ctx.arc(x, y, rad, 0, 2 * Math.PI);
+      ctx.fillStyle = lerpHex(DARKC, COBALT, Math.min(1, phot * 2)); ctx.globalAlpha = 0.45 + 0.55 * Math.sqrt(Math.min(1, occ)); ctx.fill(); ctx.globalAlpha = 1;
+      if (k === inspK) { ctx.strokeStyle = "#fff"; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.arc(x, y, rad + 3.5, 0, 2 * Math.PI); ctx.stroke(); }
     }
-    // label the two polaritons (extreme energies are the bright LP/UP)
-    ctx.fillStyle = INK; ctx.font = "600 9px 'B612 Mono', monospace"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
-    ctx.fillText("UP", HP_ML + HP_PW + 5, HP_MT + rowH * 0.5);
-    ctx.fillText("LP", HP_ML + HP_PW + 5, HP_MT + (n - 0.5) * rowH);
+    hopMarks.current = marks;
+    ctx.fillStyle = INK; ctx.font = "600 9px 'B612 Mono', monospace"; ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+    ctx.fillText("LP", xOf(vecs[0]! * vecs[0]!), yOf(eigs[0]!) - 8);
+    ctx.fillText("UP", xOf(vecs[n - 1]! * vecs[n - 1]!), yOf(eigs[n - 1]!) - 8);
     ctx.strokeStyle = AXIS; ctx.lineWidth = 0.75; ctx.strokeRect(HP_ML, HP_MT, HP_PW, HP_PH);
     ctx.fillStyle = DIM; ctx.font = "italic 11px 'B612', sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top";
-    ctx.fillText("Hopfield fraction", HP_ML + HP_PW / 2, HP_MT + HP_PH + 16);
-    ctx.save(); ctx.translate(15, HP_MT + HP_PH / 2); ctx.rotate(-Math.PI / 2); ctx.fillText("energy  E_k", 0, 0); ctx.restore();
+    ctx.fillText("photon fraction  |⟨a|ψ_k⟩|²", HP_ML + HP_PW / 2, HP_MT + HP_PH + 16);
+    ctx.save(); ctx.translate(15, HP_MT + HP_PH / 2); ctx.rotate(-Math.PI / 2); ctx.fillText("energy  E_k (ω)", 0, 0); ctx.restore();
+  }
+
+  function onHopClick(e: React.MouseEvent<HTMLCanvasElement>) {
+    const cv = hopCanvas.current; if (!cv) return;
+    const r = cv.getBoundingClientRect();
+    const px = (e.clientX - r.left) * (HP_CW / r.width), py = (e.clientY - r.top) * (HP_CH / r.height);
+    let best = -1, bd = 1e9;
+    for (const m of hopMarks.current) { const d = (m.x - px) ** 2 + (m.y - py) ** 2; if (d < bd) { bd = d; best = m.k; } }
+    const nk = best >= 0 && bd < 420 ? (best === inspectRef.current ? null : best) : null;
+    inspectRef.current = nk; setInspect(nk);
   }
 
   // P1 · the headline: photon ↔ bright vacuum-Rabi oscillation (Ω_R = 2g√M) with the dark band that
@@ -715,8 +728,8 @@ export function App() {
           ) : (
             <div className="dyn-split">
               <div className="pane grow dyn-3d">
-                <div className="pane-head">Live cavity · {dyn.m} emitters + 1 photon · matter glows amber, field cobalt · drag to orbit</div>
-                <div className="live3d"><Suspense fallback={<div className="cv-loading">loading 3D…</div>}><LiveCavityScene stateRef={dynState} tRef={simT} m={dyn.m} /></Suspense></div>
+                <div className="pane-head">Live cavity · {dyn.m} naphthalene emitters + 1 photon{inspect != null ? <> · <i style={{ color: "#fff", fontStyle: "normal" }}>inspecting eigenstate #{inspect}</i></> : <> · matter glows amber, field cobalt · drag to orbit</>}</div>
+                <div className="live3d"><Suspense fallback={<div className="cv-loading">loading 3D…</div>}><LiveCavityScene stateRef={dynState} tRef={simT} m={dyn.m} inspectRef={inspectRef} /></Suspense></div>
               </div>
               <div className="dyn-2d">
                 <div className="pane">
@@ -724,8 +737,8 @@ export function App() {
                   <canvas ref={popCanvas} className="cv" />
                 </div>
                 <div className="pane grow">
-                  <div className="pane-head">Dressed states · Hopfield composition vs energy · photon <i style={{ color: COBALT, fontStyle: "normal" }}>▪</i> bright <i style={{ color: AMBER, fontStyle: "normal" }}>▪</i> dark <i style={{ color: DARKC, fontStyle: "normal" }}>▪</i> · opacity = initial occupation</div>
-                  <canvas ref={hopCanvas} className="cv" />
+                  <div className="pane-head">Dressed-state spectrum · E<sub>k</sub> vs photon fraction · {inspect != null ? <span style={{ color: "#fff" }}>▸ eigenstate #{inspect} on the 3D · click again to release</span> : <span>click an eigenstate to project it onto the molecules</span>}</div>
+                  <canvas ref={hopCanvas} className="cv click" onClick={onHopClick} />
                 </div>
               </div>
             </div>

@@ -38,6 +38,27 @@ function popsAt(ds: NonNullable<Dyn>, t: number): Float64Array {
 }
 const photonAmp = (ds: NonNullable<Dyn>, t: number) => Math.min(1, Math.sqrt(Math.max(0, popsAt(ds, t)[0]!)));
 
+// field amplitude √⟨a†a⟩ — or, when an eigenstate is pinned for inspection, that state's photon weight.
+function fieldAmp(ds: NonNullable<Dyn>, inspK: number | null, t: number): number {
+  if (inspK != null && inspK >= 0 && inspK < ds.n) return Math.min(1, Math.abs(ds.vecs[inspK]!));
+  return photonAmp(ds, t);
+}
+
+// per-molecule excitation: live |ψᵢ(t)|², or the inspected eigenstate's molecular weights |vᵢₖ|²
+// (normalised to the brightest molecule, so a localized dark state visibly lights only a few).
+function molValues(ds: NonNullable<Dyn>, inspK: number | null, t: number, m: number): Float64Array {
+  const out = new Float64Array(m);
+  if (inspK != null && inspK >= 0 && inspK < ds.n) {
+    let mx = 1e-9;
+    for (let i = 0; i < m; i++) { const v = ds.vecs[(i + 1) * ds.n + inspK]!; out[i] = v * v; if (out[i]! > mx) mx = out[i]!; }
+    for (let i = 0; i < m; i++) out[i] = out[i]! / mx;
+    return out;
+  }
+  const pops = popsAt(ds, t);
+  for (let i = 0; i < m; i++) out[i] = pops[i + 1]!;
+  return out;
+}
+
 // excitation → glow colour: neutral carbon grey, mid amber, near-white hot. sqrt lifts small pops.
 function heat(p: number, target: THREE.Color): THREE.Color {
   const v = Math.min(1, Math.sqrt(Math.max(0, p)));
@@ -77,7 +98,7 @@ function buildFilm(m: number) {
   return { atoms, bonds };
 }
 
-function Molecules({ stateRef, tRef, m }: { stateRef: MutableRefObject<Dyn>; tRef: MutableRefObject<number>; m: number }) {
+function Molecules({ stateRef, tRef, inspectRef, m }: { stateRef: MutableRefObject<Dyn>; tRef: MutableRefObject<number>; inspectRef: MutableRefObject<number | null>; m: number }) {
   const film = useMemo(() => buildFilm(m), [m]);
   const atomRef = useRef<THREE.InstancedMesh>(null), bondRef = useRef<THREE.InstancedMesh>(null);
   const ca = useMemo(() => new THREE.Color(), []), cb = useMemo(() => new THREE.Color(), []);
@@ -93,9 +114,9 @@ function Molecules({ stateRef, tRef, m }: { stateRef: MutableRefObject<Dyn>; tRe
   useFrame(() => {
     const aM = atomRef.current, bM = bondRef.current, ds = stateRef.current;
     if (!aM || !bM || !ds || ds.n !== m + 1) return;
-    const pops = popsAt(ds, tRef.current);
-    film.atoms.forEach((a, i) => aM.setColorAt(i, heat(pops[a.mol + 1]!, ca)));
-    film.bonds.forEach((b, i) => bM.setColorAt(i, heat(pops[b.mol + 1]!, cb).multiplyScalar(0.72)));
+    const w = molValues(ds, inspectRef.current, tRef.current, m);
+    film.atoms.forEach((a, i) => aM.setColorAt(i, heat(w[a.mol]!, ca)));
+    film.bonds.forEach((b, i) => bM.setColorAt(i, heat(w[b.mol]!, cb).multiplyScalar(0.72)));
     if (aM.instanceColor) aM.instanceColor.needsUpdate = true;
     if (bM.instanceColor) bM.instanceColor.needsUpdate = true;
   });
@@ -116,7 +137,7 @@ function Molecules({ stateRef, tRef, m }: { stateRef: MutableRefObject<Dyn>; tRe
 // Cavity photon mode: two crossed standing-wave tubes sin(qπ(x+H)/2H). Built once; each frame the
 // emissive cobalt brightness AND the transverse amplitude scale with √⟨a†a⟩ — full sine when the
 // photon is in the field, flat on the axis as it empties into the molecules.
-function PhotonMode({ stateRef, tRef }: { stateRef: MutableRefObject<Dyn>; tRef: MutableRefObject<number> }) {
+function PhotonMode({ stateRef, tRef, inspectRef }: { stateRef: MutableRefObject<Dyn>; tRef: MutableRefObject<number>; inspectRef: MutableRefObject<number | null> }) {
   const geom = useMemo(() => {
     const SEG = 150, Q = 5, pts: THREE.Vector3[] = [];
     for (let i = 0; i <= SEG; i++) { const x = -HALF + (2 * HALF * i) / SEG; pts.push(new THREE.Vector3(x, Math.sin((Q * Math.PI * (x + HALF)) / (2 * HALF)), 0)); }
@@ -127,7 +148,7 @@ function PhotonMode({ stateRef, tRef }: { stateRef: MutableRefObject<Dyn>; tRef:
   const col = useMemo(() => new THREE.Color(), []);
   useFrame(() => {
     const ds = stateRef.current; if (!ds) return;
-    const amp = photonAmp(ds, tRef.current); col.copy(COB_LO).lerp(COB_HI, amp);
+    const amp = fieldAmp(ds, inspectRef.current, tRef.current); col.copy(COB_LO).lerp(COB_HI, amp);
     for (const mr of [mY, mZ]) { const mt = mr.current; if (mt) { mt.color.copy(col); mt.emissive.copy(col); mt.emissiveIntensity = 0.15 + 1.5 * amp; } }
     if (gY.current) gY.current.scale.y = 0.05 + amp;
     if (gZ.current) gZ.current.scale.y = 0.05 + amp;
@@ -143,11 +164,11 @@ function PhotonMode({ stateRef, tRef }: { stateRef: MutableRefObject<Dyn>; tRef:
 // A Fabry–Pérot mirror facing inward along the cavity axis: polished metal substrate (reflects the
 // studio env AND the cobalt field), a dark machined bezel, and a faint cobalt field tint on the inner
 // face that rises with the photon population. Correct orientation — the reflective face looks at its twin.
-function Mirror({ side, stateRef, tRef }: { side: 1 | -1; stateRef: MutableRefObject<Dyn>; tRef: MutableRefObject<number> }) {
+function Mirror({ side, stateRef, tRef, inspectRef }: { side: 1 | -1; stateRef: MutableRefObject<Dyn>; tRef: MutableRefObject<number>; inspectRef: MutableRefObject<number | null> }) {
   const tint = useRef<THREE.MeshStandardMaterial>(null);
   useFrame(() => {
     const ds = stateRef.current, t = tint.current; if (!ds || !t) return;
-    t.emissiveIntensity = 0.03 + 0.45 * photonAmp(ds, tRef.current);
+    t.emissiveIntensity = 0.03 + 0.45 * fieldAmp(ds, inspectRef.current, tRef.current);
   });
   return (
     <group position={[side * (HALF + 0.18), 0, 0]}>
@@ -167,9 +188,9 @@ function Mirror({ side, stateRef, tRef }: { side: 1 | -1; stateRef: MutableRefOb
   );
 }
 
-function FieldLight({ stateRef, tRef }: { stateRef: MutableRefObject<Dyn>; tRef: MutableRefObject<number> }) {
+function FieldLight({ stateRef, tRef, inspectRef }: { stateRef: MutableRefObject<Dyn>; tRef: MutableRefObject<number>; inspectRef: MutableRefObject<number | null> }) {
   const ref = useRef<THREE.PointLight>(null);
-  useFrame(() => { const ds = stateRef.current, l = ref.current; if (ds && l) l.intensity = 7 * photonAmp(ds, tRef.current); });
+  useFrame(() => { const ds = stateRef.current, l = ref.current; if (ds && l) l.intensity = 7 * fieldAmp(ds, inspectRef.current, tRef.current); });
   return <pointLight ref={ref} position={[0, 0, 0]} distance={13} color="#6fa8ff" />;
 }
 
@@ -187,7 +208,7 @@ function Studio() {
   );
 }
 
-export function LiveCavityScene({ stateRef, tRef, m }: { stateRef: MutableRefObject<Dyn>; tRef: MutableRefObject<number>; m: number }) {
+export function LiveCavityScene({ stateRef, tRef, inspectRef, m }: { stateRef: MutableRefObject<Dyn>; tRef: MutableRefObject<number>; inspectRef: MutableRefObject<number | null>; m: number }) {
   return (
     <div className="cav-stage">
       <div className="cav-tag cav-tag-l">mirror</div>
@@ -199,11 +220,11 @@ export function LiveCavityScene({ stateRef, tRef, m }: { stateRef: MutableRefObj
         <Studio />
         <ambientLight intensity={0.26} />
         <directionalLight castShadow intensity={0.5} position={[5, 8, 6]} shadow-mapSize={[1024, 1024]} shadow-bias={-0.0001} />
-        <FieldLight stateRef={stateRef} tRef={tRef} />
-        <Mirror side={-1} stateRef={stateRef} tRef={tRef} />
-        <Mirror side={1} stateRef={stateRef} tRef={tRef} />
-        <PhotonMode stateRef={stateRef} tRef={tRef} />
-        <Molecules stateRef={stateRef} tRef={tRef} m={m} />
+        <FieldLight stateRef={stateRef} tRef={tRef} inspectRef={inspectRef} />
+        <Mirror side={-1} stateRef={stateRef} tRef={tRef} inspectRef={inspectRef} />
+        <Mirror side={1} stateRef={stateRef} tRef={tRef} inspectRef={inspectRef} />
+        <PhotonMode stateRef={stateRef} tRef={tRef} inspectRef={inspectRef} />
+        <Molecules stateRef={stateRef} tRef={tRef} inspectRef={inspectRef} m={m} />
         <ContactShadows position={[0, -2.7, 0]} scale={26} blur={2.8} far={6} opacity={0.42} resolution={1024} color="#02040a" />
         <Grid position={[0, -2.7, 0]} args={[28, 28]} cellSize={0.9} cellThickness={0.4} cellColor="#0f1825" sectionSize={4.5} sectionThickness={0.7} sectionColor="#223247" fadeDistance={34} fadeStrength={1.6} infiniteGrid />
         <EffectComposer>
