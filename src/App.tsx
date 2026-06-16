@@ -55,6 +55,7 @@ const SWEEP_GMAX = 0.2, SWEEP_STEPS = 90;
 const HT_ML = 58, HT_MR = 18, HT_MT = 18, HT_MB = 32, HT_PW = 720, HT_PH = 372;
 const HT_CW = HT_ML + HT_PW + HT_MR, HT_CH = HT_MT + HT_PH + HT_MB;
 const HTC_GRID = 760; // absorption-spectrum sampling points
+const MX_S = 196; // live Hamiltonian heatmap size (px)
 
 const PANEL = "#0b101c", INK = "#e2e8f0", DIM = "#94a3b8", AXIS = "#475569";
 const COBALT = "#3b82f6", CRIMSON = "#ef4444", EMERALD = "#10b981", AMBER = "#f59e0b", SLATE = "#475569";
@@ -128,6 +129,8 @@ export function App() {
   const fftCanvas = useRef<HTMLCanvasElement>(null), sweepCanvas = useRef<HTMLCanvasElement>(null);
   const fftData = useRef<{ omega: Float64Array; power: Float64Array } | null>(null);
   const sweepData = useRef<{ gs: Float64Array; eigs: Float64Array[] } | null>(null);
+  const matCanvas = useRef<HTMLCanvasElement>(null);
+  const matData = useRef<{ h: Float64Array; n: number } | null>(null);
   const htcCanvas = useRef<HTMLCanvasElement>(null);
   const htcData = useRef<{ live: { eigs: Float64Array; photon: Float64Array; absorption: Float64Array }; fc: { pos: Float64Array; weight: Float64Array }; nVib: number; method: string } | null>(null);
   const offscreen = useRef<HTMLCanvasElement | null>(null), husimiOff = useRef<HTMLCanvasElement | null>(null), bridgeOff = useRef<HTMLCanvasElement | null>(null);
@@ -192,6 +195,7 @@ export function App() {
       dynState.current = { eigs, vecs, n, c, bright: brightWeights(ensemble.factors), modeAmp: ensemble.modeAmp, hist: [] };
       simT.current = 0;
       inspectRef.current = null; setInspect(null); // a new ensemble invalidates the inspected state
+      matData.current = arrowheadMatrixGi(WA, WA, dyn.sigma, dyn.seed, gi);
       fftData.current = cavityPowerSpectrumGi(WA, WA, dyn.sigma, dyn.seed, gi, FFT_N, FFT_DT, dyn.gamma);
       sweepData.current = couplingSweepGi(WA, WA, dyn.sigma, dyn.seed, ensemble.factors, 0, SWEEP_GMAX, SWEEP_STEPS);
     });
@@ -239,7 +243,7 @@ export function App() {
         if (playingRef.current) simT.current += DT_DYN;
         const d = decompAt(simT.current);
         if (playingRef.current) { ds.hist.push(Float64Array.of(d.ph, d.br, d.dk)); if (ds.hist.length > HEAT_COLS) ds.hist.shift(); }
-        drawPopTraces(); drawDressed(); drawPowerSpectrum(); updateSimReadouts(d);
+        drawPopTraces(); drawDressed(); drawPowerSpectrum(); drawMatrix(); updateSimReadouts(d);
         if (sweepRef.current) drawSweep();
       }
       raf.current = requestAnimationFrame(loop);
@@ -613,6 +617,26 @@ export function App() {
     ctx.fillStyle = DIM; ctx.font = "italic 11px 'B612', sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top";
     ctx.fillText("photon fraction  |⟨a|ψ_k⟩|²", HP_ML + HP_PW / 2, HP_MT + HP_PH + 16);
     ctx.save(); ctx.translate(15, HP_MT + HP_PH / 2); ctx.rotate(-Math.PI / 2); ctx.fillText("energy  E_k / ω_c", 0, 0); ctx.restore();
+  }
+
+  // Upgrade III · live Hamiltonian inspector: pixel-grid heatmap of the exact (N+1)×(N+1) arrowhead the
+  // WASM loop is diagonalizing. The diagonal carries the (disordered) site energies; the photon row/col
+  // (the "arrow") carries the couplings g_i — cobalt for +, crimson for − (anti-aligned dipoles). √-scaled
+  // so the small couplings are visible against the ~ω_c diagonal. It is the same array the Ĥ.npy exports.
+  function drawMatrix() {
+    const cvEl = matCanvas.current, m = matData.current; if (!cvEl || !m) return;
+    const ctx = sized(cvEl, MX_S, MX_S);
+    ctx.fillStyle = PANEL; ctx.fillRect(0, 0, MX_S, MX_S);
+    const pad = 5, n = m.n, h = m.h, cell = (MX_S - 2 * pad) / n;
+    let maxAbs = 1e-9; for (let i = 0; i < h.length; i++) maxAbs = Math.max(maxAbs, Math.abs(h[i]!));
+    for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+      const val = h[i * n + j]!, v = Math.sqrt(Math.min(1, Math.abs(val) / maxAbs));
+      ctx.fillStyle = val >= 0 ? lerpHex("#0a0f1a", "#4d8bf5", v) : lerpHex("#0a0f1a", "#ef4444", v);
+      ctx.fillRect(pad + j * cell, pad + i * cell, cell + 0.6, cell + 0.6);
+    }
+    ctx.strokeStyle = AXIS; ctx.lineWidth = 0.6; ctx.strokeRect(pad, pad, n * cell, n * cell);
+    ctx.fillStyle = DIM; ctx.font = "500 8px 'B612 Mono', monospace"; ctx.textAlign = "left"; ctx.textBaseline = "bottom";
+    ctx.fillText("photon", pad + 1, pad - 1);
   }
 
   function onHopClick(e: React.MouseEvent<HTMLCanvasElement>) {
@@ -1043,6 +1067,10 @@ export function App() {
                   <Row label={<Tex t="\Omega_R" />} k="simRabiMeV" r={read} unit="meV" />
                   <Row label={<Tex t="\textstyle\sum_k P_k" />} k="simNorm" r={read} />
                 </tbody></table>
+              </div>
+              <div className="pane">
+                <div className="pane-head">Hamiltonian Ĥ · live · diagonal = ωᵢ, arrow = gᵢ (<i style={{ color: COBALT, fontStyle: "normal" }}>+</i>/<i style={{ color: CRIMSON, fontStyle: "normal" }}>−</i>)</div>
+                <canvas ref={matCanvas} className="cv" style={{ margin: "0 auto" }} />
               </div>
               {Hud}
             </>
