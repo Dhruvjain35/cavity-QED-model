@@ -1,6 +1,6 @@
 // Thin TS wrapper over the QuTiP-validated Rust→WASM core (sim/wasm/pkg-web).
 // All physics is computed in WASM; this only marshals parameters and the RGBA buffer.
-import init, { Sim, spectrum, arrowhead_modes, arrowhead_modes_gi, arrowhead_matrix_gi, cavity_power_spectrum, cavity_power_spectrum_gi, coupling_sweep, coupling_sweep_gi, htc_spectrum, htc_spectrum_multi, htc_franck_condon, wigner_rgba_of_rho, wigner_of_rho, cavity_layers, cavity_field, cavity_reflectance } from "../../wasm/pkg-web/cqed_core.js";
+import init, { Sim, spectrum, arrowhead_modes, arrowhead_modes_gi, arrowhead_matrix_gi, cavity_power_spectrum, cavity_power_spectrum_gi, coupling_sweep, coupling_sweep_gi, htc_spectrum, htc_spectrum_multi, htc_matrix_view, htc_franck_condon, wigner_rgba_of_rho, wigner_of_rho, cavity_layers, cavity_field, cavity_reflectance } from "../../wasm/pkg-web/cqed_core.js";
 
 let initPromise: Promise<unknown> | null = null;
 export function loadWasm(): Promise<unknown> {
@@ -130,6 +130,13 @@ export function htcSpectrumMulti(wc: number, wx: number, wv: number, lambda: num
   const flat = htc_spectrum_multi(wc, wx, wv, lambda, g, nMol, nVib);
   const d = flat.length / 3;
   return { eigs: flat.slice(0, d), photon: flat.slice(d, 2 * d), absorption: flat.slice(2 * d, 3 * d) };
+}
+
+/** HTC Hamiltonian matrix-inspector view (block-max downsampled to ≤cap×cap) — reveals the Holstein/
+ *  Franck–Condon off-diagonal coupling blocks. Returns the raw matrix as {h, n}. */
+export function htcMatrixView(wc: number, wx: number, wv: number, lambda: number, g: number, nMol: number, nVib: number, cap: number): { h: Float64Array; n: number } {
+  const flat = htc_matrix_view(wc, wx, wv, lambda, g, nMol, nVib, cap);
+  return { h: flat.slice(1), n: flat[0]! };
 }
 
 /** Analytic bare-molecule (g=0) Franck–Condon sticks: positions ω_x−Sω_v+nω_v and Poisson weights. */

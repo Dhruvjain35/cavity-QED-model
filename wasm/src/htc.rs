@@ -69,35 +69,75 @@ pub fn htc(w_c: f64, w_x: f64, w_v: f64, lambda: f64, g: f64, n_vib: usize) -> H
 /// excited molecule's own oscillator; the TC term is phonon-diagonal. Absorption is the COLLECTIVE
 /// in-phase bright transition |Σ_i⟨i,vib=0|ψ_k⟩|² from the cold ground, normalized. At N=1 this reduces
 /// exactly to `htc()`; at λ=0 the lower polariton sits at ω_c − g√N (collective vacuum Rabi).
-pub fn htc_multi(w_c: f64, w_x: f64, w_v: f64, lambda: f64, g: f64, n_mol: usize, n_vib: usize) -> Htc {
+/// Construct the explicit N-molecule single-excitation HTC matrix (no diagonalization). Shared by
+/// `htc_multi` and the matrix-inspector view so the displayed matrix IS the one being solved.
+pub fn build_htc_matrix(w_c: f64, w_x: f64, w_v: f64, lambda: f64, g: f64, n_mol: usize, n_vib: usize) -> DMatrix<f64> {
     let nconf = n_vib.pow(n_mol as u32);
     let dim = (n_mol + 1) * nconf;
     let mut h = DMatrix::zeros(dim, dim);
     let vib = |c: usize, i: usize| -> usize { (c / n_vib.pow(i as u32)) % n_vib };
     let sum_vib = |c: usize| -> usize { (0..n_mol).map(|i| vib(c, i)).sum() };
-    // photon sector (s = 0): global index c
     for c in 0..nconf {
-        h[(c, c)] = w_c + sum_vib(c) as f64 * w_v;
+        h[(c, c)] = w_c + sum_vib(c) as f64 * w_v; // photon sector
     }
-    // molecule-excited sectors (s = 1..=N): global index s·nconf + c
     for s in 1..=n_mol {
-        let mi = s - 1; // 0-based molecule index of this sector
+        let mi = s - 1;
         let base = s * nconf;
         let stride = n_vib.pow(mi as u32);
         for c in 0..nconf {
             h[(base + c, base + c)] = w_x + sum_vib(c) as f64 * w_v;
             let v = vib(c, mi);
             if v + 1 < n_vib {
-                let c2 = c + stride; // raise molecule mi's phonon by one
-                let el = lambda * w_v * ((v + 1) as f64).sqrt();
+                let c2 = c + stride;
+                let el = lambda * w_v * ((v + 1) as f64).sqrt(); // Holstein ladder
                 h[(base + c, base + c2)] = el;
                 h[(base + c2, base + c)] = el;
             }
-            // Tavis–Cummings: photon sector ↔ this molecule sector, same vib config
-            h[(c, base + c)] = g;
+            h[(c, base + c)] = g; // Tavis–Cummings, phonon-diagonal
             h[(base + c, c)] = g;
         }
     }
+    h
+}
+
+/// Downsample the HTC matrix to an `cap`×`cap` block-max view (signed by the dominant element) for the
+/// matrix inspector — so the Holstein/Franck-Condon off-diagonal blocks are visible even when the full
+/// basis is hundreds of dimensions. Returns (out_dim, flat row-major out_dim² values).
+pub fn htc_matrix_view(w_c: f64, w_x: f64, w_v: f64, lambda: f64, g: f64, n_mol: usize, n_vib: usize, cap: usize) -> (usize, Vec<f64>) {
+    let h = build_htc_matrix(w_c, w_x, w_v, lambda, g, n_mol, n_vib);
+    let dim = h.nrows();
+    if dim <= cap {
+        let mut out = Vec::with_capacity(dim * dim);
+        for i in 0..dim {
+            for j in 0..dim {
+                out.push(h[(i, j)]);
+            }
+        }
+        return (dim, out);
+    }
+    let bs = dim.div_ceil(cap); // block size
+    let c = dim.div_ceil(bs);
+    let mut out = vec![0.0; c * c];
+    for oi in 0..c {
+        for oj in 0..c {
+            let mut best = 0.0_f64;
+            for i in (oi * bs)..((oi + 1) * bs).min(dim) {
+                for j in (oj * bs)..((oj + 1) * bs).min(dim) {
+                    if h[(i, j)].abs() > best.abs() {
+                        best = h[(i, j)];
+                    }
+                }
+            }
+            out[oi * c + oj] = best;
+        }
+    }
+    (c, out)
+}
+
+pub fn htc_multi(w_c: f64, w_x: f64, w_v: f64, lambda: f64, g: f64, n_mol: usize, n_vib: usize) -> Htc {
+    let nconf = n_vib.pow(n_mol as u32);
+    let dim = (n_mol + 1) * nconf;
+    let h = build_htc_matrix(w_c, w_x, w_v, lambda, g, n_mol, n_vib);
     let se = h.symmetric_eigen();
     let mut idx: Vec<usize> = (0..dim).collect();
     idx.sort_by(|&a, &b| se.eigenvalues[a].partial_cmp(&se.eigenvalues[b]).unwrap_or(std::cmp::Ordering::Equal));

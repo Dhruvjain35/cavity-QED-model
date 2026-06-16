@@ -293,6 +293,17 @@ pub fn htc_spectrum_multi(w_c: f64, w_x: f64, w_v: f64, lambda: f64, g: f64, n_m
     out
 }
 
+/// HTC Hamiltonian matrix-inspector view: flat [out_dim, then out_dim² row-major values], block-max
+/// downsampled to ≤`cap`×`cap`. Reveals the Holstein/Franck–Condon off-diagonal blocks. See htc::htc_matrix_view.
+#[wasm_bindgen]
+pub fn htc_matrix_view(w_c: f64, w_x: f64, w_v: f64, lambda: f64, g: f64, n_mol: usize, n_vib: usize, cap: usize) -> Vec<f64> {
+    let (d, mat) = crate::htc::htc_matrix_view(w_c, w_x, w_v, lambda, g, n_mol, n_vib, cap);
+    let mut out = Vec::with_capacity(1 + mat.len());
+    out.push(d as f64);
+    out.extend_from_slice(&mat);
+    out
+}
+
 /// Analytic bare-molecule (g=0) Franck–Condon reference: flat [position (n_max), weight (n_max)].
 #[wasm_bindgen]
 pub fn htc_franck_condon(w_x: f64, w_v: f64, lambda: f64, n_max: usize) -> Vec<f64> {

@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import katex from "katex";
 import "katex/dist/katex.min.css";
-import { loadWasm, Quantum, solveSpectrum, arrowheadModesGi, arrowheadMatrixGi, cavityPowerSpectrumGi, couplingSweepGi, htcSpectrum, htcSpectrumMulti, htcFranckCondon, wignerRawOfRho, cavityLayers, cavityField, cavityReflectance, type SimParams } from "./quantum/engine";
+import { loadWasm, Quantum, solveSpectrum, arrowheadModesGi, arrowheadMatrixGi, cavityPowerSpectrumGi, couplingSweepGi, htcSpectrum, htcSpectrumMulti, htcMatrixView, htcFranckCondon, wignerRawOfRho, cavityLayers, cavityField, cavityReflectance, type SimParams } from "./quantum/engine";
 
 const HTC_EXPLICIT_CAP = 3; // N ≤ this → exact (N+1)·nv^N diagonalization; above → asymptotic 1/N decoupling
 import { buildEnsemble, brightWeights } from "./cavity/ensemble";
@@ -225,7 +225,11 @@ export function App() {
       }
       const fc = htcFranckCondon(WA, htc.wv, lambda, 12);
       htcData.current = { live, fc, nVib, method };
-      drawHtc(); updateHtcReadouts();
+      // matrix inspector: the EXACT HTC matrix being solved (the Holstein/FC blocks light up with S)
+      matData.current = N <= HTC_EXPLICIT_CAP
+        ? htcMatrixView(WA, WA, htc.wv, lambda, htc.g, N, nVib, 64)
+        : htcMatrixView(WA, WA, htc.wv, lambda / Math.sqrt(N), htc.g * Math.sqrt(N), 1, nVib, 64);
+      drawHtc(); drawMatrix(); updateHtcReadouts();
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [regime, htc, wcEv]);
@@ -1050,7 +1054,7 @@ export function App() {
           ) : (
             <div className="dyn-bento">
               <div className="pane bento-3d">
-                <div className="pane-head">Live cavity · {dyn.m} naphthalene emitters + 1 photon{inspect != null ? <> · <i style={{ color: "#fff", fontStyle: "normal" }}>inspecting eigenstate #{inspect}</i></> : <> · matter amber · field cobalt · dipoles <i style={{ color: "#4fcabe", fontStyle: "normal" }}>μ</i></>}</div>
+                <div className="pane-head">Live cavity · {dyn.m} naphthalene emitters + 1 photon{inspect != null ? <> · <i style={{ color: "#fff", fontStyle: "normal" }}>inspecting eigenstate #{inspect}</i></> : <> · matter <i style={{ color: RED, fontStyle: "normal" }}>red</i> · field <i style={{ color: CYAN, fontStyle: "normal" }}>cyan</i> · μ̂ shade = coupling</>}</div>
                 <div className="live3d"><Suspense fallback={<div className="cv-loading">loading 3D…</div>}><LiveCavityScene stateRef={dynState} tRef={simT} m={dyn.m} inspectRef={inspectRef} ensemble={ensemble} waist={MODE_WAIST} polTheta={dyn.theta * Math.PI / 180} /></Suspense></div>
               </div>
               <div className="pane">
@@ -1157,6 +1161,10 @@ export function App() {
                   <Row label={<Tex t="\Omega_R = 2g\sqrt{N}" />} k="htRabi" r={read} unit="meV" />
                   <Row label={<Tex t="n_{\mathrm{vib}}" />} k="htNvib" r={read} />
                 </tbody></table>
+              </div>
+              <div className="pane">
+                <div className="pane-head">⟨i|Ĥ<sub>HTC</sub>|j⟩ · photon ⊕ vibronic blocks · Holstein/FC off-diagonals brighten with S</div>
+                <canvas ref={matCanvas} className="cv" style={{ margin: "0 auto" }} />
               </div>
               {Hud}
             </>
