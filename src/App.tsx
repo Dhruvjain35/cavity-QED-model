@@ -1,5 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { loadWasm, Quantum, solveSpectrum, wignerRawOfRho, cavityLayers, cavityField, cavityReflectance, type SimParams } from "./quantum/engine";
+
+// three.js is heavy and only used by the cavity regime — load it on demand
+const CavityScene = lazy(() => import("./cavity/CavityScene").then((m) => ({ default: m.CavityScene })));
 
 // ── Regime 1 (single emitter) ──
 const N_GRID = 100, X_RANGE = 5, DT_FRAME = 0.18, T_LOOP = 80, SERIES_MAX = 600, INV_PI = 1 / Math.PI;
@@ -22,6 +25,8 @@ const R_CW = R_ML + R_S + R_MR, R_CH = R_MT + R_S + R_MB;
 const CV_ML = 54, CV_MR = 14, CV_MT = 16, CV_MB = 40, CV_W = 516, CV_H = 300;
 const CV_CW = CV_ML + CV_W + CV_MR, CV_CH = CV_MT + CV_H + CV_MB;
 const N0 = 1.0, NS = 1.52; // air / glass substrate
+const RB_ML = 36, RB_MR = 10, RB_MT = 12, RB_MB = 24, RB_PW = 268, RB_PH = 108;
+const RB_CW = RB_ML + RB_PW + RB_MR, RB_CH = RB_MT + RB_PH + RB_MB;
 
 const PANEL = "#0b101c", INK = "#e2e8f0", DIM = "#94a3b8", AXIS = "#475569";
 const COBALT = "#3b82f6", CRIMSON = "#ef4444", EMERALD = "#10b981", AMBER = "#f59e0b", SLATE = "#475569";
@@ -67,7 +72,7 @@ export function App() {
   const [params, setParams] = useState({ g: 0.2, kappa: 0.05, gamma: 0.02 });
   const [tol, setTol] = useState({ atol: 1e-6, rtol: 1e-6 });
   const [sp, setSp] = useState({ m: 20, g: 0.05, sigma: 0.0, seed: 1 });
-  const [cav, setCav] = useState({ lambda: 550, nHi: 2.5, nLo: 1.46, pairs: 4, nCav: 1.6 });
+  const [cav, setCav] = useState({ lambda: 550, nHi: 2.5, nLo: 1.46, pairs: 4, nCav: 1.6, g: 1.6 });
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [playing, setPlaying] = useState(true);
   const [fixedScale, setFixedScale] = useState(true);
@@ -77,6 +82,7 @@ export function App() {
   const rhoCanvas = useRef<HTMLCanvasElement>(null), specCanvas = useRef<HTMLCanvasElement>(null);
   const bridgeCanvas = useRef<HTMLCanvasElement>(null);
   const cavCanvas = useRef<HTMLCanvasElement>(null);
+  const rabiCanvas = useRef<HTMLCanvasElement>(null);
   const offscreen = useRef<HTMLCanvasElement | null>(null), husimiOff = useRef<HTMLCanvasElement | null>(null), bridgeOff = useRef<HTMLCanvasElement | null>(null);
   const quantum = useRef<Quantum | null>(null);
   const raf = useRef<number>(0), dpr = useRef(1);
@@ -120,7 +126,7 @@ export function App() {
 
   useEffect(() => {
     if (regime !== "cavity") return;
-    loadWasm().then(() => drawCavity());
+    loadWasm().then(() => { drawCavity(); drawRabi(); });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [regime, cav]);
 
@@ -391,6 +397,34 @@ export function App() {
     const R = cavityReflectance(cav.lambda, cav.nHi, cav.nLo, cav.pairs, cav.nCav, N0, NS);
     set("cavLam", cav.lambda.toFixed(0)); set("cavGap", cs.d.toFixed(0)); set("cavTotal", total.toFixed(0));
     set("cavR", R.toFixed(4)); set("cavF", ((Math.PI * Math.sqrt(R)) / (1 - R)).toFixed(0));
+    set("cav2g", (2 * cav.g).toFixed(2));
+  }
+
+  function drawRabi() {
+    const cv = rabiCanvas.current; if (!cv) return;
+    const ctx = sized(cv, RB_CW, RB_CH);
+    ctx.fillStyle = PANEL; ctx.fillRect(0, 0, RB_CW, RB_CH);
+    const g = cav.g, w = 0.7, dmin = -6, dmax = 6;
+    const lor = (u: number) => 1 / (1 + (u / w) ** 2);
+    const coupled = (d: number) => lor(d - g) + lor(d + g);
+    let maxc = 1e-9; for (let s = 0; s <= 240; s++) { const d = dmin + (dmax - dmin) * s / 240; maxc = Math.max(maxc, coupled(d)); }
+    const xOf = (d: number) => RB_ML + ((d - dmin) / (dmax - dmin)) * RB_PW;
+    const yOf = (T: number) => RB_MT + (1 - T) * RB_PH;
+    ctx.font = "500 9px 'B612 Mono', monospace";
+    for (const v of [0, 0.5, 1]) { ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5; seg(ctx, RB_ML, yOf(v), RB_ML + RB_PW, yOf(v)); ctx.fillStyle = DIM; ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(v.toFixed(1), RB_ML - 5, yOf(v)); }
+    ctx.save(); ctx.setLineDash([2, 2]); ctx.lineWidth = 1; ctx.strokeStyle = "rgba(255,112,128,0.5)";
+    seg(ctx, xOf(-g), RB_MT, xOf(-g), RB_MT + RB_PH); seg(ctx, xOf(g), RB_MT, xOf(g), RB_MT + RB_PH); ctx.restore();
+    ctx.save(); ctx.setLineDash([4, 3]); ctx.strokeStyle = COBALT; ctx.lineWidth = 1.2; ctx.beginPath();
+    for (let s = 0; s <= 240; s++) { const d = dmin + (dmax - dmin) * s / 240; const x = xOf(d), y = yOf(lor(d)); s === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); } ctx.stroke(); ctx.restore();
+    ctx.strokeStyle = "#ff7080"; ctx.lineWidth = 1.7; ctx.beginPath();
+    for (let s = 0; s <= 240; s++) { const d = dmin + (dmax - dmin) * s / 240; const x = xOf(d), y = yOf(coupled(d) / maxc); s === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); } ctx.stroke();
+    ctx.fillStyle = INK; ctx.font = "italic 11px 'B612', sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText("2g", (xOf(-g) + xOf(g)) / 2, RB_MT + 3);
+    ctx.lineWidth = 0.75; ctx.strokeStyle = AXIS; ctx.strokeRect(RB_ML, RB_MT, RB_PW, RB_PH);
+    ctx.fillStyle = DIM; ctx.font = "500 9px 'B612 Mono', monospace"; ctx.textAlign = "center"; ctx.textBaseline = "top";
+    for (const t of [-4, -2, 0, 2, 4]) { const x = xOf(t); seg(ctx, x, RB_MT + RB_PH, x, RB_MT + RB_PH + 3); ctx.fillText(minus(`${t}`), x, RB_MT + RB_PH + 6); }
+    ctx.fillStyle = INK; ctx.font = "italic 12px 'B612', sans-serif"; ctx.textBaseline = "alphabetic";
+    ctx.fillText("Δ / κ", RB_ML + RB_PW / 2, RB_CH - 6);
+    ctx.save(); ctx.translate(11, RB_MT + RB_PH / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top"; ctx.fillText("T", 0, 0); ctx.restore();
   }
 
   function exportCSV() {
@@ -469,6 +503,7 @@ export function App() {
               <Field sym="n_L" label="DBR low index" value={cav.nLo} min={1.3} max={2.0} step={0.02} unit="" onChange={(nLo) => setCav((s) => ({ ...s, nLo }))} />
               <Field sym="N" label="mirror pairs" value={cav.pairs} min={2} max={16} step={1} unit="" int onChange={(pairs) => setCav((s) => ({ ...s, pairs: Math.round(pairs) }))} />
               <Field sym="n_c" label="cavity index" value={cav.nCav} min={1.3} max={2.5} step={0.05} unit="" onChange={(nCav) => setCav((s) => ({ ...s, nCav }))} />
+              <Field sym="g" label="atom–cavity coupling" value={cav.g} min={0} max={5} step={0.1} unit="κ" onChange={(g) => setCav((s) => ({ ...s, g }))} />
             </Group>
           )}
         </aside>
@@ -510,15 +545,21 @@ export function App() {
               </div>
             </>
           ) : (
-            <div className="pane grow">
-              <div className="pane-head">Panel E · cavity cross-section — DBR mirror stack + |E(z)|² standing-wave field (true nm scale)</div>
-              <canvas ref={cavCanvas} className="cv" />
-              <div className="legend">
-                <span className="leg leg-band">mirror layers</span>
-                <span className="leg leg-field">|E(z)|² mode</span>
-                <span className="leg leg-mol">emitters in gap</span>
+            <>
+              <div className="pane grow">
+                <div className="pane-head">Panel F · Fabry–Pérot cavity-QED schematic · drag to orbit · field brightens with g</div>
+                <div className="cavity3d"><Suspense fallback={<div className="cv-loading">loading 3D…</div>}><CavityScene g={cav.g} /></Suspense></div>
               </div>
-            </div>
+              <div className="pane">
+                <div className="pane-head">Panel E · |E(z)|² standing wave over the DBR stack (true nm scale)</div>
+                <canvas ref={cavCanvas} className="cv" />
+                <div className="legend">
+                  <span className="leg leg-band">mirror layers</span>
+                  <span className="leg leg-field">|E(z)|² mode</span>
+                  <span className="leg leg-mol">emitters in gap</span>
+                </div>
+              </div>
+            </>
           )}
         </main>
 
@@ -561,6 +602,11 @@ export function App() {
           ) : (
             <>
               <div className="pane">
+                <div className="pane-head">Vacuum-Rabi spectrum · peaks split by 2g</div>
+                <canvas ref={rabiCanvas} className="cv" />
+                <div className="legend"><span className="leg leg-pol">2 polaritons (coupled)</span><span className="leg leg-dash">bare cavity</span></div>
+              </div>
+              <div className="pane">
                 <div className="pane-head">Cavity</div>
                 <table className="metrics"><tbody>
                   <Row label={<>resonance <i>λ</i></>} k="cavLam" r={read} unit="nm" />
@@ -568,6 +614,7 @@ export function App() {
                   <Row label={<>stack length</>} k="cavTotal" r={read} unit="nm" />
                   <Row label={<>reflectance <i>R</i></>} k="cavR" r={read} />
                   <Row label={<>finesse <i>F</i></>} k="cavF" r={read} />
+                  <Row label={<>Rabi split 2<i>g</i></>} k="cav2g" r={read} unit="κ" />
                 </tbody></table>
               </div>
               {Hud}
