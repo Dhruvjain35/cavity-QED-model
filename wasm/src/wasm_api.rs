@@ -179,6 +179,26 @@ pub fn spectrum(w_c: f64, w_a: f64, g: f64, m: usize, sigma: f64, seed: f64) -> 
     out
 }
 
+/// Cavity transmission/PL power spectrum: a flat array [ω (n/2 values), then power (n/2, peak=1)].
+/// `n_fft` must be a power of two. Peaks land at the polariton energies (the vacuum-Rabi doublet);
+/// disorder σ splits and broadens them. See `fft::power_spectrum`.
+#[wasm_bindgen]
+pub fn cavity_power_spectrum(w_c: f64, w_a: f64, g: f64, m: usize, sigma: f64, seed: f64, n_fft: usize, dt: f64) -> Vec<f64> {
+    let s = disordered_spectrum(w_c, w_a, g, m, sigma, seed as u64);
+    let (freqs, power) = crate::fft::power_spectrum(&s.eigs, &s.photon_frac, n_fft, dt);
+    let mut out = Vec::with_capacity(freqs.len() + power.len());
+    out.extend_from_slice(&freqs);
+    out.extend_from_slice(&power);
+    out
+}
+
+/// Coupling sweep: the (M+1) eigen-energies at each of `steps` values of g in [g0, g1], flat and
+/// row-major by step (length steps·(M+1)). The polariton dispersion fan. See `spectrum::coupling_sweep`.
+#[wasm_bindgen]
+pub fn coupling_sweep(w_c: f64, w_a: f64, m: usize, sigma: f64, seed: f64, g0: f64, g1: f64, steps: usize) -> Vec<f64> {
+    crate::spectrum::coupling_sweep(w_c, w_a, m, sigma, seed as u64, g0, g1, steps)
+}
+
 // ── Cavity cross-section (transfer-matrix optics) ──────────────────────────────
 /// DBR-cavity layer stack as a flat [n_0, d_0, n_1, d_1, …] array (index, thickness in nm).
 #[wasm_bindgen]

@@ -1,6 +1,6 @@
 // Thin TS wrapper over the QuTiP-validated Rust→WASM core (sim/wasm/pkg-web).
 // All physics is computed in WASM; this only marshals parameters and the RGBA buffer.
-import init, { Sim, spectrum, arrowhead_modes, wigner_rgba_of_rho, wigner_of_rho, cavity_layers, cavity_field, cavity_reflectance } from "../../wasm/pkg-web/cqed_core.js";
+import init, { Sim, spectrum, arrowhead_modes, cavity_power_spectrum, coupling_sweep, wigner_rgba_of_rho, wigner_of_rho, cavity_layers, cavity_field, cavity_reflectance } from "../../wasm/pkg-web/cqed_core.js";
 
 let initPromise: Promise<unknown> | null = null;
 export function loadWasm(): Promise<unknown> {
@@ -59,6 +59,31 @@ export function arrowheadModes(wc: number, wa: number, g: number, m: number, sig
   const flat = arrowhead_modes(wc, wa, g, m, sigma, seed);
   const n = m + 1;
   return { eigs: flat.slice(0, n), vecs: flat.slice(n), n };
+}
+
+/** Cavity transmission/PL power spectrum S(ω) (FFT of the photon amplitude, computed in Rust):
+ *  vacuum-Rabi doublet at the polariton energies, broadening with disorder. Validated in
+ *  wasm/tests/fft_spectrum.rs (two peaks split by 2g√M, centred on ω_a). */
+export function cavityPowerSpectrum(
+  wc: number, wa: number, g: number, m: number, sigma: number, seed: number, nFft: number, dt: number,
+): { omega: Float64Array; power: Float64Array } {
+  const flat = cavity_power_spectrum(wc, wa, g, m, sigma, seed, nFft, dt); // [ω(n/2), power(n/2)]
+  const h = flat.length / 2;
+  return { omega: flat.slice(0, h), power: flat.slice(h) };
+}
+
+/** Coupling sweep: the (M+1) eigen-energies at each of `steps` values of g in [g0, g1] (Rust loop).
+ *  Reshaped to one Float64Array of energies per step — the polariton dispersion fan. */
+export function couplingSweep(
+  wc: number, wa: number, m: number, sigma: number, seed: number, g0: number, g1: number, steps: number,
+): { gs: Float64Array; eigs: Float64Array[] } {
+  const flat = coupling_sweep(wc, wa, m, sigma, seed, g0, g1, steps); // steps·(m+1), row-major by step
+  const k = m + 1, eigs: Float64Array[] = [], gs = new Float64Array(steps);
+  for (let s = 0; s < steps; s++) {
+    gs[s] = steps <= 1 ? g0 : g0 + (g1 - g0) * s / (steps - 1);
+    eigs.push(flat.slice(s * k, s * k + k));
+  }
+  return { gs, eigs };
 }
 
 export interface SimParams {

@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import katex from "katex";
 import "katex/dist/katex.min.css";
-import { loadWasm, Quantum, solveSpectrum, arrowheadModes, wignerRawOfRho, cavityLayers, cavityField, cavityReflectance, type SimParams } from "./quantum/engine";
+import { loadWasm, Quantum, solveSpectrum, arrowheadModes, cavityPowerSpectrum, couplingSweep, wignerRawOfRho, cavityLayers, cavityField, cavityReflectance, type SimParams } from "./quantum/engine";
 
 // Inline LaTeX via KaTeX — proper math symbols across the lab UI (no plain-text physics variables).
 function Tex({ t }: { t: string }) {
@@ -41,6 +41,12 @@ const PP_ML = 50, PP_MR = 14, PP_MT = 16, PP_MB = 28, PP_PW = 466, PP_PH = 176;
 const PP_CW = PP_ML + PP_PW + PP_MR, PP_CH = PP_MT + PP_PH + PP_MB;
 const HP_ML = 78, HP_MR = 16, HP_MT = 18, HP_MB = 30, HP_PW = 426, HP_PH = 232;
 const HP_CW = HP_ML + HP_PW + HP_MR, HP_CH = HP_MT + HP_PH + HP_MB;
+const FF_ML = 52, FF_MR = 14, FF_MT = 14, FF_MB = 28, FF_PW = 464, FF_PH = 132;
+const FF_CW = FF_ML + FF_PW + FF_MR, FF_CH = FF_MT + FF_PH + FF_MB;
+const FFT_N = 1024, FFT_DT = 0.12; // power-spectrum FFT length + sample step
+const SW_ML = 60, SW_MR = 18, SW_MT = 18, SW_MB = 32, SW_PW = 560, SW_PH = 408;
+const SW_CW = SW_ML + SW_PW + SW_MR, SW_CH = SW_MT + SW_PH + SW_MB;
+const SWEEP_GMAX = 0.2, SWEEP_STEPS = 90;
 
 const PANEL = "#0b101c", INK = "#e2e8f0", DIM = "#94a3b8", AXIS = "#475569";
 const COBALT = "#3b82f6", CRIMSON = "#ef4444", EMERALD = "#10b981", AMBER = "#f59e0b", SLATE = "#475569";
@@ -89,6 +95,7 @@ export function App() {
   const [cav, setCav] = useState({ lambda: 550, nHi: 2.5, nLo: 1.46, pairs: 4, nCav: 1.6, g: 1.6 });
   const [dyn, setDyn] = useState({ m: 12, g: 0.06, sigma: 0.04, seed: 1, init: 0 });
   const [inspect, setInspect] = useState<number | null>(null); // clicked dressed eigenstate (UI badge)
+  const [dynSweep, setDynSweep] = useState(false); // coupling-sweep dispersion mode (replaces the 3D)
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [playing, setPlaying] = useState(true);
   const [fixedScale, setFixedScale] = useState(true);
@@ -105,16 +112,21 @@ export function App() {
   const simT = useRef(0);
   const hopMarks = useRef<{ x: number; y: number; k: number }[]>([]);
   const inspectRef = useRef<number | null>(null); // dressed eigenstate frozen onto the 3D (null = live)
+  const fftCanvas = useRef<HTMLCanvasElement>(null), sweepCanvas = useRef<HTMLCanvasElement>(null);
+  const fftData = useRef<{ omega: Float64Array; power: Float64Array } | null>(null);
+  const sweepData = useRef<{ gs: Float64Array; eigs: Float64Array[] } | null>(null);
   const offscreen = useRef<HTMLCanvasElement | null>(null), husimiOff = useRef<HTMLCanvasElement | null>(null), bridgeOff = useRef<HTMLCanvasElement | null>(null);
   const quantum = useRef<Quantum | null>(null);
   const raf = useRef<number>(0), dpr = useRef(1);
   const regimeRef = useRef(regime), playingRef = useRef(playing), scaleRef = useRef(fixedScale), tolRef = useRef(tol);
+  const sweepRef = useRef(dynSweep), dynGRef = useRef(dyn.g);
   const series = useRef<Pt[]>([]), sweep = useRef<SweepCol[]>([]);
   const sel = useRef<{ j: number; k: number } | null>(null);
   const specMap = useRef({ emin: 0, emax: 1, R: 6 });
   const read = useRef<Record<string, HTMLSpanElement | null>>({});
 
   regimeRef.current = regime; playingRef.current = playing; scaleRef.current = fixedScale; tolRef.current = tol;
+  sweepRef.current = dynSweep; dynGRef.current = dyn.g;
   const toggle = (k: string) => setCollapsed((c) => ({ ...c, [k]: !c[k] }));
 
   useEffect(() => {
@@ -161,6 +173,8 @@ export function App() {
       dynState.current = { eigs, vecs, n, c, hist: [] };
       simT.current = 0;
       inspectRef.current = null; setInspect(null); // a new ensemble invalidates the inspected state
+      fftData.current = cavityPowerSpectrum(WA, WA, dyn.g, dyn.m, dyn.sigma, dyn.seed, FFT_N, FFT_DT);
+      sweepData.current = couplingSweep(WA, WA, dyn.m, dyn.sigma, dyn.seed, 0, SWEEP_GMAX, SWEEP_STEPS);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [regime, dyn]);
@@ -183,7 +197,8 @@ export function App() {
         if (playingRef.current) simT.current += DT_DYN;
         const d = decompAt(simT.current);
         if (playingRef.current) { ds.hist.push(Float64Array.of(d.ph, d.br, d.dk)); if (ds.hist.length > HEAT_COLS) ds.hist.shift(); }
-        drawPopTraces(); drawDressed(); updateSimReadouts(d);
+        drawPopTraces(); drawDressed(); drawPowerSpectrum(); updateSimReadouts(d);
+        if (sweepRef.current) drawSweep();
       }
       raf.current = requestAnimationFrame(loop);
     };
@@ -550,6 +565,60 @@ export function App() {
     inspectRef.current = nk; setInspect(nk);
   }
 
+  // #9 · cavity transmission/PL power spectrum S(ω) (FFT of the photon amplitude, computed in Rust):
+  // the vacuum-Rabi doublet at the polariton energies; raise σ and the peaks broaden and wash out.
+  function drawPowerSpectrum() {
+    const cvEl = fftCanvas.current, fd = fftData.current, ds = dynState.current; if (!cvEl || !fd || !ds) return;
+    const ctx = sized(cvEl, FF_CW, FF_CH);
+    ctx.fillStyle = PANEL; ctx.fillRect(0, 0, FF_CW, FF_CH);
+    const lo = ds.eigs[0]!, hi = ds.eigs[ds.n - 1]!, span = hi - lo, wlo = lo - span * 0.6 - 0.03, whi = hi + span * 0.6 + 0.03;
+    const xOf = (w: number) => FF_ML + (w - wlo) / (whi - wlo) * FF_PW, yOf = (p: number) => FF_MT + (1 - p) * FF_PH;
+    ctx.font = "500 8.5px 'B612 Mono', monospace";
+    for (const p of [0, 0.5, 1]) { ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5; seg(ctx, FF_ML, yOf(p), FF_ML + FF_PW, yOf(p)); ctx.fillStyle = DIM; ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(p.toFixed(1), FF_ML - 6, yOf(p)); }
+    for (const e of [lo, hi]) { const x = xOf(e); ctx.strokeStyle = "rgba(245,158,11,0.45)"; ctx.setLineDash([3, 3]); ctx.lineWidth = 0.75; seg(ctx, x, FF_MT, x, FF_MT + FF_PH); ctx.setLineDash([]); }
+    const om = fd.omega, pw = fd.power;
+    const path = (close: boolean) => { ctx.beginPath(); let st = false; for (let i = 0; i < om.length; i++) { const w = om[i]!; if (w < wlo) continue; if (w > whi) break; const x = xOf(w), y = yOf(pw[i]!); if (!st) { if (close) { ctx.moveTo(x, yOf(0)); ctx.lineTo(x, y); } else ctx.moveTo(x, y); st = true; } else ctx.lineTo(x, y); } if (close && st) { ctx.lineTo(xOf(whi), yOf(0)); ctx.closePath(); } };
+    path(true); ctx.fillStyle = "rgba(59,130,246,0.16)"; ctx.fill();
+    path(false); ctx.strokeStyle = COBALT; ctx.lineWidth = 1.6; ctx.stroke();
+    ctx.fillStyle = DIM; ctx.textAlign = "center"; ctx.textBaseline = "top";
+    for (const w of [wlo, (wlo + whi) / 2, whi]) ctx.fillText(fmt(w, 2), xOf(w), FF_MT + FF_PH + 5);
+    ctx.strokeStyle = AXIS; ctx.lineWidth = 0.75; ctx.strokeRect(FF_ML, FF_MT, FF_PW, FF_PH);
+    ctx.fillStyle = DIM; ctx.font = "italic 11px 'B612', sans-serif"; ctx.fillText("frequency  ω  (vacuum-Rabi doublet)", FF_ML + FF_PW / 2, FF_CH - 7);
+    ctx.save(); ctx.translate(13, FF_MT + FF_PH / 2); ctx.rotate(-Math.PI / 2); ctx.fillText("S(ω)", 0, 0); ctx.restore();
+  }
+
+  // #12 · coupling-sweep dispersion fan (Rust loop over g): the two bright polaritons split as 2g√M
+  // while the M−1 dark states stay pinned at ω_a. Amber line marks the live coupling.
+  function drawSweep() {
+    const cvEl = sweepCanvas.current, sw = sweepData.current; if (!cvEl || !sw) return;
+    const ctx = sized(cvEl, SW_CW, SW_CH);
+    ctx.fillStyle = PANEL; ctx.fillRect(0, 0, SW_CW, SW_CH);
+    const steps = sw.gs.length, K = sw.eigs[0]!.length;
+    let emin = Infinity, emax = -Infinity;
+    for (const e of sw.eigs) for (let i = 0; i < K; i++) { emin = Math.min(emin, e[i]!); emax = Math.max(emax, e[i]!); }
+    const pad = (emax - emin) * 0.08 + 1e-3; emin -= pad; emax += pad;
+    const xOf = (g: number) => SW_ML + (g / SWEEP_GMAX) * SW_PW, yOf = (e: number) => SW_MT + (1 - (e - emin) / (emax - emin)) * SW_PH;
+    ctx.font = "500 9px 'B612 Mono', monospace";
+    for (let t = 0; t <= 4; t++) { const g = SWEEP_GMAX * t / 4; ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5; seg(ctx, xOf(g), SW_MT, xOf(g), SW_MT + SW_PH); ctx.fillStyle = DIM; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText(g.toFixed(2), xOf(g), SW_MT + SW_PH + 6); }
+    for (let t = 0; t <= 4; t++) { const e = emin + (emax - emin) * t / 4; ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5; seg(ctx, SW_ML, yOf(e), SW_ML + SW_PW, yOf(e)); ctx.fillStyle = DIM; ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(fmt(e, 2), SW_ML - 7, yOf(e)); }
+    for (let i = 0; i < K; i++) {
+      const bright = i === 0 || i === K - 1;
+      ctx.strokeStyle = bright ? COBALT : "rgba(176,140,240,0.45)"; ctx.lineWidth = bright ? 1.9 : 0.9; ctx.beginPath();
+      for (let s = 0; s < steps; s++) { const x = xOf(sw.gs[s]!), y = yOf(sw.eigs[s]![i]!); s === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); }
+      ctx.stroke();
+    }
+    const gx = xOf(Math.min(SWEEP_GMAX, dynGRef.current));
+    ctx.strokeStyle = "rgba(245,158,11,0.85)"; ctx.lineWidth = 1; ctx.setLineDash([4, 3]); seg(ctx, gx, SW_MT, gx, SW_MT + SW_PH); ctx.setLineDash([]);
+    ctx.fillStyle = AMBER; ctx.font = "600 9px 'B612 Mono', monospace"; ctx.textAlign = "center"; ctx.textBaseline = "bottom"; ctx.fillText("g = " + fmt(dynGRef.current, 3), gx, SW_MT - 3);
+    ctx.strokeStyle = AXIS; ctx.lineWidth = 0.75; ctx.strokeRect(SW_ML, SW_MT, SW_PW, SW_PH);
+    ctx.fillStyle = INK; ctx.font = "italic 12px 'B612', sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText("coupling  g  (ω)", SW_ML + SW_PW / 2, SW_MT + SW_PH + 18);
+    ctx.save(); ctx.translate(16, SW_MT + SW_PH / 2); ctx.rotate(-Math.PI / 2); ctx.fillText("polariton energy  E  (ω)", 0, 0); ctx.restore();
+    ctx.font = "600 10px 'B612 Mono', monospace"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+    ctx.fillStyle = COBALT; ctx.fillText("UP", SW_ML + SW_PW + 5, yOf(sw.eigs[steps - 1]![K - 1]!));
+    ctx.fillText("LP", SW_ML + SW_PW + 5, yOf(sw.eigs[steps - 1]![0]!));
+    ctx.fillStyle = DARKC; ctx.fillText("dark", SW_ML + SW_PW + 5, yOf(sw.eigs[steps - 1]![Math.floor(K / 2)]!));
+  }
+
   // P1 · the headline: photon ↔ bright vacuum-Rabi oscillation (Ω_R = 2g√M) with the dark band that
   // stays flat at σ=0 and grows as disorder leaks population out of the bright mode. hist = [ph,br,dk].
   function drawPopTraces() {
@@ -678,6 +747,9 @@ export function App() {
                 <button onClick={() => { simT.current = 0; if (dynState.current) dynState.current.hist = []; }}>RESET</button>
                 <button onClick={() => setDyn((s) => ({ ...s, seed: s.seed + 1 }))}>RE-ROLL σ</button>
               </div>
+              <div className="btn-row">
+                <button className={dynSweep ? "on" : ""} onClick={() => setDynSweep((v) => !v)}>{dynSweep ? "● SWEEP g vs Ω_R" : "SWEEP g vs Ω_R"}</button>
+              </div>
             </Group>
           )}
         </aside>
@@ -737,13 +809,26 @@ export function App() {
           ) : (
             <div className="dyn-split">
               <div className="pane grow dyn-3d">
-                <div className="pane-head">Live cavity · {dyn.m} naphthalene emitters + 1 photon{inspect != null ? <> · <i style={{ color: "#fff", fontStyle: "normal" }}>inspecting eigenstate #{inspect}</i></> : <> · matter amber · field cobalt · dipoles <i style={{ color: "#4fcabe", fontStyle: "normal" }}>μ</i> · drag to orbit</>}</div>
-                <div className="live3d"><Suspense fallback={<div className="cv-loading">loading 3D…</div>}><LiveCavityScene stateRef={dynState} tRef={simT} m={dyn.m} inspectRef={inspectRef} sigma={dyn.sigma} /></Suspense></div>
+                {dynSweep ? (
+                  <>
+                    <div className="pane-head">Coupling sweep · polariton dispersion E(g) · {SWEEP_STEPS} diagonalizations · bright split as 2g√M, dark flat at ω_a</div>
+                    <canvas ref={sweepCanvas} className="cv" />
+                  </>
+                ) : (
+                  <>
+                    <div className="pane-head">Live cavity · {dyn.m} naphthalene emitters + 1 photon{inspect != null ? <> · <i style={{ color: "#fff", fontStyle: "normal" }}>inspecting eigenstate #{inspect}</i></> : <> · matter amber · field cobalt · dipoles <i style={{ color: "#4fcabe", fontStyle: "normal" }}>μ</i> · drag to orbit</>}</div>
+                    <div className="live3d"><Suspense fallback={<div className="cv-loading">loading 3D…</div>}><LiveCavityScene stateRef={dynState} tRef={simT} m={dyn.m} inspectRef={inspectRef} sigma={dyn.sigma} /></Suspense></div>
+                  </>
+                )}
               </div>
               <div className="dyn-2d">
                 <div className="pane">
                   <div className="pane-head">Populations — photon <i style={{ color: COBALT, fontStyle: "normal" }}>━</i> bright mode <i style={{ color: AMBER, fontStyle: "normal" }}>━</i> dark manifold <i style={{ color: DARKC, fontStyle: "normal" }}>━</i></div>
                   <canvas ref={popCanvas} className="cv" />
+                </div>
+                <div className="pane">
+                  <div className="pane-head">Transmission spectrum · S(ω) · FFT of the photon field · vacuum-Rabi doublet</div>
+                  <canvas ref={fftCanvas} className="cv" />
                 </div>
                 <div className="pane grow">
                   <div className="pane-head">Dressed-state spectrum · E<sub>k</sub> vs photon fraction · {inspect != null ? <span style={{ color: "#fff" }}>▸ eigenstate #{inspect} on the 3D · click again to release</span> : <span>click an eigenstate to project it onto the molecules</span>}</div>

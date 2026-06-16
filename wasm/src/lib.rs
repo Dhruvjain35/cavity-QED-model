@@ -8,6 +8,7 @@
 //! Every operator is validated element-wise against a QuTiP golden in `tests/operator_lock.rs`.
 
 pub mod entropy;
+pub mod fft;
 pub mod operators;
 pub mod optics;
 pub mod solver;

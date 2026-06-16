@@ -96,6 +96,21 @@ pub fn gaussians(seed: u64, n: usize) -> Vec<f64> {
     out
 }
 
+/// Sweep the coupling g over [g0, g1] in `steps` points (one fixed disorder realization), returning
+/// the full (M+1) eigen-energies at each step, flat and row-major by step. Plotting energy vs g gives
+/// the polariton dispersion fan: the two bright states split apart as 2g√M while the M−1 dark states
+/// stay pinned at the bare emitter energy — the canonical Rabi-splitting-vs-coupling phase map.
+pub fn coupling_sweep(w_c: f64, w_a: f64, m: usize, sigma: f64, seed: u64, g0: f64, g1: f64, steps: usize) -> Vec<f64> {
+    let z = gaussians(seed, m);
+    let w: Vec<f64> = z.iter().map(|zi| w_a + sigma * zi).collect();
+    let mut out = Vec::with_capacity(steps * (m + 1));
+    for s in 0..steps {
+        let g = if steps <= 1 { g0 } else { g0 + (g1 - g0) * s as f64 / (steps as f64 - 1.0) };
+        out.extend_from_slice(&solve(w_c, &w, &vec![g; m]).eigs);
+    }
+    out
+}
+
 /// Live spectrum for M identical-coupling emitters with Gaussian energy disorder.
 /// w_i = w_a + sigma·N(0,1)_i  (deterministic from `seed`, so a detuning sweep keeps one realization),
 /// g_i = g for all i. Returns the (M+1) eigenvalues + photon fractions.
