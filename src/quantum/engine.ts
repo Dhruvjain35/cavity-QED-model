@@ -1,6 +1,6 @@
 // Thin TS wrapper over the QuTiP-validated Rust→WASM core (sim/wasm/pkg-web).
 // All physics is computed in WASM; this only marshals parameters and the RGBA buffer.
-import init, { Sim, spectrum, arrowhead_modes, arrowhead_modes_gi, arrowhead_matrix_gi, cavity_power_spectrum, cavity_power_spectrum_gi, coupling_sweep, coupling_sweep_gi, wigner_rgba_of_rho, wigner_of_rho, cavity_layers, cavity_field, cavity_reflectance } from "../../wasm/pkg-web/cqed_core.js";
+import init, { Sim, spectrum, arrowhead_modes, arrowhead_modes_gi, arrowhead_matrix_gi, cavity_power_spectrum, cavity_power_spectrum_gi, coupling_sweep, coupling_sweep_gi, htc_spectrum, htc_franck_condon, wigner_rgba_of_rho, wigner_of_rho, cavity_layers, cavity_field, cavity_reflectance } from "../../wasm/pkg-web/cqed_core.js";
 
 let initPromise: Promise<unknown> | null = null;
 export function loadWasm(): Promise<unknown> {
@@ -113,6 +113,21 @@ export function couplingSweepGi(wc: number, wa: number, sigma: number, seed: num
   const k = factors.length + 1, eigs: Float64Array[] = [], gs = new Float64Array(steps);
   for (let s = 0; s < steps; s++) { gs[s] = steps <= 1 ? g0 : g0 + (g1 - g0) * s / (steps - 1); eigs.push(flat.slice(s * k, s * k + k)); }
   return { gs, eigs };
+}
+
+/** Single-molecule Holstein–Tavis–Cummings absorption (cavity + emitter + one vibration). Returns the
+ *  2·n_vib eigen-energies, their photon weight, and absorption stick intensity. Validated against the
+ *  analytic g→0 Franck–Condon progression in wasm/tests/htc.rs. λ = √(Huang–Rhys S). */
+export function htcSpectrum(wc: number, wx: number, wv: number, lambda: number, g: number, nVib: number): { eigs: Float64Array; photon: Float64Array; absorption: Float64Array } {
+  const flat = htc_spectrum(wc, wx, wv, lambda, g, nVib);
+  const d = 2 * nVib;
+  return { eigs: flat.slice(0, d), photon: flat.slice(d, 2 * d), absorption: flat.slice(2 * d, 3 * d) };
+}
+
+/** Analytic bare-molecule (g=0) Franck–Condon sticks: positions ω_x−Sω_v+nω_v and Poisson weights. */
+export function htcFranckCondon(wx: number, wv: number, lambda: number, nMax: number): { pos: Float64Array; weight: Float64Array } {
+  const flat = htc_franck_condon(wx, wv, lambda, nMax);
+  return { pos: flat.slice(0, nMax), weight: flat.slice(nMax) };
 }
 
 export interface SimParams {

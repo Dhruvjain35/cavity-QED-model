@@ -268,6 +268,28 @@ pub fn coupling_sweep(w_c: f64, w_a: f64, m: usize, sigma: f64, seed: f64, g0: f
     crate::spectrum::coupling_sweep(w_c, w_a, m, sigma, seed as u64, g0, g1, steps)
 }
 
+/// Single-molecule Holstein–Tavis–Cummings absorption: flat [eigs (2·n_vib), photon_frac (2·n_vib),
+/// absorption (2·n_vib)]. Vibronic polaritons + Franck–Condon sidebands. See `htc::htc`.
+#[wasm_bindgen]
+pub fn htc_spectrum(w_c: f64, w_x: f64, w_v: f64, lambda: f64, g: f64, n_vib: usize) -> Vec<f64> {
+    let r = crate::htc::htc(w_c, w_x, w_v, lambda, g, n_vib);
+    let mut out = Vec::with_capacity(6 * n_vib);
+    out.extend_from_slice(&r.eigs);
+    out.extend_from_slice(&r.photon_frac);
+    out.extend_from_slice(&r.absorption);
+    out
+}
+
+/// Analytic bare-molecule (g=0) Franck–Condon reference: flat [position (n_max), weight (n_max)].
+#[wasm_bindgen]
+pub fn htc_franck_condon(w_x: f64, w_v: f64, lambda: f64, n_max: usize) -> Vec<f64> {
+    let (p, w) = crate::htc::franck_condon(w_x, w_v, lambda, n_max);
+    let mut out = Vec::with_capacity(2 * n_max);
+    out.extend_from_slice(&p);
+    out.extend_from_slice(&w);
+    out
+}
+
 // ── Cavity cross-section (transfer-matrix optics) ──────────────────────────────
 /// DBR-cavity layer stack as a flat [n_0, d_0, n_1, d_1, …] array (index, thickness in nm).
 #[wasm_bindgen]

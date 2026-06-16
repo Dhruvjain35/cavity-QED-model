@@ -9,6 +9,7 @@
 
 pub mod entropy;
 pub mod fft;
+pub mod htc;
 pub mod operators;
 pub mod optics;
 pub mod solver;
