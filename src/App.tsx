@@ -96,6 +96,7 @@ export function App() {
   const [dyn, setDyn] = useState({ m: 12, g: 0.06, sigma: 0.04, seed: 1, init: 0 });
   const [inspect, setInspect] = useState<number | null>(null); // clicked dressed eigenstate (UI badge)
   const [dynSweep, setDynSweep] = useState(false); // coupling-sweep dispersion mode (replaces the 3D)
+  const [wcEv, setWcEv] = useState(2.0); // physical cavity-photon energy ℏω_c in eV (display scale only)
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [playing, setPlaying] = useState(true);
   const [fixedScale, setFixedScale] = useState(true);
@@ -119,14 +120,17 @@ export function App() {
   const quantum = useRef<Quantum | null>(null);
   const raf = useRef<number>(0), dpr = useRef(1);
   const regimeRef = useRef(regime), playingRef = useRef(playing), scaleRef = useRef(fixedScale), tolRef = useRef(tol);
-  const sweepRef = useRef(dynSweep), dynGRef = useRef(dyn.g);
+  const sweepRef = useRef(dynSweep), dynGRef = useRef(dyn.g), wcRef = useRef(wcEv);
+  // dimensionless (units of ω_c) → physical: energies/couplings to meV, dimensionless time to fs (ℏ = 0.6582 eV·fs)
+  const toMeV = (dimless: number) => dimless * wcRef.current * 1000;
+  const toFs = (dimlessT: number) => dimlessT * 0.6582 / wcRef.current;
   const series = useRef<Pt[]>([]), sweep = useRef<SweepCol[]>([]);
   const sel = useRef<{ j: number; k: number } | null>(null);
   const specMap = useRef({ emin: 0, emax: 1, R: 6 });
   const read = useRef<Record<string, HTMLSpanElement | null>>({});
 
   regimeRef.current = regime; playingRef.current = playing; scaleRef.current = fixedScale; tolRef.current = tol;
-  sweepRef.current = dynSweep; dynGRef.current = dyn.g;
+  sweepRef.current = dynSweep; dynGRef.current = dyn.g; wcRef.current = wcEv;
   const toggle = (k: string) => setCollapsed((c) => ({ ...c, [k]: !c[k] }));
 
   useEffect(() => {
@@ -552,7 +556,7 @@ export function App() {
     ctx.strokeStyle = AXIS; ctx.lineWidth = 0.75; ctx.strokeRect(HP_ML, HP_MT, HP_PW, HP_PH);
     ctx.fillStyle = DIM; ctx.font = "italic 11px 'B612', sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top";
     ctx.fillText("photon fraction  |⟨a|ψ_k⟩|²", HP_ML + HP_PW / 2, HP_MT + HP_PH + 16);
-    ctx.save(); ctx.translate(15, HP_MT + HP_PH / 2); ctx.rotate(-Math.PI / 2); ctx.fillText("energy  E_k (ω)", 0, 0); ctx.restore();
+    ctx.save(); ctx.translate(15, HP_MT + HP_PH / 2); ctx.rotate(-Math.PI / 2); ctx.fillText("energy  E_k / ω_c", 0, 0); ctx.restore();
   }
 
   function onHopClick(e: React.MouseEvent<HTMLCanvasElement>) {
@@ -583,7 +587,7 @@ export function App() {
     ctx.fillStyle = DIM; ctx.textAlign = "center"; ctx.textBaseline = "top";
     for (const w of [wlo, (wlo + whi) / 2, whi]) ctx.fillText(fmt(w, 2), xOf(w), FF_MT + FF_PH + 5);
     ctx.strokeStyle = AXIS; ctx.lineWidth = 0.75; ctx.strokeRect(FF_ML, FF_MT, FF_PW, FF_PH);
-    ctx.fillStyle = DIM; ctx.font = "italic 11px 'B612', sans-serif"; ctx.fillText("frequency  ω  (vacuum-Rabi doublet)", FF_ML + FF_PW / 2, FF_CH - 7);
+    ctx.fillStyle = DIM; ctx.font = "italic 11px 'B612', sans-serif"; ctx.fillText("frequency  ω / ω_c", FF_ML + FF_PW / 2, FF_CH - 7);
     ctx.save(); ctx.translate(13, FF_MT + FF_PH / 2); ctx.rotate(-Math.PI / 2); ctx.fillText("S(ω)", 0, 0); ctx.restore();
   }
 
@@ -611,8 +615,8 @@ export function App() {
     ctx.strokeStyle = "rgba(245,158,11,0.85)"; ctx.lineWidth = 1; ctx.setLineDash([4, 3]); seg(ctx, gx, SW_MT, gx, SW_MT + SW_PH); ctx.setLineDash([]);
     ctx.fillStyle = AMBER; ctx.font = "600 9px 'B612 Mono', monospace"; ctx.textAlign = "center"; ctx.textBaseline = "bottom"; ctx.fillText("g = " + fmt(dynGRef.current, 3), gx, SW_MT - 3);
     ctx.strokeStyle = AXIS; ctx.lineWidth = 0.75; ctx.strokeRect(SW_ML, SW_MT, SW_PW, SW_PH);
-    ctx.fillStyle = INK; ctx.font = "italic 12px 'B612', sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText("coupling  g  (ω)", SW_ML + SW_PW / 2, SW_MT + SW_PH + 18);
-    ctx.save(); ctx.translate(16, SW_MT + SW_PH / 2); ctx.rotate(-Math.PI / 2); ctx.fillText("polariton energy  E  (ω)", 0, 0); ctx.restore();
+    ctx.fillStyle = INK; ctx.font = "italic 12px 'B612', sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText("coupling  g_0 / ω_c", SW_ML + SW_PW / 2, SW_MT + SW_PH + 18);
+    ctx.save(); ctx.translate(16, SW_MT + SW_PH / 2); ctx.rotate(-Math.PI / 2); ctx.fillText("energy  E / ω_c", 0, 0); ctx.restore();
     ctx.font = "600 10px 'B612 Mono', monospace"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
     ctx.fillStyle = COBALT; ctx.fillText("UP", SW_ML + SW_PW + 5, yOf(sw.eigs[steps - 1]![K - 1]!));
     ctx.fillText("LP", SW_ML + SW_PW + 5, yOf(sw.eigs[steps - 1]![0]!));
@@ -640,7 +644,7 @@ export function App() {
     trace(1, AMBER, false);  // bright collective mode
     ctx.lineWidth = 0.75; ctx.strokeStyle = AXIS; ctx.strokeRect(PP_ML, PP_MT, PP_PW, PP_PH);
     ctx.fillStyle = INK; ctx.font = "italic 11px 'B612', sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
-    ctx.fillText("Rabi cycles  Ω_R t / 2π →", PP_ML + PP_PW / 2, PP_CH - 8);
+    ctx.fillText("time   t Ω_R / 2π   (Rabi cycles)", PP_ML + PP_PW / 2, PP_CH - 8);
     ctx.save(); ctx.translate(13, PP_MT + PP_PH / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top"; ctx.fillText("population", 0, 0); ctx.restore();
   }
 
@@ -649,8 +653,10 @@ export function App() {
     const ds = dynState.current; if (!ds) return;
     const split = ds.eigs[ds.n - 1]! - ds.eigs[0]!; // LP→UP polariton splitting Ω_R (≈ 2g√M on resonance)
     const cycles = split * simT.current / (2 * Math.PI); // dimensionless time in vacuum-Rabi periods
-    set("simTau", cycles.toFixed(2)); set("simPh", d.ph.toFixed(4)); set("simBr", d.br.toFixed(4));
-    set("simDk", d.dk.toFixed(4)); set("simRabi", fmt(split, 4)); set("simNorm", (d.ph + d.br + d.dk).toFixed(6));
+    set("simTau", cycles.toFixed(2)); set("simTfs", toFs(simT.current).toFixed(1));
+    set("simPh", d.ph.toFixed(4)); set("simBr", d.br.toFixed(4)); set("simDk", d.dk.toFixed(4));
+    set("simRabi", fmt(split, 4)); set("simRabiMeV", Math.round(toMeV(split)).toString());
+    set("simNorm", (d.ph + d.br + d.dk).toFixed(6));
   }
 
   function exportCSV() {
@@ -735,8 +741,9 @@ export function App() {
           ) : (
             <Group title="MOLECULAR ENSEMBLE" k="dyn" c={collapsed} t={toggle}>
               <Field sym="N" texSym="N" label="molecules" value={dyn.m} min={2} max={40} step={1} unit="" int onChange={(m) => setDyn((s) => ({ ...s, m: Math.round(m) }))} />
-              <Field sym="g" texSym="g" label="coupling" value={dyn.g} min={0.01} max={0.2} step={0.005} unit="ω" onChange={(g) => setDyn((s) => ({ ...s, g }))} />
-              <Field sym="σ" texSym="\sigma_\omega" label="inhomog. disorder" value={dyn.sigma} min={0} max={0.25} step={0.005} unit="ω" onChange={(sigma) => setDyn((s) => ({ ...s, sigma }))} />
+              <Field sym="g" texSym="g_0" label="coupling" value={dyn.g} min={0.01} max={0.2} step={0.005} unit="ω_c" onChange={(g) => setDyn((s) => ({ ...s, g }))} />
+              <Field sym="σ" texSym="\sigma_\omega" label="inhomog. disorder" value={dyn.sigma} min={0} max={0.25} step={0.005} unit="ω_c" onChange={(sigma) => setDyn((s) => ({ ...s, sigma }))} />
+              <Field sym="ω" texSym="\hbar\omega_c" label="cavity energy" value={wcEv} min={0.5} max={4} step={0.05} unit="eV" onChange={setWcEv} />
               <div className="knob-top" style={{ marginBottom: 6 }}><span className="knob-name">initial excitation</span></div>
               <div className="btn-row">
                 <button className={dyn.init === 0 ? "on" : ""} onClick={() => setDyn((s) => ({ ...s, init: 0 }))}>PHOTON</button>
@@ -894,11 +901,13 @@ export function App() {
               <div className="pane">
                 <div className="pane-head">Live observables</div>
                 <table className="metrics"><tbody>
-                  <Row label={<Tex t="\tau = \Omega_R\,t/2\pi" />} k="simTau" r={read} unit="cyc" />
+                  <Row label={<Tex t="\tau = \Omega_R t/2\pi" />} k="simTau" r={read} unit="cyc" />
+                  <Row label={<Tex t="t" />} k="simTfs" r={read} unit="fs" />
                   <Row label={<Tex t="P_{\mathrm{photon}}" />} k="simPh" r={read} />
                   <Row label={<Tex t="P_{\mathrm{bright}}" />} k="simBr" r={read} />
                   <Row label={<Tex t="P_{\mathrm{dark}}" />} k="simDk" r={read} />
-                  <Row label={<Tex t="\Omega_R\;(\mathrm{LP}\!\to\!\mathrm{UP})" />} k="simRabi" r={read} unit="ω" />
+                  <Row label={<Tex t="\Omega_R" />} k="simRabi" r={read} unit="ω_c" />
+                  <Row label={<Tex t="\Omega_R" />} k="simRabiMeV" r={read} unit="meV" />
                   <Row label={<Tex t="\textstyle\sum_k P_k" />} k="simNorm" r={read} />
                 </tbody></table>
               </div>

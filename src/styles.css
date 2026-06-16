@@ -21,18 +21,18 @@ body { background: var(--bg); color: var(--ink); font-family: var(--serif); -web
 .topbar .live { color: var(--emerald); font-size: 12px; vertical-align: middle; }
 
 /* 3-column desktop grid */
-.workstation { flex: 1; min-height: 0; display: grid; grid-template-columns: 230px minmax(0, 1fr) 352px; overflow: hidden; }
+.workstation { flex: 1; min-height: 0; display: grid; grid-template-columns: 208px minmax(0, 1fr) 312px; overflow: hidden; }
 @media (max-width: 1040px) { .workstation { grid-template-columns: 1fr; overflow-y: auto; } .ws-root { overflow: auto; } }
 .rail { border-right: 1px solid var(--rule); }
 .dock { border-left: 1px solid var(--rule); }
 .rail, .dock { overflow-y: auto; min-height: 0; }
 .center { display: flex; flex-direction: column; min-height: 0; overflow-y: auto; }
 
-/* panes */
-.pane { border-bottom: 1px solid var(--rule); padding: 10px 13px; }
+/* panes — brutally dense, instrument-grade (every pixel is data) */
+.pane { border-bottom: 1px solid var(--rule); padding: 5px 8px; }
 .pane:last-child { border-bottom: none; }
 .pane.grow { flex: 1; min-height: 0; }
-.pane-head { font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--faint); margin-bottom: 9px; line-height: 1.4; }
+.pane-head { font-family: var(--mono); font-size: 8.5px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--faint); margin-bottom: 3px; line-height: 1.35; }
 .pane-head i { font-style: normal; }
 .cv { display: block; max-width: 100%; height: auto; }
 .tex { display: inline-block; line-height: 1; }
