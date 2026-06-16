@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import katex from "katex";
 import "katex/dist/katex.min.css";
-import { loadWasm, Quantum, solveSpectrum, arrowheadModesGi, cavityPowerSpectrumGi, couplingSweepGi, wignerRawOfRho, cavityLayers, cavityField, cavityReflectance, type SimParams } from "./quantum/engine";
+import { loadWasm, Quantum, solveSpectrum, arrowheadModesGi, arrowheadMatrixGi, cavityPowerSpectrumGi, couplingSweepGi, wignerRawOfRho, cavityLayers, cavityField, cavityReflectance, type SimParams } from "./quantum/engine";
 import { buildEnsemble, brightWeights } from "./cavity/ensemble";
 
 const MODE_WAIST = 2.4; // TEM00 Gaussian mode waist w (length units of the molecular layout)
@@ -681,6 +681,12 @@ export function App() {
     const a = document.createElement("a"); a.href = cv.toDataURL("image/png"); a.download = `${regime}.png`; a.click();
   }
 
+  function exportHamiltonian() {
+    const gi = Float64Array.from(ensemble.factors, (f) => f * dyn.g);
+    const { h, n } = arrowheadMatrixGi(WA, WA, dyn.sigma, dyn.seed, gi);
+    downloadNpy(`H_cavityQED_N${dyn.m}.npy`, h, [n, n]); // np.load(...) → (N+1)×(N+1) Hamiltonian in units of ω_c
+  }
+
   const Hud = (
     <div className="pane hud">
       <div className="pane-head">Validation · QuTiP / numpy golden</div>
@@ -691,6 +697,7 @@ export function App() {
       <div className="hud-pass">✓ physics survives the WASM boundary</div>
       <div className="btn-row">
         <button onClick={exportCSV}>CSV</button><button onClick={exportJSON}>JSON</button><button onClick={exportPNG}>PNG</button>
+        {regime === "dynamics" ? <button onClick={exportHamiltonian} title="exact (N+1)×(N+1) Hamiltonian → np.load()">Ĥ.npy</button> : null}
       </div>
     </div>
   );
@@ -956,6 +963,20 @@ function lerpHex(a: string, b: string, t: number): string {
 function csv(rows: (string | number)[][]): string { return rows.map((r) => r.join(",")).join("\n"); }
 function download(name: string, type: string, content: string) {
   const url = URL.createObjectURL(new Blob([content], { type }));
+  const a = document.createElement("a"); a.href = url; a.download = name; a.click(); URL.revokeObjectURL(url);
+}
+// Serialize a Float64Array as a real NumPy .npy (v1.0, '<f8', C-order) — np.load() reads it directly.
+function downloadNpy(name: string, data: Float64Array, shape: number[]) {
+  const header = `{'descr': '<f8', 'fortran_order': False, 'shape': (${shape.join(", ")}${shape.length === 1 ? "," : ""}), }`;
+  const base = 10 + header.length + 1; // magic(6)+ver(2)+len(2) + header + '\n'
+  const pad = (64 - (base % 64)) % 64;
+  const headBytes = new TextEncoder().encode(header + " ".repeat(pad) + "\n");
+  const buf = new ArrayBuffer(10 + headBytes.length + data.length * 8), dv = new DataView(buf);
+  [0x93, 0x4e, 0x55, 0x4d, 0x50, 0x59, 1, 0].forEach((b, i) => dv.setUint8(i, b)); // \x93NUMPY v1.0
+  dv.setUint16(8, headBytes.length, true);
+  new Uint8Array(buf, 10, headBytes.length).set(headBytes);
+  for (let i = 0; i < data.length; i++) dv.setFloat64(10 + headBytes.length + i * 8, data[i]!, true);
+  const url = URL.createObjectURL(new Blob([buf], { type: "application/octet-stream" }));
   const a = document.createElement("a"); a.href = url; a.download = name; a.click(); URL.revokeObjectURL(url);
 }
 function Row({ label, k, r, unit, v }: { label: React.ReactNode; k?: string; r?: React.MutableRefObject<Record<string, HTMLSpanElement | null>>; unit?: string; v?: string }) {

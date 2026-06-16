@@ -1,6 +1,6 @@
 // Thin TS wrapper over the QuTiP-validated Rust→WASM core (sim/wasm/pkg-web).
 // All physics is computed in WASM; this only marshals parameters and the RGBA buffer.
-import init, { Sim, spectrum, arrowhead_modes, arrowhead_modes_gi, cavity_power_spectrum, cavity_power_spectrum_gi, coupling_sweep, coupling_sweep_gi, wigner_rgba_of_rho, wigner_of_rho, cavity_layers, cavity_field, cavity_reflectance } from "../../wasm/pkg-web/cqed_core.js";
+import init, { Sim, spectrum, arrowhead_modes, arrowhead_modes_gi, arrowhead_matrix_gi, cavity_power_spectrum, cavity_power_spectrum_gi, coupling_sweep, coupling_sweep_gi, wigner_rgba_of_rho, wigner_of_rho, cavity_layers, cavity_field, cavity_reflectance } from "../../wasm/pkg-web/cqed_core.js";
 
 let initPromise: Promise<unknown> | null = null;
 export function loadWasm(): Promise<unknown> {
@@ -92,6 +92,12 @@ export function arrowheadModesGi(wc: number, wa: number, sigma: number, seed: nu
   const flat = arrowhead_modes_gi(wc, wa, sigma, seed, gi);
   const n = gi.length + 1;
   return { eigs: flat.slice(0, n), vecs: flat.slice(n), n };
+}
+
+/** The exact (M+1)×(M+1) single-excitation Hamiltonian matrix the engine diagonalizes (row-major),
+ *  for export to NumPy/MATLAB. */
+export function arrowheadMatrixGi(wc: number, wa: number, sigma: number, seed: number, gi: Float64Array): { h: Float64Array; n: number } {
+  return { h: arrowhead_matrix_gi(wc, wa, sigma, seed, gi), n: gi.length + 1 };
 }
 
 /** Power spectrum for per-molecule couplings g_i. */
