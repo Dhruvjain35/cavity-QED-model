@@ -239,6 +239,21 @@ function FieldLight({ stateRef, tRef, inspectRef }: { stateRef: MutableRefObject
   return <pointLight ref={ref} position={[0, 0, 0]} distance={13} color="#6fa8ff" />;
 }
 
+// Cavity field-polarization axis ε̂(θ) = (sinθ, cosθ, 0) — a double-headed amber rod through the cavity
+// centre. Rotating it off the (crystal) dipoles collapses the coupling g_i = g_0(μ̂·ε̂); at θ=90° it is
+// ⟂ ŷ and the Rabi splitting vanishes. Distinct amber so it never reads as a molecular dipole.
+function PolarizationAxis({ theta }: { theta: number }) {
+  const L = 2.5, dir = new THREE.Vector3(0, Math.cos(theta), Math.sin(theta)); // ε̂(θ) transverse (ŷ→ẑ)
+  const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+  return (
+    <group quaternion={q}>
+      <mesh><cylinderGeometry args={[0.026, 0.026, 2 * L, 10]} /><meshBasicMaterial color="#f5b942" toneMapped={false} /></mesh>
+      <mesh position={[0, L, 0]}><coneGeometry args={[0.09, 0.26, 12]} /><meshBasicMaterial color="#ffd98a" toneMapped={false} /></mesh>
+      <mesh position={[0, -L, 0]} rotation={[Math.PI, 0, 0]}><coneGeometry args={[0.09, 0.26, 12]} /><meshBasicMaterial color="#ffd98a" toneMapped={false} /></mesh>
+    </group>
+  );
+}
+
 // Baked neutral studio environment (no external HDRI) — gives the polished mirrors real specular form
 // and the molecules real shading. Cool, low, lab-grade; deliberately not a game-engine preset.
 function Studio() {
@@ -253,13 +268,13 @@ function Studio() {
   );
 }
 
-export function LiveCavityScene({ stateRef, tRef, inspectRef, m, ensemble, waist }: { stateRef: MutableRefObject<Dyn>; tRef: MutableRefObject<number>; inspectRef: MutableRefObject<number | null>; m: number; ensemble: Ens; waist: number }) {
+export function LiveCavityScene({ stateRef, tRef, inspectRef, m, ensemble, waist, polTheta }: { stateRef: MutableRefObject<Dyn>; tRef: MutableRefObject<number>; inspectRef: MutableRefObject<number | null>; m: number; ensemble: Ens; waist: number; polTheta: number }) {
   const film = useMemo(() => buildFilm(ensemble), [ensemble]);
   return (
     <div className="cav-stage">
       <div className="cav-tag cav-tag-l">mirror</div>
       <div className="cav-tag cav-tag-r">mirror</div>
-      <div className="cav-tag cav-tag-mode">ω<sub>c</sub> TEM₀₀ mode</div>
+      <div className="cav-tag cav-tag-mode">ω<sub>c</sub> TEM₀₀ mode · <span style={{ color: "#f5b942" }}>ε̂</span> polariz.</div>
       <div className="cav-tag cav-tag-mol">{m} naphthalene emitters · μ̂ → g<sub>i</sub></div>
       <Canvas shadows dpr={[1, 2]} gl={{ antialias: true, alpha: true }} camera={{ position: [8.3, 3.9, 9.4], fov: 33 }}>
         <PerspectiveCamera makeDefault fov={33} position={[8.3, 3.9, 9.4]} />
@@ -270,6 +285,7 @@ export function LiveCavityScene({ stateRef, tRef, inspectRef, m, ensemble, waist
         <Mirror side={-1} stateRef={stateRef} tRef={tRef} inspectRef={inspectRef} />
         <Mirror side={1} stateRef={stateRef} tRef={tRef} inspectRef={inspectRef} />
         <PhotonMode stateRef={stateRef} tRef={tRef} inspectRef={inspectRef} waist={waist} />
+        <PolarizationAxis theta={polTheta} />
         <Molecules stateRef={stateRef} tRef={tRef} inspectRef={inspectRef} m={m} film={film} />
         <Dipoles stateRef={stateRef} tRef={tRef} inspectRef={inspectRef} m={m} film={film} />
         <ContactShadows position={[0, -2.7, 0]} scale={26} blur={2.8} far={6} opacity={0.42} resolution={1024} color="#02040a" />

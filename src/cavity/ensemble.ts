@@ -27,10 +27,13 @@ function mulberry32(a: number) {
   };
 }
 
-/** Build the ensemble. `order` ∈ [0,1]: 1 = perfectly oriented crystal (all μ̂ ∥ ε̂), 0 = amorphous
- *  film (random 3D orientations). `waist` = Gaussian mode waist w (in the same length units as the
- *  layout); molecules far from the cavity axis couple weakly. */
-export function buildEnsemble(m: number, seed: number, order: number, waist: number): Ensemble {
+/** Build the ensemble. `order` ∈ [0,1]: 1 = perfectly oriented crystal (μ̂ along ŷ), 0 = amorphous
+ *  film (random 3D orientations). `waist` = Gaussian mode waist w. `theta` (radians) rotates the cavity
+ *  field polarization in the TRANSVERSE plane ε̂(θ) = (0, cosθ, sinθ) (ŷ→ẑ, ⊥ the cavity axis x̂): at
+ *  θ=0 ε̂∥crystal dipoles (max coupling), at θ=π/2 ε̂⊥them (g_i→0, Rabi splitting collapses).
+ *  g_i = g_0 (μ̂_i·ε̂(θ)) f(r_i). */
+export function buildEnsemble(m: number, seed: number, order: number, waist: number, theta = 0): Ensemble {
+  const es = Math.sin(theta), ec = Math.cos(theta); // ε̂(θ) = (0, cosθ, sinθ), transverse to x̂
   const rng = mulberry32(Math.floor(seed) * 2654435761 + 12345);
   const cols = Math.max(1, Math.ceil(Math.sqrt(m))), rows = Math.ceil(m / cols), gap = 1.12;
   const centers: [number, number, number][] = [];
@@ -52,7 +55,7 @@ export function buildEnsemble(m: number, seed: number, order: number, waist: num
     dipoles.push([dx, dy, dz]);
     const f = Math.exp(-(y * y + z * z) / w2); // transverse Gaussian mode amplitude
     modeAmp[i] = f;
-    factors[i] = dy * f; // (μ̂·ε̂)·f(r), ε̂=ŷ ⇒ μ̂·ε̂ = dy
+    factors[i] = (dy * ec + dz * es) * f; // (μ̂·ε̂(θ))·f(r), ε̂=(0,cosθ,sinθ)
   }
   return { m, centers, dipoles, factors, modeAmp };
 }
