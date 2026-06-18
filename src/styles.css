@@ -22,6 +22,19 @@ body { background: var(--bg); color: var(--ink); font-family: var(--mono); font-
 .topbar .brand { color: var(--ink); font-weight: 700; }
 .topbar .status { color: var(--faint); }
 .topbar .live { color: var(--green); font-size: 12px; vertical-align: middle; }
+/* 3.F / 3.G · top-bar actions: shareable link + about */
+.topbar-right { display: flex; align-items: center; gap: 10px; }
+.copy-link { font-family: var(--mono); font-size: 12px; background: #444; color: #00ff66; border: none; padding: 2px 8px; cursor: pointer; letter-spacing: 0.04em; text-transform: none; }
+.copy-link:hover { background: #555; }
+.about-btn { width: 18px; height: 18px; background: #21262d; color: #888; border: 1px solid #30363d; cursor: pointer; font-size: 11px; line-height: 1; display: inline-flex; align-items: center; justify-content: center; padding: 0; }
+.about-btn:hover { color: #fff; }
+.about-overlay { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 400px; background: #0c0f12; border: 1px solid #30363d; padding: 16px; z-index: 1000; font-family: var(--mono); text-transform: none; }
+.about-overlay .about-title { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; color: var(--cyan); margin-bottom: 10px; }
+.about-overlay p { font-size: 10.5px; line-height: 1.55; color: var(--dim); margin: 0 0 9px; }
+.about-overlay p:last-child { margin-bottom: 0; }
+.about-link { color: var(--green); }
+.about-x { position: absolute; top: 8px; right: 10px; background: transparent; border: none; color: var(--dim); font-size: 16px; cursor: pointer; line-height: 1; padding: 0; }
+.about-x:hover { color: #fff; }
 
 /* 3-column console grid */
 .workstation { flex: 1; min-height: 0; display: grid; grid-template-columns: 214px minmax(0, 1fr) 318px; overflow: hidden; }
@@ -35,12 +48,20 @@ body { background: var(--bg); color: var(--ink); font-family: var(--mono); font-
 .pane { border-bottom: 1px solid var(--rule); padding: 4px 6px; }
 .pane:last-child { border-bottom: none; }
 .pane.grow { flex: 1; min-height: 0; }
-.pane-head { font-family: var(--mono); font-size: 8.5px; font-weight: 600; letter-spacing: 0.03em; text-transform: uppercase; color: var(--dim); margin-bottom: 3px; line-height: 1.35; }
+/* 2.3 / 2.4 · center the plot inside grow panes so leftover height is symmetric padding, never a
+   one-sided black gap between panels (single / collective / vibronic columns). */
+.center > .pane.grow { display: flex; flex-direction: column; }
+.center > .pane.grow > .plotwrap, .center > .pane.grow > .cv, .center > .pane.grow > .bloch-wrap { margin-top: auto; margin-bottom: auto; }
+/* 3.E · panel-header hierarchy — cyan hairline above every panel title */
+.pane-head { font-family: var(--mono); font-size: 9px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: #888; margin-bottom: 3px; line-height: 1.35; border-top: 1px solid #00ffff22; padding-top: 4px; }
 .pane-head i { font-style: normal; }
 .cv { display: block; max-width: 100%; height: auto; }
 .tex { display: inline-block; line-height: 1; }
 .tex .katex { font-size: 1.0em; color: inherit; }
 .cv.click { cursor: crosshair; }
+/* 3.C · hover crosshair overlay — sits exactly over a plot canvas, never intercepts its clicks */
+.plotwrap { position: relative; display: inline-block; max-width: 100%; line-height: 0; }
+.plot-ov { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; }
 .cavity3d { width: 100%; height: 460px; min-height: 360px; overflow: hidden; background: #050708; }
 .cav-stage { position: relative; width: 100%; height: 100%; }
 .cav-stage canvas { width: 100% !important; height: 100% !important; display: block; }
@@ -48,13 +69,18 @@ body { background: var(--bg); color: var(--ink); font-family: var(--mono); font-
 .phase-row { display: flex; gap: 8px; flex-wrap: wrap; }
 
 /* live dynamics: bento grid — 3D viewport + diagnostic cells, single-pixel metallic dividers */
-.dyn-bento { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1.18fr) minmax(330px, 0.82fr); grid-template-rows: minmax(0, 1.42fr) minmax(0, 1fr); }
+.dyn-bento { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1.18fr) minmax(330px, 0.82fr); grid-template-rows: minmax(0, 55fr) minmax(0, 45fr); }
 .dyn-bento > .pane { min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; border-bottom: 1px solid var(--rule-2); border-right: 1px solid var(--rule-2); }
 .dyn-bento > .pane:nth-child(2n) { border-right: none; }
 .dyn-bento > .pane:nth-last-child(-n+2) { border-bottom: none; }
 .dyn-bento .cv { margin-top: auto; margin-bottom: auto; }
-.bento-3d { padding-bottom: 8px; }
+/* FIX 3 · center the (enlarged) plots in their bento quadrants so they fill the space, not float */
+.dyn-bento .plotwrap { margin: auto; }
+.bento-3d { padding-bottom: 8px; position: relative; }
 .live3d { flex: 1; width: 100%; min-height: 240px; overflow: hidden; background: #050708; }
+/* 3.B · Leva 3D-scene controls — docked top-right of the 3D viewport */
+.leva-host { position: absolute; top: 8px; right: 8px; width: 214px; z-index: 40; font-size: 10px; }
+.leva-host .leva-c-kWgxhW, .leva-host > div { width: 214px; }
 .cav-tag { position: absolute; font-family: var(--mono); font-size: 9px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--dim); pointer-events: none; text-shadow: 1px 1px 0 #000; }
 .cav-tag sub { font-size: 0.74em; }
 .cav-tag-l { top: 10px; left: 10px; }
@@ -106,9 +132,12 @@ body { background: var(--bg); color: var(--ink); font-family: var(--mono); font-
 .knob-input::-webkit-outer-spin-button, .knob-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .knob-input[type="number"] { -moz-appearance: textfield; }
 .knob-entry .u, .u { font-family: var(--mono); font-size: 9.5px; color: var(--faint); }
-input[type="range"] { width: 100%; height: 2px; -webkit-appearance: none; appearance: none; background: var(--axis); cursor: pointer; }
-input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 7px; height: 13px; background: var(--cyan); border: none; cursor: pointer; }
-input[type="range"]::-moz-range-thumb { width: 7px; height: 13px; background: var(--cyan); border: none; cursor: pointer; }
+/* 3.D · slider overhaul — 2px rule track, 3px cyan blade thumb, flashes white while dragging */
+input[type="range"] { width: 100%; height: 2px; -webkit-appearance: none; appearance: none; background: var(--rule); cursor: col-resize; }
+input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 3px; height: 14px; background: var(--cyan); border: none; cursor: col-resize; transition: background 0.1s; }
+input[type="range"]::-moz-range-thumb { width: 3px; height: 14px; background: var(--cyan); border: none; cursor: col-resize; transition: background 0.1s; }
+input[type="range"]:active::-webkit-slider-thumb { background: #ffffff; }
+input[type="range"]:active::-moz-range-thumb { background: #ffffff; }
 
 /* buttons — sharp command nodes */
 .btn-row { display: flex; margin-top: 7px; border: 1px solid var(--rule-2); width: fit-content; flex-wrap: wrap; }

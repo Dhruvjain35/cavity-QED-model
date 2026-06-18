@@ -17,3 +17,7 @@ __pycache__/
 # internal scratch (workflow scripts, design notes)
 .wf-*.js
 .impeccable.md
+
+# screenshot tool output (npm run screenshot) + throwaway verification scripts
+screenshots/
+scratch/

@@ -104,6 +104,19 @@ impl Sim {
         self.rho.iter().map(|z| z.norm_sqr()).sum()
     }
 
+    /// Bloch vector of the single-excitation effective qubit {|0,e⟩, |1,g⟩} — the two states the vacuum
+    /// Rabi oscillation swaps the excitation between. Returns [x, y, z] = [2 Re ρ_01, 2 Im ρ_01, ρ_00 −
+    /// ρ_11] with 0 ≡ |0,e⟩ (basis index 2·0+0 = 0) and 1 ≡ |1,g⟩ (index 2·1+1 = 3). Tracing out the
+    /// cavity kills the BARE-atom g–e coherence (the photon-number entanglement is orthogonal), so this
+    /// manifold coherence ρ[|0,e⟩,|1,g⟩] is the honest one: its (x,z) projection spirals inward as κ,γ
+    /// leak population to |0,g⟩ and damp the coherence — the geometric signature of decoherence.
+    pub fn emitter_bloch(&self) -> Vec<f64> {
+        let r00 = self.rho[(0, 0)].re; // |0,e⟩ population
+        let r11 = self.rho[(3, 3)].re; // |1,g⟩ population
+        let r01 = self.rho[(0, 3)]; // vacuum-Rabi coherence ρ[|0,e⟩,|1,g⟩]
+        vec![2.0 * r01.re, 2.0 * r01.im, r00 - r11]
+    }
+
     /// von Neumann entropy S = −Tr(ρ ln ρ) of the full joint state (0 = pure, > 0 = mixed).
     pub fn von_neumann_entropy(&self) -> f64 {
         crate::entropy::von_neumann_entropy(&self.rho)

@@ -18,7 +18,7 @@ export interface Ensemble {
 }
 
 // deterministic PRNG (mulberry32) — pure JS, fixed by seed
-function mulberry32(a: number) {
+export function mulberry32(a: number) {
   return function () {
     a |= 0; a = (a + 0x6d2b79f5) | 0;
     let t = Math.imul(a ^ (a >>> 15), 1 | a);
@@ -58,6 +58,26 @@ export function buildEnsemble(m: number, seed: number, order: number, waist: num
     factors[i] = (dy * ec + dz * es) * f; // (μ̂·ε̂(θ))·f(r), ε̂=(0,cosθ,sinθ)
   }
   return { m, centers, dipoles, factors, modeAmp };
+}
+
+/** Deterministic 3D layout for the m molecules in the live 3D view: spread them around the central
+ *  antinode (z ∈ [−45,45], x,y ∈ [−30,30]) with a Poisson-disk-ish minimum 3D separation of 12 units so
+ *  no two emitters visually merge. This is a VISUALISATION layout (the physics couplings g_i still come
+ *  from buildEnsemble); seeded by m so it is stable per ensemble size. */
+export function clusterLayout(m: number, seed: number): [number, number, number][] {
+  const rng = mulberry32(Math.floor(seed) * 40503 + 1337), pts: [number, number, number][] = [], minSep2 = 12 * 12;
+  for (let i = 0; i < m; i++) {
+    let chosen: [number, number, number] = [0, 0, 0];
+    for (let tries = 0; tries < 60; tries++) {
+      const x = (rng() * 2 - 1) * 30, y = (rng() * 2 - 1) * 30, z = (rng() * 2 - 1) * 45;
+      chosen = [x, y, z];
+      let ok = true;
+      for (const p of pts) { const dx = p[0] - x, dy = p[1] - y, dz = p[2] - z; if (dx * dx + dy * dy + dz * dz < minSep2) { ok = false; break; } }
+      if (ok) break;
+    }
+    pts.push(chosen);
+  }
+  return pts;
 }
 
 /** Collective bright-mode weights b_i = g_i/‖g‖ (the only matter direction the photon couples to).

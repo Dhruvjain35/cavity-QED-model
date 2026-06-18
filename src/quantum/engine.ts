@@ -210,6 +210,11 @@ export class Quantum {
   get entropy(): number {
     return this.sim.von_neumann_entropy();
   }
+  /** Single-excitation effective-qubit Bloch vector [x,y,z] = [2Re ρ_01, 2Im ρ_01, ρ_00−ρ_11] on the
+   *  {|0,e⟩,|1,g⟩} manifold. The (2Im ρ_01, z) projection spirals inward as the system decoheres. */
+  emitterBloch(): Float64Array {
+    return this.sim.emitter_bloch();
+  }
   dispose(): void {
     this.sim.free();
   }
