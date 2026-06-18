@@ -99,6 +99,36 @@ impl Sim {
         out
     }
 
+    /// Flattened Re ρ[i,j] (SIGNED, row-major (2·n_fock)²) of the FULL joint state. ρ is Hermitian, so
+    /// Re ρ is symmetric and the diagonal is the (real, ≥0) populations; off-diagonal real parts carry the
+    /// SIGN of the in-phase coherence. Pairs with `rho_imag` so the UI can render a diverging (signed)
+    /// density-matrix colour map instead of a magnitude-only one.
+    pub fn rho_real(&self) -> Vec<f64> {
+        let d = 2 * self.n_fock;
+        let mut out = Vec::with_capacity(d * d);
+        for i in 0..d {
+            for j in 0..d {
+                out.push(self.rho[(i, j)].re);
+            }
+        }
+        out
+    }
+
+    /// Flattened Im ρ[i,j] (SIGNED, row-major (2·n_fock)²) of the FULL joint state. For the resonant JC
+    /// coupling phase the vacuum-Rabi coherence ρ[|0,e⟩,|1,g⟩] is PURELY IMAGINARY (= (i/2)·sin 2gt), so
+    /// the honest "where is the coherence" signal lives here, not in `rho_real`. Antisymmetric (Im ρ_ji =
+    /// −Im ρ_ij). Paired with `rho_real`, gives the UI the full complex ρ for a signed colour map.
+    pub fn rho_imag(&self) -> Vec<f64> {
+        let d = 2 * self.n_fock;
+        let mut out = Vec::with_capacity(d * d);
+        for i in 0..d {
+            for j in 0..d {
+                out.push(self.rho[(i, j)].im);
+            }
+        }
+        out
+    }
+
     /// Purity Tr(ρ²) = Σ_ij |ρ_ij|² (= 1 pure, < 1 mixed). Falls as the open system decoheres.
     pub fn purity(&self) -> f64 {
         self.rho.iter().map(|z| z.norm_sqr()).sum()

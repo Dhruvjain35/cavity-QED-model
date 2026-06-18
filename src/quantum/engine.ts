@@ -194,6 +194,15 @@ export class Quantum {
   rhoAbs(): Float64Array {
     return this.sim.rho_abs();
   }
+  /** Flattened SIGNED Re ρ[i,j] ((2·n_fock)², row-major) — symmetric; diagonal = real populations. */
+  rhoReal(): Float64Array {
+    return this.sim.rho_real();
+  }
+  /** Flattened SIGNED Im ρ[i,j] ((2·n_fock)², row-major) — antisymmetric; carries the (imaginary) JC
+   *  vacuum-Rabi coherence ρ[|0,e⟩,|1,g⟩]. Pair with rhoReal for a diverging density-matrix colour map. */
+  rhoImag(): Float64Array {
+    return this.sim.rho_imag();
+  }
   /** Raw real-valued Wigner grid (n·n, row-major) of the live cavity-reduced state. */
   wignerRaw(n: number): Float64Array {
     return this.sim.wigner(-5, 5, n);

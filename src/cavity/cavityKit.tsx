@@ -24,8 +24,9 @@ export const STAGE_TILT: [number, number, number] = [0.18, 1.52, 0];
 export const STAGE_SCALE = 1.0;
 export const STAGE_OFFSET: [number, number, number] = [0, 0, 0];
 
-/** Gaussian beam radius w(z) = w0·√(1 + (z/zR)²). */
-export const beamRadius = (z: number) => W0 * Math.sqrt(1 + (z / ZR) ** 2);
+/** Gaussian beam radius w(z) = w0·√(1 + (|z|/zR)²). Even in z by construction (the square already makes
+ *  it sign-independent — Math.abs is explicit so the symmetry can't be misread): w(−z) ≡ w(+z). */
+export const beamRadius = (z: number) => W0 * Math.sqrt(1 + (Math.abs(z) / ZR) ** 2);
 
 /** Antinode z-positions of the q-th standing wave: z_j = −HALF + (2j+1)·HALF/q, j = 0…q−1. */
 export function antinodes(): number[] {

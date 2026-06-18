@@ -13,12 +13,14 @@ import * as http from "node:http";
 
 const PORT = 4317;
 const URL = `http://localhost:${PORT}`;
+// `tall` tabs scroll inside the .center container, so a tall viewport (not Playwright fullPage, which
+// only extends the document) is what brings their below-fold panels into a single frame.
 const TABS = [
-  { name: "1-single", text: "SINGLE EMITTER", settle: 2500 },
-  { name: "2-collective", text: "COLLECTIVE", settle: 2500 },
-  { name: "3-cavity", text: "CAVITY FIELD", settle: 6000 }, // 3D needs longer warm-up under swiftshader
-  { name: "4-dynamics", text: "DYNAMICS", settle: 6000 },   // 3D + live RAF
-  { name: "5-vibronic", text: "VIBRONIC", settle: 2500 },
+  { name: "1-single", text: "SINGLE EMITTER", settle: 2500, tall: true }, // tall → includes Panel F (Bloch)
+  { name: "2-collective", text: "COLLECTIVE", settle: 2500, tall: false },
+  { name: "3-cavity", text: "CAVITY FIELD", settle: 6000, tall: false }, // 3D needs longer warm-up under swiftshader
+  { name: "4-dynamics", text: "DYNAMICS", settle: 6000, tall: false },   // 3D + live RAF
+  { name: "5-vibronic", text: "VIBRONIC", settle: 2500, tall: true },    // tall → includes Panel W (disorder)
 ];
 
 function waitForServer(timeoutMs = 20000): Promise<void> {
@@ -53,8 +55,16 @@ function waitForServer(timeoutMs = 20000): Promise<void> {
     fs.mkdirSync(outDir, { recursive: true });
 
     for (const tab of TABS) {
+      await page.setViewportSize({ width: 1512, height: 900 });
       await page.getByText(tab.text, { exact: true }).first().click().catch(() => { /* tab may already be active */ });
       await page.waitForTimeout(tab.settle);
+      if (tab.tall) {
+        // The app scrolls inside .center, so grow the viewport to the actual bottom of the last panel —
+        // this captures the below-fold panels (Bloch / disorder) with no trailing black void.
+        const bottom = await page.evaluate(() => { const p = document.querySelectorAll(".center > .pane"); const last = p[p.length - 1]; return last ? Math.ceil(last.getBoundingClientRect().bottom) + 18 : 1320; });
+        await page.setViewportSize({ width: 1512, height: Math.min(2200, Math.max(900, bottom)) });
+        await page.waitForTimeout(700);
+      }
       const file = path.join(outDir, `${tab.name}.png`);
       await page.screenshot({ path: file, fullPage: false });
       console.log(`SCREENSHOT_PATH:${file}`);

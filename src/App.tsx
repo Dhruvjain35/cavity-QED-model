@@ -20,7 +20,7 @@ const CavityScene = lazy(() => import("./cavity/CavityScene").then((m) => ({ def
 const LiveCavityScene = lazy(() => import("./cavity/LiveCavityScene").then((m) => ({ default: m.LiveCavityScene })));
 
 // ── Regime 1 (single emitter) ──
-const N_GRID = 100, X_RANGE = 5, DT_FRAME = 0.18, T_LOOP = 80, SERIES_MAX = 600, INV_PI = 1 / Math.PI;
+const N_GRID = 100, X_RANGE = 5, DT_FRAME = 0.18, T_LOOP = 45, SERIES_MAX = 600, INV_PI = 1 / Math.PI;
 const BASE: SimParams = { nFock: 16, wc: 1.0, wa: 1.0, g: 0.2, kappa: 0.05, gamma: 0.02, gammaPhi: 0.0 };
 const DFULL = 32; // 2·N_FOCK — full joint density matrix
 // ── Regime 2 (collective) ──
@@ -39,7 +39,7 @@ const TR_ML = 50, TR_MR = 16, TR_MT = 16, TR_MB = 32, TR_PW = 520, TR_PH = 168; 
 const TR_CW = TR_ML + TR_PW + TR_MR, TR_CH = TR_MT + TR_PH + TR_MB;
 const DI_ML = 54, DI_MR = 16, DI_MT = 18, DI_MB = 34, DI_PW = 520, DI_PH = 184; // 4.C disorder broadening
 const DI_CW = DI_ML + DI_PW + DI_MR, DI_CH = DI_MT + DI_PH + DI_MB;
-const HB_ML = 14, HB_MR = 14, HB_MT = 30, HB_PW = 1040, HB_PH = 210, HB_MB = 26;
+const HB_ML = 14, HB_MR = 14, HB_MT = 30, HB_PW = 1040, HB_PH = 200, HB_MB = 26; // fits Panel G with the x-axis label inside the 900px fold (FIX 5)
 const HB_CW = HB_ML + HB_PW + HB_MR, HB_CH = HB_MT + HB_PH + HB_MB;
 const VB_ML = 14, VB_MR = 14, VB_MT = 28, VB_PW = 1040, VB_PH = 230, VB_MB = 30;
 const VB_CW = VB_ML + VB_PW + VB_MR, VB_CH = VB_MT + VB_PH + VB_MB;
@@ -54,7 +54,7 @@ const CV_CW = CV_ML + CV_W + CV_MR, CV_CH = CV_MT + CV_H + CV_MB;
 const N0 = 1.0, NS = 1.52; // air / glass substrate
 const RB_ML = 36, RB_MR = 10, RB_MT = 12, RB_MB = 24, RB_PW = 268, RB_PH = 108;
 const RB_CW = RB_ML + RB_PW + RB_MR, RB_CH = RB_MT + RB_PH + RB_MB;
-const DT_DYN = 0.22, HEAT_COLS = 200;
+const DT_DYN = 0.22;
 const PP_ML = 50, PP_MR = 14, PP_MT = 16, PP_MB = 28, PP_PW = 466, PP_PH = 176;
 const PP_CW = PP_ML + PP_PW + PP_MR, PP_CH = PP_MT + PP_PH + PP_MB;
 const HP_ML = 78, HP_MR = 16, HP_MT = 18, HP_MB = 30, HP_PW = 540, HP_PH = 320; // dressed-states scatter (fills its quadrant)
@@ -153,7 +153,8 @@ export function App() {
 
   const wigCanvas = useRef<HTMLCanvasElement>(null), husimiCanvas = useRef<HTMLCanvasElement>(null), seriesCanvas = useRef<HTMLCanvasElement>(null), decohereCanvas = useRef<HTMLCanvasElement>(null);
   const blochCanvas = useRef<HTMLCanvasElement>(null); // 4.A Bloch trajectory
-  const blochTrail = useRef<{ x: number; z: number }[]>([]);
+  const blochCurve = useRef<{ n: number; T: number; data: Float32Array } | null>(null); // analytic spiral over ~6 Rabi cycles
+  const popSeries = useRef<{ n: number; T: number; Trabi: number; data: Float32Array } | null>(null); // analytic photon/excited/purity/entropy over [0,T_LOOP]
   const hopBarsCanvas = useRef<HTMLCanvasElement>(null);
   const rhoCanvas = useRef<HTMLCanvasElement>(null), specCanvas = useRef<HTMLCanvasElement>(null);
   const bridgeCanvas = useRef<HTMLCanvasElement>(null);
@@ -165,6 +166,7 @@ export function App() {
   const hopCanvas = useRef<HTMLCanvasElement>(null);
   const dynState = useRef<{ eigs: Float64Array; vecs: Float64Array; n: number; c: Float64Array; bright: Float64Array; modeAmp: Float64Array; hist: Float64Array[] } | null>(null);
   const simT = useRef(0);
+  const popCurve = useRef<{ T: number; split: number; n: number; data: Float32Array } | null>(null); // FIX 3 · analytic population trajectory over 6 Rabi cycles
   const hopMarks = useRef<{ x: number; y: number; k: number }[]>([]);
   const inspectRef = useRef<number | null>(null); // dressed eigenstate frozen onto the 3D (null = live)
   const fftCanvas = useRef<HTMLCanvasElement>(null), sweepCanvas = useRef<HTMLCanvasElement>(null);
@@ -198,6 +200,23 @@ export function App() {
       quantum.current?.dispose();
       quantum.current = new Quantum({ ...BASE, ...params });
       series.current = []; setReady(true);
+      // FIX 3 · analytic Bloch spiral: integrate a fresh copy of the open system over [0,T] (T ≫ 1/(κ+γ))
+      // and sample (2 Im ρ_01, ρ_00−ρ_11) at 600 points — the radius shrinks with decoherence → visible spiral.
+      const merged = { ...BASE, ...params };
+      const tmp = new Quantum(merged); tmp.reset();
+      const NB = 600, TB = 60, dtb = TB / NB, bd = new Float32Array(NB * 2);
+      for (let i = 0; i < NB; i++) { const b = tmp.emitterBloch(); bd[i * 2] = b[1]!; bd[i * 2 + 1] = b[2]!; tmp.advance(dtb, 1e-6, 1e-6); }
+      tmp.dispose();
+      blochCurve.current = { n: NB, T: TB, data: bd };
+      // FIX 4 · analytic population window over [0,T_LOOP=45]: integrate a fresh copy and sample photon
+      // ⟨a†a⟩ / excited ⟨P_e⟩ / purity / entropy at 300 points. The panel then shows ~3 damped vacuum-Rabi
+      // cycles (Ω_R=2g) IMMEDIATELY — robust to the slow headless RAF (the live loop only reaches t≈8 by
+      // screenshot time). A live cursor (wrapped mod T) marks where the running system currently sits.
+      const tp = new Quantum(merged); tp.reset();
+      const NP = 300, TP = T_LOOP, dtp = TP / NP, pd = new Float32Array(NP * 4);
+      for (let i = 0; i < NP; i++) { pd[i * 4] = tp.photon; pd[i * 4 + 1] = tp.excited; pd[i * 4 + 2] = tp.purity; pd[i * 4 + 3] = tp.entropy; tp.advance(dtp, 1e-6, 1e-6); }
+      tp.dispose();
+      popSeries.current = { n: NP, T: TP, Trabi: Math.PI / Math.max(1e-6, merged.g), data: pd };
     });
     return () => { alive = false; };
   }, [params]);
@@ -236,6 +255,11 @@ export function App() {
       const bright = brightWeights(ensemble.factors); // per-molecule b_i = g_i/‖g‖ — drives the live glow
       console.log(`%c[brightWeights]%c N=${ensemble.m} η=${dyn.order} θ=${dyn.theta}°  →  ${Array.from(bright).map((x) => x.toFixed(3)).join(", ")}`, "color:#00ffff;font-weight:600", "color:#8b949e");
       dynState.current = { eigs, vecs, n, c, bright, modeAmp: ensemble.modeAmp, hist: [] };
+      // FIX 3 · precompute photon/bright/dark populations over 6 vacuum-Rabi cycles (analytic, from the
+      // eigenmodes) so the panel shows the full oscillation + dephasing envelope at once, not frame-by-frame.
+      const split = Math.max(1e-6, eigs[n - 1]! - eigs[0]!), NP = 320, T_POP = 6 * 2 * Math.PI / split, pdata = new Float32Array(NP * 3);
+      for (let i = 0; i < NP; i++) { const d = decompAt(T_POP * i / (NP - 1)); pdata[i * 3] = d.ph; pdata[i * 3 + 1] = d.br; pdata[i * 3 + 2] = d.dk; }
+      popCurve.current = { T: T_POP, split, n: NP, data: pdata };
       simT.current = 0;
       inspectRef.current = null; setInspect(null); // a new ensemble invalidates the inspected state
       matData.current = arrowheadMatrixGi(WA, WA, dyn.sigma, dyn.seed, gi);
@@ -283,16 +307,12 @@ export function App() {
           q.advance(DT_FRAME, tolRef.current.atol, tolRef.current.rtol);
           series.current.push({ t: q.time, n: q.photon, pe: q.excited, pur: q.purity, s: q.entropy });
           if (series.current.length > SERIES_MAX) series.current.shift();
-          const bl = q.emitterBloch(); blochTrail.current.push({ x: bl[1]!, z: bl[2]! }); // (2Im ρ_01, ρ_00−ρ_11)
-          if (blochTrail.current.length > 300) blochTrail.current.shift();
-          if (q.time > T_LOOP) { q.reset(); series.current = []; blochTrail.current = []; }
+          if (q.time > T_LOOP) { q.reset(); series.current = []; }
         }
         drawWigner(q); drawHusimi(q); drawSeries(); drawRho(q); drawDecohere(); drawBloch(); updateReadouts(q);
       } else if (regimeRef.current === "dynamics" && dynState.current) {
-        const ds = dynState.current;
         if (playingRef.current) simT.current += DT_DYN;
         const d = decompAt(simT.current);
-        if (playingRef.current) { ds.hist.push(Float64Array.of(d.ph, d.br, d.dk)); if (ds.hist.length > HEAT_COLS) ds.hist.shift(); }
         drawPopTraces(); drawDressed(); drawPowerSpectrum(); drawMatrix(); updateSimReadouts(d);
         if (sweepRef.current) drawSweep();
       }
@@ -385,29 +405,33 @@ export function App() {
     const cv = seriesCanvas.current; if (!cv) return;
     const ctx = sized(cv, S_CW, S_CH);
     ctx.fillStyle = PANEL; ctx.fillRect(0, 0, S_CW, S_CH);
-    const yOf = (v: number) => S_MT + (1 - v) * S_PH;
+    const ps = popSeries.current, T = ps ? ps.T : T_LOOP;
+    const yOf = (v: number) => S_MT + (1 - v) * S_PH, xOf = (t: number) => S_ML + (t / T) * S_PW;
     ctx.font = "500 9px 'JetBrains Mono','SF Mono',monospace"; ctx.fillStyle = DIM;
     for (const v of [0, 0.5, 1]) {
       ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5;
       seg(ctx, S_ML, yOf(v), S_ML + S_PW, yOf(v)); seg(ctx, S_ML - 3, yOf(v), S_ML, yOf(v));
       ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(v.toFixed(1), S_ML - 6, yOf(v));
     }
-    const pts = series.current;
-    if (pts.length >= 2) {
-      const t0 = pts[0]!.t, t1 = pts[pts.length - 1]!.t, span = Math.max(t1 - t0, 1e-6);
-      const xOf = (t: number) => S_ML + ((t - t0) / span) * S_PW;
-      const trace = (key: "n" | "pe" | "pur", color: string) => {
+    if (ps) {
+      // faint vacuum-Rabi period gridlines (Ω_R = 2g → period π/g) so the cycles are countable
+      ctx.strokeStyle = DASH; ctx.setLineDash([1, 3]); ctx.lineWidth = 0.6;
+      for (let tc = ps.Trabi; tc < T; tc += ps.Trabi) seg(ctx, xOf(tc), S_MT, xOf(tc), S_MT + S_PH);
+      ctx.setLineDash([]);
+      const trace = (off: number, color: string) => {
         ctx.strokeStyle = color; ctx.lineWidth = 1.4; ctx.beginPath();
-        pts.forEach((p, i) => { const x = xOf(p.t), y = yOf(Math.min(p[key], 1)); i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); });
+        for (let i = 0; i < ps.n; i++) { const x = xOf((i / (ps.n - 1)) * T), y = yOf(Math.min(1, ps.data[i * 4 + off]!)); i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); }
         ctx.stroke();
       };
-      trace("n", COBALT); trace("pe", CRIMSON); trace("pur", EMERALD);
+      trace(0, COBALT); trace(1, CRIMSON); trace(2, EMERALD); // ⟨a†a⟩, ⟨P_e⟩, purity
+      const q = quantum.current; // live cursor — where the running open system currently sits in the window
+      if (q) { const tc = ((q.time % T) + T) % T; ctx.strokeStyle = "rgba(255,255,255,0.5)"; ctx.lineWidth = 1; seg(ctx, xOf(tc), S_MT, xOf(tc), S_MT + S_PH); }
       ctx.fillStyle = DIM; ctx.textAlign = "center"; ctx.textBaseline = "top";
-      ctx.fillText(t0.toFixed(0), S_ML, S_MT + S_PH + 5); ctx.fillText(t1.toFixed(0), S_ML + S_PW, S_MT + S_PH + 5);
+      for (const t of [0, T / 3, (2 * T) / 3, T]) ctx.fillText(t.toFixed(0), xOf(t), S_MT + S_PH + 5);
     }
     ctx.lineWidth = 0.75; ctx.strokeStyle = AXIS; ctx.strokeRect(S_ML, S_MT, S_PW, S_PH);
     ctx.fillStyle = INK; ctx.font = "600 12px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
-    ctx.fillText("t", S_ML + S_PW / 2, S_CH - 4);
+    ctx.fillText("t  (ω_c⁻¹)", S_ML + S_PW / 2, S_CH - 4);
   }
 
   // FIX 4 (SINGLE) · decoherence panel: purity Tr(ρ²) and von Neumann entropy S(t) together — the
@@ -416,18 +440,20 @@ export function App() {
     const cv = decohereCanvas.current; if (!cv) return;
     const ctx = sized(cv, DC_CW, DC_CH);
     ctx.fillStyle = PANEL; ctx.fillRect(0, 0, DC_CW, DC_CH);
-    const yOf = (v: number) => DC_MT + (1 - v) * DC_PH;
+    const ps = popSeries.current, T = ps ? ps.T : T_LOOP;
+    const yOf = (v: number) => DC_MT + (1 - v) * DC_PH, xOf = (t: number) => DC_ML + (t / T) * DC_PW;
     ctx.font = "500 9px 'JetBrains Mono','SF Mono',monospace";
-    for (let f = 0; f <= 6; f++) { const x = DC_ML + f / 6 * DC_PW; ctx.strokeStyle = DASH; ctx.setLineDash([1, 3]); ctx.lineWidth = 0.6; seg(ctx, x, DC_MT, x, DC_MT + DC_PH); ctx.setLineDash([]); }
     for (const v of [0, 0.5, 1]) { ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5; seg(ctx, DC_ML, yOf(v), DC_ML + DC_PW, yOf(v)); ctx.fillStyle = DIM; ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(v.toFixed(1), DC_ML - 6, yOf(v)); }
-    const pts = series.current;
-    if (pts.length >= 2) {
-      const t0 = pts[0]!.t, t1 = pts[pts.length - 1]!.t, span = Math.max(t1 - t0, 1e-6), xOf = (t: number) => DC_ML + ((t - t0) / span) * DC_PW;
-      let smax = 0.1; for (const p of pts) if (p.s > smax) smax = p.s;
-      const trace = (fn: (p: Pt) => number, color: string) => { ctx.strokeStyle = color; ctx.lineWidth = 1.8; ctx.beginPath(); pts.forEach((p, i) => { const x = xOf(p.t), y = yOf(Math.max(0, Math.min(1, fn(p)))); i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); }); ctx.stroke(); };
-      trace((p) => p.pur, GREEN);        // Tr(ρ²) ∈ (0,1]
-      trace((p) => p.s / smax, AMBER);   // S(t) normalized to running max
-      ctx.fillStyle = DIM; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText(t0.toFixed(0), DC_ML, DC_MT + DC_PH + 5); ctx.fillText(t1.toFixed(0), DC_ML + DC_PW, DC_MT + DC_PH + 5);
+    if (ps) {
+      let smax = 0.1; for (let i = 0; i < ps.n; i++) if (ps.data[i * 4 + 3]! > smax) smax = ps.data[i * 4 + 3]!;
+      ctx.strokeStyle = DASH; ctx.setLineDash([1, 3]); ctx.lineWidth = 0.6; // vacuum-Rabi period gridlines
+      for (let tc = ps.Trabi; tc < T; tc += ps.Trabi) seg(ctx, xOf(tc), DC_MT, xOf(tc), DC_MT + DC_PH);
+      ctx.setLineDash([]);
+      const trace = (off: number, norm: number, color: string) => { ctx.strokeStyle = color; ctx.lineWidth = 1.8; ctx.beginPath(); for (let i = 0; i < ps.n; i++) { const x = xOf((i / (ps.n - 1)) * T), y = yOf(Math.max(0, Math.min(1, ps.data[i * 4 + off]! / norm))); i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); } ctx.stroke(); };
+      trace(2, 1, GREEN);      // purity Tr(ρ²) ∈ (0,1]
+      trace(3, smax, AMBER);   // entropy S(t), normalized to its window max
+      const q = quantum.current; if (q) { const tc = ((q.time % T) + T) % T; ctx.strokeStyle = "rgba(255,255,255,0.5)"; ctx.lineWidth = 1; seg(ctx, xOf(tc), DC_MT, xOf(tc), DC_MT + DC_PH); }
+      ctx.fillStyle = DIM; ctx.textAlign = "center"; ctx.textBaseline = "top"; for (const t of [0, T / 3, (2 * T) / 3, T]) ctx.fillText(t.toFixed(0), xOf(t), DC_MT + DC_PH + 5);
       ctx.fillStyle = AMBER; ctx.textAlign = "left"; ctx.textBaseline = "top"; ctx.fillText(`S max = ${smax.toFixed(2)}`, DC_ML + 5, DC_MT + 4);
     }
     ctx.strokeStyle = AXIS; ctx.lineWidth = 0.75; ctx.strokeRect(DC_ML, DC_MT, DC_PW, DC_PH);
@@ -451,14 +477,15 @@ export function App() {
     for (const t of [-1, 1]) ctx.fillText(minus(`${t}`), xPx(t), cy + 4);
     ctx.textAlign = "right"; ctx.textBaseline = "middle";
     for (const t of [-1, 1]) ctx.fillText(minus(`${t}`), cx - 5, yPx(t));
-    const tr = blochTrail.current, n = tr.length;
-    if (n >= 2) {
-      for (let i = 1; i < n; i++) {
-        ctx.strokeStyle = `rgba(0,255,255,${(0.1 + 0.9 * (i / (n - 1))).toFixed(3)})`; ctx.lineWidth = 1.5;
-        ctx.beginPath(); ctx.moveTo(xPx(tr[i - 1]!.x), yPx(tr[i - 1]!.z)); ctx.lineTo(xPx(tr[i]!.x), yPx(tr[i]!.z)); ctx.stroke();
+    const bc = blochCurve.current; // analytic spiral: oldest at opacity 0.08, newest at 1.0
+    if (bc && bc.n >= 2) {
+      for (let i = 1; i < bc.n; i++) {
+        ctx.strokeStyle = `rgba(0,255,255,${(0.08 + 0.92 * (i / (bc.n - 1))).toFixed(3)})`; ctx.lineWidth = 1.4;
+        ctx.beginPath(); ctx.moveTo(xPx(bc.data[(i - 1) * 2]!), yPx(bc.data[(i - 1) * 2 + 1]!)); ctx.lineTo(xPx(bc.data[i * 2]!), yPx(bc.data[i * 2 + 1]!)); ctx.stroke();
       }
-      const last = tr[n - 1]!; ctx.fillStyle = CYAN; ctx.beginPath(); ctx.arc(xPx(last.x), yPx(last.z), 3, 0, 2 * Math.PI); ctx.fill();
     }
+    const q = quantum.current; // live cursor — where the running open system currently sits on the spiral
+    if (q) { const b = q.emitterBloch(); ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(xPx(b[1]!), yPx(b[2]!), 3.5, 0, 2 * Math.PI); ctx.fill(); }
     ctx.strokeStyle = AXIS; ctx.lineWidth = 0.75; ctx.strokeRect(BL_ML, BL_MT, BL_S, BL_S);
     ctx.fillStyle = INK; ctx.font = "600 11px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
     ctx.fillText("2 Im ρ₀₁  (coherence)", BL_ML + BL_S / 2, BL_CH - 6);
@@ -473,14 +500,21 @@ export function App() {
   function drawRho(q: Quantum) {
     const cv = rhoCanvas.current; if (!cv) return;
     const ctx = sized(cv, R_CW, R_CH);
-    ctx.fillStyle = "#000"; ctx.fillRect(0, 0, R_CW, R_CH);
-    const a = q.rhoAbs(), B = RHO_BLOCK, cell = R_S / B;
-    let maxOff = 1e-6, maxAll = 1e-6;
-    for (let i = 0; i < B; i++) for (let j = 0; j < B; j++) { const v = a[i * DFULL + j]!; if (v > maxAll) maxAll = v; if (i !== j && v > maxOff) maxOff = v; }
-    const norm = Math.max(maxOff, 0.05 * maxAll); // off-diagonal saturates; floor prevents blow-up at t=0
+    ctx.fillStyle = "#050708"; ctx.fillRect(0, 0, R_CW, R_CH);
+    // Diverging colour map over the COMPLEX joint ρ. Intensity = |ρ_ij| (so populations AND the purely-
+    // imaginary vacuum-Rabi coherence ρ[|0,e⟩,|1,g⟩] both show — a literal Re ρ map would render that
+    // coherence black). Colour = SIGN of the dominant (real-or-imaginary) component: + → cyan, − → red.
+    // In this JC manifold every element is purely real (populations, diagonal) or purely imaginary
+    // (the coherence), so the coherence appears as an antisymmetric cyan/red conjugate pair off-diagonal,
+    // flipping cyan↔red as the excitation sloshes atom↔cavity. No gray, no white at any value.
+    const re = q.rhoReal(), im = q.rhoImag(), B = RHO_BLOCK, cell = R_S / B;
+    let maxAbs = 1e-6;
+    for (let i = 0; i < B; i++) for (let j = 0; j < B; j++) { const m = Math.hypot(re[i * DFULL + j]!, im[i * DFULL + j]!); if (m > maxAbs) maxAbs = m; }
     for (let i = 0; i < B; i++) for (let j = 0; j < B; j++) {
-      const v = Math.sqrt(Math.min(1, a[i * DFULL + j]! / norm));
-      ctx.fillStyle = lerpHex("#0c0f12", "#00ffff", v); // |ρ| ≥ 0 → panel → stark cyan
+      const r = re[i * DFULL + j]!, m = im[i * DFULL + j]!, mag = Math.hypot(r, m);
+      const v = Math.min(1, mag / maxAbs);                  // normalised to the largest |ρ_ij| this frame
+      const signed = Math.abs(r) >= Math.abs(m) ? r : m;    // the non-zero (dominant) component carries the sign
+      ctx.fillStyle = signed >= 0 ? lerpHex("#050708", "#00ffff", v) : lerpHex("#050708", "#ff3333", v);
       ctx.fillRect(R_ML + j * cell, R_MT + i * cell, cell, cell);
     }
     ctx.strokeStyle = "#000"; ctx.lineWidth = 1; // explicit 1px matrix grid
@@ -1096,23 +1130,26 @@ export function App() {
   // P1 · the headline: photon ↔ bright vacuum-Rabi oscillation (Ω_R = 2g√M) with the dark band that
   // stays flat at σ=0 and grows as disorder leaks population out of the bright mode. hist = [ph,br,dk].
   function drawPopTraces() {
-    const cvEl = popCanvas.current, ds = dynState.current; if (!cvEl || !ds) return;
+    const cvEl = popCanvas.current, pc = popCurve.current; if (!cvEl || !pc) return;
     const ctx = sized(cvEl, PP_CW, PP_CH);
     ctx.fillStyle = PANEL; ctx.fillRect(0, 0, PP_CW, PP_CH);
-    const yOf = (v: number) => PP_MT + (1 - v) * PP_PH;
+    const yOf = (v: number) => PP_MT + (1 - v) * PP_PH, xOf = (t: number) => PP_ML + (t / pc.T) * PP_PW;
     ctx.font = "500 9px 'JetBrains Mono','SF Mono',monospace";
-    for (let f = 0; f <= 4; f++) { const x = PP_ML + f / 4 * PP_PW; ctx.strokeStyle = DASH; ctx.setLineDash([1, 3]); ctx.lineWidth = 0.6; seg(ctx, x, PP_MT, x, PP_MT + PP_PH); ctx.setLineDash([]); }
     for (const v of [0, 0.5, 1]) { ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5; seg(ctx, PP_ML, yOf(v), PP_ML + PP_PW, yOf(v)); ctx.fillStyle = DIM; ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(v.toFixed(1), PP_ML - 6, yOf(v)); }
-    const H = ds.hist, cw = PP_PW / HEAT_COLS;
+    // one dashed gridline + tick per vacuum-Rabi cycle (0…6)
+    const cycT = 2 * Math.PI / pc.split;
+    ctx.textAlign = "center"; ctx.textBaseline = "top";
+    for (let k = 0; k <= 6; k++) { const t = k * cycT; if (t > pc.T + 1e-6) break; const x = xOf(t); ctx.strokeStyle = DASH; ctx.setLineDash([1, 3]); ctx.lineWidth = 0.6; seg(ctx, x, PP_MT, x, PP_MT + PP_PH); ctx.setLineDash([]); ctx.fillStyle = DIM; ctx.fillText(String(k), x, PP_MT + PP_PH + 5); }
     const trace = (idx: number, color: string, fill: boolean) => {
-      ctx.beginPath();
-      H.forEach((p, col) => { const x = PP_ML + col * cw, y = yOf(Math.min(1, p[idx]!)); col === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); });
-      if (fill && H.length) { ctx.lineTo(PP_ML + (H.length - 1) * cw, yOf(0)); ctx.lineTo(PP_ML, yOf(0)); ctx.closePath(); ctx.fillStyle = color + "22"; ctx.fill(); ctx.beginPath(); H.forEach((p, col) => { const x = PP_ML + col * cw, y = yOf(Math.min(1, p[idx]!)); col === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); }); }
-      ctx.strokeStyle = color; ctx.lineWidth = 1.6; ctx.stroke();
+      const path = () => { ctx.beginPath(); for (let i = 0; i < pc.n; i++) { const x = xOf(pc.T * i / (pc.n - 1)), y = yOf(Math.min(1, pc.data[i * 3 + idx]!)); i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); } };
+      if (fill) { path(); ctx.lineTo(PP_ML + PP_PW, yOf(0)); ctx.lineTo(PP_ML, yOf(0)); ctx.closePath(); ctx.fillStyle = color + "22"; ctx.fill(); }
+      path(); ctx.strokeStyle = color; ctx.lineWidth = 1.6; ctx.stroke();
     };
-    trace(2, DARKC, true);  // dark manifold (filled — the leakage you watch grow)
+    trace(2, DARKC, true);   // dark / subradiant manifold (dephasing leakage at σ>0)
     trace(0, COBALT, false); // photon
-    trace(1, RED, false);  // bright collective (superradiant) mode — matter
+    trace(1, RED, false);    // bright / superradiant matter
+    const tnow = ((simT.current % pc.T) + pc.T) % pc.T; // live cursor, wraps every 6 cycles
+    ctx.strokeStyle = "rgba(255,204,0,0.7)"; ctx.lineWidth = 1; ctx.setLineDash([3, 3]); seg(ctx, xOf(tnow), PP_MT, xOf(tnow), PP_MT + PP_PH); ctx.setLineDash([]);
     ctx.lineWidth = 0.75; ctx.strokeStyle = AXIS; ctx.strokeRect(PP_ML, PP_MT, PP_PW, PP_PH);
     ctx.fillStyle = INK; ctx.font = "600 11px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
     ctx.fillText("time   t Ω_R / 2π   (Rabi cycles)", PP_ML + PP_PW / 2, PP_CH - 8);
@@ -1255,7 +1292,7 @@ export function App() {
                 <NumField sym="rtol" value={tol.rtol} onChange={(rtol) => setTol((s) => ({ ...s, rtol: clamp(rtol, 1e-12, 1e-2) }))} />
                 <div className="btn-row">
                   <button onClick={() => setPlaying((p) => !p)}>{playing ? "PAUSE" : "PLAY"}</button>
-                  <button onClick={() => { quantum.current?.reset(); series.current = []; blochTrail.current = []; }}>RE-EXCITE</button>
+                  <button onClick={() => { quantum.current?.reset(); series.current = []; }}>RE-EXCITE</button>
                   <button className={fixedScale ? "on" : ""} onClick={() => setFixedScale((s) => !s)}>{fixedScale ? "1/π" : "AUTO"}</button>
                 </div>
               </Group>
@@ -1327,7 +1364,7 @@ export function App() {
             <>
               <div className="pane">
                 <div className="pane-head">Panel C · observables ⟨a†a⟩ <i style={{ color: COBALT }}>—</i> ⟨P_e⟩ <i style={{ color: CRIMSON }}>—</i> purity <i style={{ color: EMERALD }}>—</i></div>
-                <PlotWrap cw={S_CW} ch={S_CH} area={{ ml: S_ML, mt: S_MT, pw: S_PW, ph: S_PH }} inv={(px, py) => { const pts = series.current; if (pts.length < 2) return null; const t0 = pts[0]!.t, t1 = pts[pts.length - 1]!.t; return [(t0 + ((px - S_ML) / S_PW) * (t1 - t0)).toFixed(1), (1 - (py - S_MT) / S_PH).toFixed(2)]; }}>
+                <PlotWrap cw={S_CW} ch={S_CH} area={{ ml: S_ML, mt: S_MT, pw: S_PW, ph: S_PH }} inv={(px, py) => { const T = popSeries.current?.T ?? T_LOOP; return [(((px - S_ML) / S_PW) * T).toFixed(1), (1 - (py - S_MT) / S_PH).toFixed(2)]; }}>
                   <canvas ref={seriesCanvas} className="cv" />
                 </PlotWrap>
               </div>
@@ -1340,7 +1377,7 @@ export function App() {
               </div>
               <div className="pane">
                 <div className="pane-head">Panel E · decoherence — purity Tr(ρ²) <i style={{ color: GREEN, fontStyle: "normal" }}>—</i> von Neumann entropy S(t) <i style={{ color: AMBER, fontStyle: "normal" }}>—</i> (open-system mixing under κ,γ)</div>
-                <PlotWrap cw={DC_CW} ch={DC_CH} area={{ ml: DC_ML, mt: DC_MT, pw: DC_PW, ph: DC_PH }} inv={(px, py) => { const pts = series.current; if (pts.length < 2) return null; const t0 = pts[0]!.t, t1 = pts[pts.length - 1]!.t; return [(t0 + ((px - DC_ML) / DC_PW) * (t1 - t0)).toFixed(1), (1 - (py - DC_MT) / DC_PH).toFixed(2)]; }}>
+                <PlotWrap cw={DC_CW} ch={DC_CH} area={{ ml: DC_ML, mt: DC_MT, pw: DC_PW, ph: DC_PH }} inv={(px, py) => { const T = popSeries.current?.T ?? T_LOOP; return [(((px - DC_ML) / DC_PW) * T).toFixed(1), (1 - (py - DC_MT) / DC_PH).toFixed(2)]; }}>
                   <canvas ref={decohereCanvas} className="cv" />
                 </PlotWrap>
               </div>
@@ -1374,7 +1411,7 @@ export function App() {
                   </tbody></table>
                 </div>
               </div>
-              <div className="pane">
+              <div className="pane grow">
                 <div className="pane-head">Panel G · Hopfield composition (selected) + photon-weight distribution — bright <i style={{ color: CYAN, fontStyle: "normal" }}>▪</i> matter <i style={{ color: RED, fontStyle: "normal" }}>▪</i> dark <i style={{ color: PURPLE, fontStyle: "normal" }}>▪</i></div>
                 <canvas ref={hopBarsCanvas} className="cv" />
               </div>
@@ -1434,7 +1471,7 @@ export function App() {
               </div>
               <div className="pane">
                 <div className="pane-head">Populations — photon <i style={{ color: CYAN, fontStyle: "normal" }}>━</i> bright/superradiant <i style={{ color: RED, fontStyle: "normal" }}>━</i> dark/subradiant <i style={{ color: PURPLE, fontStyle: "normal" }}>━</i></div>
-                <PlotWrap cw={PP_CW} ch={PP_CH} area={{ ml: PP_ML, mt: PP_MT, pw: PP_PW, ph: PP_PH }} inv={(px, py) => { const ds = dynState.current; if (!ds) return null; const split = ds.eigs[ds.n - 1]! - ds.eigs[0]!, cyc = split * simT.current / (2 * Math.PI), span = HEAT_COLS * DT_DYN * split / (2 * Math.PI); return [(cyc - span * (1 - (px - PP_ML) / PP_PW)).toFixed(2), (1 - (py - PP_MT) / PP_PH).toFixed(2)]; }}>
+                <PlotWrap cw={PP_CW} ch={PP_CH} area={{ ml: PP_ML, mt: PP_MT, pw: PP_PW, ph: PP_PH }} inv={(px, py) => [(((px - PP_ML) / PP_PW) * 6).toFixed(2), (1 - (py - PP_MT) / PP_PH).toFixed(2)]}>
                   <canvas ref={popCanvas} className="cv" />
                 </PlotWrap>
               </div>
@@ -1459,7 +1496,7 @@ export function App() {
           {regime === "single" ? (
             <>
               <div className="pane">
-                <div className="pane-head">Panel A · |ρ| joint density matrix · coherences pulse + decay</div>
+                <div className="pane-head">Panel A · joint density matrix ρ · |ρ_ij| brightness · sign <i style={{ color: "#00ffff", fontStyle: "normal" }}>+ ▪</i> <i style={{ color: "#ff3333", fontStyle: "normal" }}>− ▪</i> · coherence = cyan/red pair</div>
                 <canvas ref={rhoCanvas} className="cv" />
               </div>
               <div className="pane">

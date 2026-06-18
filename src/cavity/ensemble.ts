@@ -60,16 +60,21 @@ export function buildEnsemble(m: number, seed: number, order: number, waist: num
   return { m, centers, dipoles, factors, modeAmp };
 }
 
-/** Deterministic 3D layout for the m molecules in the live 3D view: spread them around the central
- *  antinode (z ∈ [−45,45], x,y ∈ [−30,30]) with a Poisson-disk-ish minimum 3D separation of 12 units so
- *  no two emitters visually merge. This is a VISUALISATION layout (the physics couplings g_i still come
- *  from buildEnsemble); seeded by m so it is stable per ensemble size. */
+/** Deterministic 3D layout for the m molecules in the live 3D view: a THIN molecular film ON the central
+ *  field antinode. Spread across the beam cross-section (x,y ∈ [−26,26]) but tightly confined ALONG the
+ *  cavity axis (z ∈ [−5,5]) — physically a sub-wavelength film at the antinode, and visually essential:
+ *  the cavity is shown in profile (local-z runs left↔right on screen), so any axial spread becomes a
+ *  HORIZONTAL smear that drifts the cluster off the centre disc toward its neighbours. Pinning z tight
+ *  keeps the cluster locked on the bright centre antinode. A Poisson-disk-ish minimum 3D separation of 12
+ *  keeps emitters from merging; the centroid is then recentred to (0,0,0) exactly (small-N random draws
+ *  are otherwise biased off-centre). Visualisation only — the physics couplings g_i still come from
+ *  buildEnsemble. Stable per m. */
 export function clusterLayout(m: number, seed: number): [number, number, number][] {
   const rng = mulberry32(Math.floor(seed) * 40503 + 1337), pts: [number, number, number][] = [], minSep2 = 12 * 12;
   for (let i = 0; i < m; i++) {
     let chosen: [number, number, number] = [0, 0, 0];
-    for (let tries = 0; tries < 60; tries++) {
-      const x = (rng() * 2 - 1) * 30, y = (rng() * 2 - 1) * 30, z = (rng() * 2 - 1) * 45;
+    for (let tries = 0; tries < 80; tries++) {
+      const x = (rng() * 2 - 1) * 26, y = (rng() * 2 - 1) * 26, z = (rng() * 2 - 1) * 5; // thin film: tight along the cavity axis (z), spread in the transverse x–y plane
       chosen = [x, y, z];
       let ok = true;
       for (const p of pts) { const dx = p[0] - x, dy = p[1] - y, dz = p[2] - z; if (dx * dx + dy * dy + dz * dz < minSep2) { ok = false; break; } }
@@ -77,6 +82,9 @@ export function clusterLayout(m: number, seed: number): [number, number, number]
     }
     pts.push(chosen);
   }
+  let cx = 0, cy = 0, cz = 0; for (const p of pts) { cx += p[0]; cy += p[1]; cz += p[2]; }
+  const d = m || 1; cx /= d; cy /= d; cz /= d;
+  for (const p of pts) { p[0] -= cx; p[1] -= cy; p[2] -= cz; } // centroid → (0,0,0) exactly on the antinode
   return pts;
 }
 
