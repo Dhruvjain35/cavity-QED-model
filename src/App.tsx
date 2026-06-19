@@ -16,7 +16,6 @@ function Tex({ t }: { t: string }) {
 }
 
 // three.js is heavy and only used by the cavity regime — load it on demand
-const CavityScene = lazy(() => import("./cavity/CavityScene").then((m) => ({ default: m.CavityScene })));
 const LiveCavityScene = lazy(() => import("./cavity/LiveCavityScene").then((m) => ({ default: m.LiveCavityScene })));
 
 // ── Regime 1 (single emitter) ──
@@ -49,10 +48,10 @@ const B_ML = 24, B_MR = 8, B_MT = 8, B_MB = 20, B_S = 176;
 const B_CW = B_ML + B_S + B_MR, B_CH = B_MT + B_S + B_MB;
 const R_ML = 16, R_MR = 8, R_MT = 8, R_MB = 16, R_S = 256;
 const R_CW = R_ML + R_S + R_MR, R_CH = R_MT + R_S + R_MB;
-const CV_ML = 54, CV_MR = 14, CV_MT = 16, CV_MB = 40, CV_W = 516, CV_H = 300;
+const CV_ML = 60, CV_MR = 60, CV_MT = 18, CV_MB = 42, CV_W = 1200, CV_H = 470;
 const CV_CW = CV_ML + CV_W + CV_MR, CV_CH = CV_MT + CV_H + CV_MB;
 const N0 = 1.0, NS = 1.52; // air / glass substrate
-const RB_ML = 36, RB_MR = 10, RB_MT = 12, RB_MB = 24, RB_PW = 268, RB_PH = 108;
+const RB_ML = 48, RB_MR = 16, RB_MT = 16, RB_MB = 30, RB_PW = 540, RB_PH = 250;
 const RB_CW = RB_ML + RB_PW + RB_MR, RB_CH = RB_MT + RB_PH + RB_MB;
 const DT_DYN = 0.22;
 const PP_ML = 50, PP_MR = 14, PP_MT = 16, PP_MB = 28, PP_PW = 466, PP_PH = 176;
@@ -123,6 +122,7 @@ export function App() {
   const [tol, setTol] = useState({ atol: 1e-6, rtol: 1e-6 });
   const [sp, setSp] = useState({ m: 20, g: 0.1, sigma: 0.0, seed: 1 });
   const [cav, setCav] = useState({ lambda: 550, nHi: 2.5, nLo: 1.46, pairs: 4, nCav: 1.6, g: 1.6 });
+  const [cavN, setCavN] = useState(1); // CAVITY: emitter ensemble size N for the 2g√N-vs-κ collective-coupling demo
   const [htc, setHtc] = useState({ wv: 0.15, S: 1.0, g: 0.05, N: 1, gamma: 0.012 }); // HTC: ω_v, Huang-Rhys S, cavity g, collective N, broadening γ (units of ω_c)
   const [dyn, setDyn] = useState({ m: 12, g: 0.06, sigma: 0.0, seed: 1, init: 0, order: 1.0, gamma: 0.022, theta: 0 });
   const [inspect, setInspect] = useState<number | null>(null); // clicked dressed eigenstate (UI badge)
@@ -160,7 +160,8 @@ export function App() {
   const rhoCanvas = useRef<HTMLCanvasElement>(null), specCanvas = useRef<HTMLCanvasElement>(null);
   const bridgeCanvas = useRef<HTMLCanvasElement>(null);
   const cavCanvas = useRef<HTMLCanvasElement>(null);
-  const rabiCanvas = useRef<HTMLCanvasElement>(null);
+  const stopCanvas = useRef<HTMLCanvasElement>(null);   // R(λ) stopband
+  const collCanvas = useRef<HTMLCanvasElement>(null);   // 2g√N vs κ collective coupling
   const transferCanvas = useRef<HTMLCanvasElement>(null); // 4.B
   const disorderCanvas = useRef<HTMLCanvasElement>(null); // 4.C
   const popCanvas = useRef<HTMLCanvasElement>(null);
@@ -244,9 +245,9 @@ export function App() {
 
   useEffect(() => {
     if (regime !== "cavity") return;
-    loadWasm().then(() => { drawCavity(); drawRabi(); drawTransfer(); });
+    loadWasm().then(() => { drawCavity(); drawStopband(); drawTransfer(); drawCollective(); });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [regime, cav]);
+  }, [regime, cav, cavN]);
 
   useEffect(() => {
     if (regime !== "dynamics") return;
@@ -689,6 +690,30 @@ export function App() {
     sel.current = { j, k: bestK }; renderSpectrum();
   }
 
+  // The full hardware → coupling chain, SI, from the cavity geometry. Every number is derived (no fit); the
+  // only two INPUTS flagged as assumptions are w₀=λ/2n_c (transverse area — absent from the 1D TMM) and the
+  // µ=5 D reference dipole used for g. Verified: L_DBR=301.6, L_eff=775.2 nm, F=36.3, Q=164, τ=47.8 fs,
+  // κ=13.78 meV, stopband 33.8 %/186 nm, V_m=0.886(λ/n)³, g=0.08 meV ⇒ single-emitter WEAK (2g≪κ).
+  function cavPhys() {
+    const c = 299792458, hbar = 1.054571817e-34, eps0 = 8.8541878128e-12, eVj = 1.602176634e-19, Deb = 3.33564e-30;
+    const lam = cav.lambda * 1e-9, nH = cav.nHi, nL = cav.nLo, ncv = cav.nCav, NP = cav.pairs;
+    const Lcav = lam / (2 * ncv);                                  // half-wave spacer
+    const wc = 2 * Math.PI * c / lam, EcEv = hbar * wc / eVj;       // cavity angular freq, photon energy (eV)
+    const Ldbr = (lam / 2) * (nH * nL) / (2 * ncv * (nH - nL));     // DBR phase-penetration depth (vacuum-k₀ convention)
+    const Leff = Lcav + 2 * Ldbr;
+    const a = ncv * Math.pow(nL, 2 * NP), b = Math.pow(nH, 2 * NP); // mirror reflectivity from the cavity side (back = air)
+    const Rm = Math.pow((a - b) / (a + b), 2);
+    const FSR = c / (2 * ncv * Leff), F = Math.PI * Math.sqrt(Rm) / (1 - Rm), FWHM = FSR / F;
+    const nu0 = c / lam, Q = nu0 / FWHM, tau = Q / wc, kappa = wc / Q, kappaMeV = hbar * kappa / eVj * 1e3;
+    const dff = (4 / Math.PI) * Math.asin((nH - nL) / (nH + nL));   // stopband fractional width (contrast-limited)
+    const w0 = lam / (2 * ncv), Aperp = Math.PI * w0 * w0 / 2, Vm = Aperp * Leff; // w₀ ASSUMED (diffraction limit)
+    const Evac = Math.sqrt(hbar * wc / (2 * eps0 * Vm)), mu = 5 * Deb; // µ ASSUMED (5 Debye chromophore)
+    const g = mu * Evac / hbar, gMeV = hbar * g / eVj * 1e3, Nstar = Math.pow(kappaMeV / (2 * gMeV), 2);
+    return { LcavNm: Lcav * 1e9, LdbrNm: Ldbr * 1e9, LeffNm: Leff * 1e9, EcEv, Rm, FSRthz: FSR / 1e12, F,
+      FWHMthz: FWHM / 1e12, Q, tauFs: tau * 1e15, kappaMeV, dffPct: dff * 100, dLamNm: dff * cav.lambda,
+      VmRel: Vm / Math.pow(lam / ncv, 3), EvacMV: Evac / 1e6, gMeV, Nstar };
+  }
+
   function drawCavity() {
     const cvEl = cavCanvas.current; if (!cvEl) return;
     const ctx = sized(cvEl, CV_CW, CV_CH);
@@ -697,65 +722,148 @@ export function App() {
     let total = 0;
     const bands = layers.map((l) => { const b = { z0: total, d: l.d, n: l.n }; total += l.d; return b; });
     const { z, intensity } = cavityField(cav.lambda, cav.nHi, cav.nLo, cav.pairs, cav.nCav, N0, NS, 30);
-    let imax = 1e-9; for (const v of intensity) if (v > imax) imax = v;
+    let imax = 1e-9, iAt = 0; for (let k = 0; k < intensity.length; k++) if (intensity[k]! > imax) { imax = intensity[k]!; iAt = k; }
+    const ph = cavPhys();
     const xOf = (zz: number) => CV_ML + (zz / total) * CV_W;
     const yOf = (ii: number) => CV_MT + (1 - ii / imax) * CV_H;
-    const nmin = Math.min(cav.nLo, cav.nCav), nmax = cav.nHi;
-    for (const b of bands) {
-      const t = clamp((b.n - nmin) / (nmax - nmin + 1e-9), 0, 1);
-      ctx.fillStyle = `rgba(${lin(16, 70, t)},${lin(26, 110, t)},${lin(46, 170, t)},0.6)`;
-      ctx.fillRect(xOf(b.z0), CV_MT, Math.max(0.4, xOf(b.z0 + b.d) - xOf(b.z0)), CV_H);
+    // ── n(z) refractive-index staircase: high-index layers dark-blue, low-index slate, spacer amber; the
+    //    two fills make the λ/4 pairs countable. Right-hand axis is the true index scale. ──────────────────
+    const cs = bands[cav.pairs * 2]!; // λ/2 cavity spacer
+    for (const bnd of bands) {
+      const isHi = Math.abs(bnd.n - cav.nHi) < 1e-6, isCav = Math.abs(bnd.n - cav.nCav) < 1e-6;
+      ctx.fillStyle = isCav ? "rgba(245,158,11,0.10)" : isHi ? "rgba(56,84,150,0.34)" : "rgba(40,52,74,0.30)";
+      ctx.fillRect(xOf(bnd.z0), CV_MT, Math.max(0.5, xOf(bnd.z0 + bnd.d) - xOf(bnd.z0)), CV_H);
     }
-    const cs = bands[cav.pairs * 2]!; // the λ/2 cavity spacer
-    ctx.fillStyle = "rgba(245,158,11,0.10)"; ctx.fillRect(xOf(cs.z0), CV_MT, xOf(cs.z0 + cs.d) - xOf(cs.z0), CV_H);
+    const nmin = Math.min(cav.nLo, cav.nCav) - 0.15, nmax = cav.nHi + 0.15;
+    const ynOf = (n: number) => CV_MT + (1 - (n - nmin) / (nmax - nmin)) * CV_H;
+    ctx.strokeStyle = "rgba(140,160,190,0.55)"; ctx.lineWidth = 1; ctx.beginPath(); // literal n(z) step line
+    let started = false;
+    for (const bnd of bands) { const x0 = xOf(bnd.z0), x1 = xOf(bnd.z0 + bnd.d), yn = ynOf(bnd.n); if (!started) { ctx.moveTo(x0, yn); started = true; } else ctx.lineTo(x0, yn); ctx.lineTo(x1, yn); }
+    ctx.stroke();
+    ctx.fillStyle = "rgba(140,160,190,0.8)"; ctx.font = "500 8.5px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+    for (const n of [cav.nLo, cav.nCav, cav.nHi]) { const yn = ynOf(n); seg(ctx, CV_ML + CV_W, yn, CV_ML + CV_W + 3, yn); ctx.fillText(n.toFixed(2), CV_ML + CV_W + 5, yn); }
+    // ── |E(z)|² standing wave (left axis), antinode pinned in the spacer, exponential tails INTO the mirrors ──
     const fieldPath = () => { ctx.beginPath(); for (let k = 0; k < z.length; k++) { const x = xOf(z[k]!), y = yOf(intensity[k]!); k === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); } };
     fieldPath(); ctx.lineTo(xOf(total), CV_MT + CV_H); ctx.lineTo(CV_ML, CV_MT + CV_H); ctx.closePath();
-    ctx.fillStyle = "rgba(245,158,11,0.18)"; ctx.fill();
+    ctx.fillStyle = "rgba(245,158,11,0.16)"; ctx.fill();
     fieldPath(); ctx.strokeStyle = AMBER; ctx.lineWidth = 1.6; ctx.stroke();
-    const gapMid = cs.z0 + cs.d / 2;
-    for (const dz of [-cs.d * 0.16, 0, cs.d * 0.16]) {
-      const zz = gapMid + dz;
-      let best = 0, bd = Infinity; for (let k = 0; k < z.length; k++) { const dd = Math.abs(z[k]! - zz); if (dd < bd) { bd = dd; best = k; } }
-      ctx.fillStyle = "#e2e8f0"; ctx.beginPath(); ctx.arc(xOf(zz), yOf(intensity[best]!), 2.4, 0, 2 * Math.PI); ctx.fill();
-    }
+    // ── emitter pinned to argmax(|E|²) with a guide line — the single most load-bearing teaching point ─────
+    const zAnti = z[iAt]!, xAnti = xOf(zAnti);
+    ctx.strokeStyle = "rgba(226,232,240,0.5)"; ctx.setLineDash([2, 3]); ctx.lineWidth = 1; seg(ctx, xAnti, CV_MT, xAnti, CV_MT + CV_H); ctx.setLineDash([]);
+    ctx.fillStyle = "#e2e8f0"; ctx.beginPath(); ctx.arc(xAnti, yOf(imax), 3.2, 0, 2 * Math.PI); ctx.fill();
+    ctx.fillStyle = "#e2e8f0"; ctx.font = "600 8.5px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+    ctx.fillText("emitter @ antinode ⇒ g max", xAnti, CV_MT + 10);
+    // ── penetration L_DBR over each mirror tail + L_eff bracket across the field region ─────────────────────
+    const innerHalf = (ph.LcavNm) / 2, zL = cs.z0 + cs.d / 2 - innerHalf - ph.LdbrNm, zR = cs.z0 + cs.d / 2 + innerHalf + ph.LdbrNm;
+    ctx.strokeStyle = CYAN; ctx.fillStyle = CYAN; ctx.lineWidth = 1; ctx.font = "500 8px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "center"; ctx.textBaseline = "top";
+    const yb = CV_MT + CV_H - 8;
+    seg(ctx, xOf(Math.max(0, zL)), yb, xOf(cs.z0), yb); ctx.fillText(`L_DBR ${ph.LdbrNm.toFixed(0)}nm`, xOf((Math.max(0, zL) + cs.z0) / 2), yb + 2);
+    ctx.strokeStyle = "rgba(0,229,255,0.5)"; ctx.setLineDash([3, 2]);
+    seg(ctx, xOf(Math.max(0, zL)), CV_MT + 14, xOf(Math.min(total, zR)), CV_MT + 14); ctx.setLineDash([]);
+    ctx.fillStyle = CYAN; ctx.textBaseline = "top"; ctx.fillText(`L_eff = ${ph.LeffNm.toFixed(0)} nm`, (xOf(Math.max(0, zL)) + xOf(Math.min(total, zR))) / 2, CV_MT + 16);
+    // axes
     ctx.lineWidth = 0.75; ctx.strokeStyle = AXIS; ctx.strokeRect(CV_ML, CV_MT, CV_W, CV_H);
     ctx.fillStyle = DIM; ctx.font = "500 10px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "center"; ctx.textBaseline = "top";
     for (const t of niceTicks(0, total, 6)) { const x = xOf(t); seg(ctx, x, CV_MT + CV_H, x, CV_MT + CV_H + 3); ctx.fillText(`${Math.round(t)}`, x, CV_MT + CV_H + 6); }
-    ctx.fillStyle = INK; ctx.font = "600 13px 'JetBrains Mono','SF Mono',monospace"; ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = AMBER; ctx.font = "600 9px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "right"; ctx.textBaseline = "top";
+    ctx.fillText(`peak |E|²/inc = ${imax.toFixed(2)}×`, CV_ML + CV_W - 4, CV_MT + 3); // field enhancement
+    ctx.fillStyle = INK; ctx.font = "600 13px 'JetBrains Mono','SF Mono',monospace"; ctx.textBaseline = "alphabetic"; ctx.textAlign = "center";
     ctx.fillText("z  (nm)", CV_ML + CV_W / 2, CV_CH - 7);
-    ctx.save(); ctx.translate(14, CV_MT + CV_H / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top"; ctx.fillText("|E|²", 0, 0); ctx.restore();
+    ctx.save(); ctx.translate(14, CV_MT + CV_H / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top"; ctx.fillStyle = AMBER; ctx.fillText("|E(z)|²  (E₀⁺=1)", 0, 0); ctx.restore();
+    ctx.save(); ctx.translate(CV_CW - 2, CV_MT + CV_H / 2); ctx.rotate(Math.PI / 2); ctx.fillStyle = "rgba(140,160,190,0.8)"; ctx.textBaseline = "top"; ctx.fillText("refractive index n", 0, 0); ctx.restore();
+    // ── readout stack ──
     const set = (k: string, v: string) => { const el = read.current[k]; if (el) el.textContent = v; };
-    const R = cavityReflectance(cav.lambda, cav.nHi, cav.nLo, cav.pairs, cav.nCav, N0, NS);
-    set("cavLam", cav.lambda.toFixed(0)); set("cavGap", cs.d.toFixed(0)); set("cavTotal", total.toFixed(0));
-    set("cavR", R.toFixed(4)); set("cavF", ((Math.PI * Math.sqrt(R)) / (1 - R)).toFixed(0));
-    set("cav2g", (2 * cav.g).toFixed(2));
+    set("cavLam", cav.lambda.toFixed(0)); set("cavWc", ph.EcEv.toFixed(3)); set("cavGap", ph.LcavNm.toFixed(0)); set("cavTotal", total.toFixed(0));
+    set("cavLdbr", ph.LdbrNm.toFixed(1)); set("cavLeff", ph.LeffNm.toFixed(1));
+    set("cavR", ph.Rm.toFixed(3)); set("cavFSR", ph.FSRthz.toFixed(1)); set("cavF", ph.F.toFixed(1)); set("cavFWHM", ph.FWHMthz.toFixed(2));
+    set("cavQ", ph.Q.toFixed(0)); set("cavTau", ph.tauFs.toFixed(1)); set("cavKappa", ph.kappaMeV.toFixed(2));
+    set("cavStop", `${ph.dffPct.toFixed(1)} %`); set("cavVm", ph.VmRel.toFixed(2)); set("cavGd", ph.gMeV.toFixed(3));
   }
 
-  function drawRabi() {
-    const cv = rabiCanvas.current; if (!cv) return;
+  // Characteristic-matrix reflectance R(λ) of a FIXED layer stack at normal incidence (admittance η=n).
+  // Needed because the WASM cavity_reflectance rebuilds the stack at the probe λ (always on-resonance), so
+  // it can't sweep; this evaluates the stack designed at λ₀ across λ. Same TMM math validated for L_DBR.
+  function tmmReflectance(layers: { n: number; d: number }[], lam: number, n0: number, ns: number): number {
+    let a = 1, b = 0, c = 0, d = 0, e = 0, f = 0, g = 1, h = 0; // M = [[a+bi, c+di],[e+fi, g+hi]] = I
+    for (const L of layers) {
+      const dl = 2 * Math.PI * L.n * L.d / lam, co = Math.cos(dl), si = Math.sin(dl);
+      const F0r = co, F1i = si / L.n, F2i = L.n * si, F3r = co;            // film [[co, i si/n],[i n si, co]]
+      const n00r = a * F0r - d * F2i, n00i = b * F0r + c * F2i, n01r = c * F3r - b * F1i, n01i = a * F1i + d * F3r;
+      const n10r = e * F0r - h * F2i, n10i = f * F0r + g * F2i, n11r = g * F3r - f * F1i, n11i = e * F1i + h * F3r;
+      a = n00r; b = n00i; c = n01r; d = n01i; e = n10r; f = n10i; g = n11r; h = n11i;
+    }
+    const numr = e + g * ns, numi = f + h * ns, denr = a + c * ns, deni = b + d * ns, dd = denr * denr + deni * deni;
+    const Yr = (numr * denr + numi * deni) / dd, Yi = (numi * denr - numr * deni) / dd;
+    const rnr = n0 - Yr, rni = -Yi, rdr = n0 + Yr, rdi = Yi, rd = rdr * rdr + rdi * rdi;
+    const rr = (rnr * rdr + rni * rdi) / rd, ri = (rni * rdr - rnr * rdi) / rd;
+    return rr * rr + ri * ri;
+  }
+
+  // R(λ) of the full DBR cavity (TMM): a flat-topped high-R STOPBAND plateau (photonic bandgap) with the
+  // sharp cavity-resonance transmission DIP at λ₀. Teaches that adding pairs DEEPENS, while index contrast
+  // WIDENS — Δf/f₀ = (4/π)·arcsin((n_H−n_L)/(n_H+n_L)) is set by contrast, not pair count.
+  function drawStopband() {
+    const cv = stopCanvas.current; if (!cv) return;
     const ctx = sized(cv, RB_CW, RB_CH);
     ctx.fillStyle = PANEL; ctx.fillRect(0, 0, RB_CW, RB_CH);
-    const g = cav.g, w = 0.7, dmin = -6, dmax = 6;
-    const lor = (u: number) => 1 / (1 + (u / w) ** 2);
-    const coupled = (d: number) => lor(d - g) + lor(d + g);
-    let maxc = 1e-9; for (let s = 0; s <= 240; s++) { const d = dmin + (dmax - dmin) * s / 240; maxc = Math.max(maxc, coupled(d)); }
-    const xOf = (d: number) => RB_ML + ((d - dmin) / (dmax - dmin)) * RB_PW;
-    const yOf = (T: number) => RB_MT + (1 - T) * RB_PH;
+    const lam0 = cav.lambda, lmin = 0.6 * lam0, lmax = 1.4 * lam0, M = 260;
+    const xOf = (l: number) => RB_ML + ((l - lmin) / (lmax - lmin)) * RB_PW;
+    const yOf = (R: number) => RB_MT + (1 - R) * RB_PH;
+    const flat = cavityLayers(cav.lambda, cav.nHi, cav.nLo, cav.pairs, cav.nCav); // FIXED stack designed at λ₀
+    const Rs: number[] = []; for (let s = 0; s <= M; s++) { const l = lmin + (lmax - lmin) * s / M; Rs.push(tmmReflectance(flat, l, N0, NS)); }
     ctx.font = "500 9px 'JetBrains Mono','SF Mono',monospace";
     for (const v of [0, 0.5, 1]) { ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5; seg(ctx, RB_ML, yOf(v), RB_ML + RB_PW, yOf(v)); ctx.fillStyle = DIM; ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(v.toFixed(1), RB_ML - 5, yOf(v)); }
-    ctx.save(); ctx.setLineDash([2, 2]); ctx.lineWidth = 1; ctx.strokeStyle = "rgba(255,112,128,0.5)";
-    seg(ctx, xOf(-g), RB_MT, xOf(-g), RB_MT + RB_PH); seg(ctx, xOf(g), RB_MT, xOf(g), RB_MT + RB_PH); ctx.restore();
-    ctx.save(); ctx.setLineDash([4, 3]); ctx.strokeStyle = COBALT; ctx.lineWidth = 1.2; ctx.beginPath();
-    for (let s = 0; s <= 240; s++) { const d = dmin + (dmax - dmin) * s / 240; const x = xOf(d), y = yOf(lor(d)); s === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); } ctx.stroke(); ctx.restore();
-    ctx.strokeStyle = "#ff7080"; ctx.lineWidth = 1.7; ctx.beginPath();
-    for (let s = 0; s <= 240; s++) { const d = dmin + (dmax - dmin) * s / 240; const x = xOf(d), y = yOf(coupled(d) / maxc); s === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); } ctx.stroke();
-    ctx.fillStyle = INK; ctx.font = "600 11px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText("2g", (xOf(-g) + xOf(g)) / 2, RB_MT + 3);
+    ctx.fillStyle = "rgba(56,84,150,0.18)"; for (let s = 0; s < M; s++) { if (Rs[s]! > 0.5) { const l = lmin + (lmax - lmin) * s / M; ctx.fillRect(xOf(l), RB_MT, Math.max(0.6, RB_PW / M + 0.6), RB_PH); } } // stopband shading
+    ctx.strokeStyle = CYAN; ctx.lineWidth = 1.7; ctx.beginPath();
+    for (let s = 0; s <= M; s++) { const l = lmin + (lmax - lmin) * s / M; const x = xOf(l), y = yOf(Rs[s]!); s === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); } ctx.stroke();
+    ctx.save(); ctx.setLineDash([2, 3]); ctx.strokeStyle = AMBER; ctx.lineWidth = 1; seg(ctx, xOf(lam0), RB_MT, xOf(lam0), RB_MT + RB_PH); ctx.restore();
+    const ph = cavPhys();
+    ctx.fillStyle = AMBER; ctx.font = "600 8.5px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText("resonance dip λ₀", xOf(lam0), RB_MT + 2);
+    ctx.fillStyle = "rgba(120,150,210,0.95)"; ctx.textBaseline = "bottom"; ctx.fillText(`stopband Δf/f₀ = ${ph.dffPct.toFixed(0)}% (${ph.dLamNm.toFixed(0)}nm) · contrast-set`, RB_ML + RB_PW / 2, RB_MT + RB_PH - 3);
     ctx.lineWidth = 0.75; ctx.strokeStyle = AXIS; ctx.strokeRect(RB_ML, RB_MT, RB_PW, RB_PH);
     ctx.fillStyle = DIM; ctx.font = "500 9px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "center"; ctx.textBaseline = "top";
-    for (const t of [-4, -2, 0, 2, 4]) { const x = xOf(t); seg(ctx, x, RB_MT + RB_PH, x, RB_MT + RB_PH + 3); ctx.fillText(minus(`${t}`), x, RB_MT + RB_PH + 6); }
-    ctx.fillStyle = INK; ctx.font = "600 12px 'JetBrains Mono','SF Mono',monospace"; ctx.textBaseline = "alphabetic";
-    ctx.fillText("Δ / κ", RB_ML + RB_PW / 2, RB_CH - 6);
-    ctx.save(); ctx.translate(11, RB_MT + RB_PH / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top"; ctx.fillText("T", 0, 0); ctx.restore();
+    for (const l of [lmin, lam0, lmax]) { const x = xOf(l); seg(ctx, x, RB_MT + RB_PH, x, RB_MT + RB_PH + 3); ctx.fillText(`${Math.round(l)}`, x, RB_MT + RB_PH + 6); }
+    ctx.fillStyle = INK; ctx.font = "600 12px 'JetBrains Mono','SF Mono',monospace"; ctx.textBaseline = "alphabetic"; ctx.fillText("wavelength λ (nm)", RB_ML + RB_PW / 2, RB_CH - 6);
+    ctx.save(); ctx.translate(11, RB_MT + RB_PH / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top"; ctx.fillText("Reflectance R", 0, 0); ctx.restore();
+  }
+
+  // The single most important lesson of the tab: with a realistic dipole (µ=5 D) the SINGLE-emitter coupling
+  // 2g sits far below κ — weak/Purcell. Strong coupling is reached only COLLECTIVELY when 2g√N crosses κ
+  // (N* = (κ/2g)²); real polariton-chemistry ensembles (N~10⁶–10¹⁰) live deep above it. Log–log: 2g√N is a
+  // slope-½ line, κ is horizontal, they cross at N*. The N slider moves the marker live.
+  function drawCollective() {
+    const cv = collCanvas.current; if (!cv) return;
+    const ctx = sized(cv, RB_CW, RB_CH);
+    ctx.fillStyle = PANEL; ctx.fillRect(0, 0, RB_CW, RB_CH);
+    const ph = cavPhys(), g2 = 2 * ph.gMeV, kap = ph.kappaMeV;
+    const Nx = 8; // log10(Nmax) = 8
+    const ymin = Math.log10(Math.max(1e-3, g2 * 0.6)), ymax = Math.log10(g2 * Math.pow(10, Nx / 2) * 1.4);
+    const xOf = (logN: number) => RB_ML + (logN / Nx) * RB_PW;
+    const yOf = (logE: number) => RB_MT + (1 - (logE - ymin) / (ymax - ymin)) * RB_PH;
+    const Nstar = ph.Nstar, logNstar = Math.log10(Math.max(1, Nstar));
+    // strong-coupling region shading (N > N*)
+    ctx.fillStyle = "rgba(0,229,255,0.07)"; ctx.fillRect(xOf(Math.min(Nx, logNstar)), RB_MT, RB_PW - (xOf(Math.min(Nx, logNstar)) - RB_ML), RB_PH);
+    ctx.font = "500 8px 'JetBrains Mono','SF Mono',monospace"; ctx.fillStyle = DIM; ctx.textAlign = "right"; ctx.textBaseline = "middle";
+    for (const e of [1, 10, 100, 1000]) { const le = Math.log10(e); if (le < ymin || le > ymax) continue; ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5; seg(ctx, RB_ML, yOf(le), RB_ML + RB_PW, yOf(le)); ctx.fillText(`${e}`, RB_ML - 4, yOf(le)); }
+    // κ horizontal line
+    ctx.strokeStyle = "#ff7080"; ctx.setLineDash([4, 3]); ctx.lineWidth = 1.4; seg(ctx, RB_ML, yOf(Math.log10(kap)), RB_ML + RB_PW, yOf(Math.log10(kap))); ctx.setLineDash([]);
+    ctx.fillStyle = "#ff7080"; ctx.textAlign = "left"; ctx.textBaseline = "bottom"; ctx.fillText(`κ = ${kap.toFixed(1)} meV`, RB_ML + 4, yOf(Math.log10(kap)) - 1);
+    // 2g√N line (slope ½ in log-log)
+    ctx.strokeStyle = CYAN; ctx.lineWidth = 1.8; ctx.beginPath();
+    for (let s = 0; s <= 120; s++) { const logN = Nx * s / 120, E = g2 * Math.pow(10, logN / 2); ctx.lineTo(xOf(logN), yOf(Math.log10(E))); } ctx.stroke();
+    // crossover marker
+    if (logNstar >= 0 && logNstar <= Nx) { ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(xOf(logNstar), yOf(Math.log10(kap)), 2.6, 0, 2 * Math.PI); ctx.fill(); ctx.fillStyle = DIM; ctx.font = "600 8px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText(`N* ≈ ${Nstar < 1e4 ? Math.round(Nstar) : Nstar.toExponential(0)}`, xOf(logNstar), yOf(Math.log10(kap)) + 4); }
+    // current N marker + regime
+    const logNcur = Math.log10(Math.max(1, cavN)), Ecur = g2 * Math.sqrt(Math.max(1, cavN)), strong = Ecur > kap;
+    ctx.strokeStyle = AMBER; ctx.setLineDash([1, 2]); ctx.lineWidth = 1; seg(ctx, xOf(Math.min(Nx, logNcur)), RB_MT, xOf(Math.min(Nx, logNcur)), RB_MT + RB_PH); ctx.setLineDash([]);
+    ctx.fillStyle = strong ? CYAN : "#ff9b50"; ctx.beginPath(); ctx.arc(xOf(Math.min(Nx, logNcur)), yOf(Math.log10(Math.max(Math.pow(10, ymin), Ecur))), 3, 0, 2 * Math.PI); ctx.fill();
+    ctx.font = "600 9px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "center"; ctx.textBaseline = "top";
+    ctx.fillText(`N=${cavN < 1e4 ? cavN : cavN.toExponential(0)} · 2g√N=${Ecur < 1 ? Ecur.toFixed(2) : Ecur.toFixed(0)} meV · ${strong ? "STRONG" : "weak"}`, RB_ML + RB_PW / 2, RB_MT + 2);
+    ctx.lineWidth = 0.75; ctx.strokeStyle = AXIS; ctx.strokeRect(RB_ML, RB_MT, RB_PW, RB_PH);
+    ctx.fillStyle = DIM; ctx.font = "500 9px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "center"; ctx.textBaseline = "top";
+    for (const p of [0, 2, 4, 6, 8]) { const x = xOf(p); seg(ctx, x, RB_MT + RB_PH, x, RB_MT + RB_PH + 3); ctx.fillText(`10${p === 0 ? "⁰" : p === 2 ? "²" : p === 4 ? "⁴" : p === 6 ? "⁶" : "⁸"}`, x, RB_MT + RB_PH + 6); }
+    ctx.fillStyle = INK; ctx.font = "600 12px 'JetBrains Mono','SF Mono',monospace"; ctx.textBaseline = "alphabetic"; ctx.fillText("emitter number N", RB_ML + RB_PW / 2, RB_CH - 6);
+    ctx.save(); ctx.translate(11, RB_MT + RB_PH / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top"; ctx.fillText("Ω_R = 2g√N (meV)", 0, 0); ctx.restore();
   }
 
   // 4.B (CAVITY) · cavity transfer function |T(ω)|² over 0.5→1.5 ω_c. The bare Fabry–Pérot resonance is
@@ -1319,6 +1427,7 @@ export function App() {
               <Field sym="N" label="mirror pairs" value={cav.pairs} min={2} max={16} step={1} unit="" int onChange={(pairs) => setCav((s) => ({ ...s, pairs: Math.round(pairs) }))} />
               <Field sym="n_c" label="cavity index" value={cav.nCav} min={1.3} max={2.5} step={0.05} unit="" onChange={(nCav) => setCav((s) => ({ ...s, nCav }))} />
               <Field sym="g" label="atom–cavity coupling" value={cav.g} min={0} max={5} step={0.1} unit="κ" onChange={(g) => setCav((s) => ({ ...s, g }))} />
+              <Field sym="N" texSym="(\log_{10}N)" label="emitter number (log₁₀)" value={Math.log10(Math.max(1, cavN))} min={0} max={8} step={0.2} unit="" onChange={(v) => setCavN(Math.round(Math.pow(10, v)))} />
             </Group>
           ) : regime === "dynamics" ? (
             <Group title="MOLECULAR ENSEMBLE" k="dyn" c={collapsed} t={toggle}>
@@ -1426,22 +1535,22 @@ export function App() {
           ) : regime === "cavity" ? (
             <>
               <div className="pane grow">
-                <div className="pane-head">Panel F · Fabry–Pérot cavity-QED schematic · drag to orbit · field brightens with g</div>
-                <div className="cavity3d"><Suspense fallback={<div className="cv-loading">loading 3D…</div>}><CavityScene g={cav.g} /></Suspense></div>
-              </div>
-              <div className="pane">
-                <div className="pane-head">Panel G · cavity transfer function — |T(ω)|² vs frequency · bare Lorentzian <i style={{ color: "#8b949e", fontStyle: "normal" }}>┄</i> vs coupled doublet (2g split) <i style={{ color: CYAN, fontStyle: "normal" }}>━</i></div>
-                <PlotWrap cw={TR_CW} ch={TR_CH} area={{ ml: TR_ML, mt: TR_MT, pw: TR_PW, ph: TR_PH }} inv={(px, py) => [(0.5 + ((px - TR_ML) / TR_PW)).toFixed(3), (1 - (py - TR_MT) / TR_PH).toFixed(2)]}>
-                  <canvas ref={transferCanvas} className="cv" />
-                </PlotWrap>
-              </div>
-              <div className="pane">
-                <div className="pane-head">Panel E · |E(z)|² standing wave over the DBR stack (true nm scale)</div>
+                <div className="pane-head">Panel E · |E(z)|² standing-wave mode over the real DBR stack · refractive-index n(z) staircase (right axis) · emitter pinned to argmax|E|² · L_DBR / L_eff penetration</div>
                 <canvas ref={cavCanvas} className="cv" />
                 <div className="legend">
-                  <span className="leg leg-band">mirror layers</span>
+                  <span className="leg leg-band">n(z) layers</span>
                   <span className="leg leg-field">|E(z)|² mode</span>
-                  <span className="leg leg-mol">emitters in gap</span>
+                  <span className="leg leg-mol">emitter @ antinode</span>
+                </div>
+              </div>
+              <div className="cav-row">
+                <div className="pane">
+                  <div className="pane-head">Panel R · cavity reflectance R(λ) · stopband / photonic bandgap <i style={{ color: CYAN, fontStyle: "normal" }}>━</i> · resonance dip at λ₀ <i style={{ color: AMBER, fontStyle: "normal" }}>┆</i> · width set by index contrast, not pairs</div>
+                  <canvas ref={stopCanvas} className="cv" />
+                </div>
+                <div className="pane">
+                  <div className="pane-head">Panel N · collective coupling Ω<sub>R</sub>=2g√N <i style={{ color: CYAN, fontStyle: "normal" }}>━</i> vs cavity loss κ <i style={{ color: "#ff7080", fontStyle: "normal" }}>┄</i> · single-molecule g(µ=5D) is WEAK; strong coupling reached only collectively at N*</div>
+                  <canvas ref={collCanvas} className="cv" />
                 </div>
               </div>
             </>
@@ -1549,19 +1658,24 @@ export function App() {
           ) : regime === "cavity" ? (
             <>
               <div className="pane">
-                <div className="pane-head">Vacuum-Rabi spectrum · peaks split by 2g</div>
-                <canvas ref={rabiCanvas} className="cv" />
-                <div className="legend"><span className="leg leg-pol">2 polaritons (coupled)</span><span className="leg leg-dash">bare cavity</span></div>
-              </div>
-              <div className="pane">
-                <div className="pane-head">Cavity</div>
+                <div className="pane-head">Hardware → coupling chain · every value derived from the geometry</div>
                 <table className="metrics"><tbody>
                   <Row label={<>resonance <i>λ</i></>} k="cavLam" r={read} unit="nm" />
-                  <Row label={<>cavity gap</>} k="cavGap" r={read} unit="nm" />
+                  <Row label={<>photon <Tex t="\hbar\omega_c" /></>} k="cavWc" r={read} unit="eV" />
+                  <Row label={<>spacer <Tex t="L_\mathrm{cav}" /></>} k="cavGap" r={read} unit="nm" />
                   <Row label={<>stack length</>} k="cavTotal" r={read} unit="nm" />
-                  <Row label={<>reflectance <i>R</i></>} k="cavR" r={read} />
+                  <Row label={<>penetration <Tex t="L_\mathrm{DBR}" /></>} k="cavLdbr" r={read} unit="nm" />
+                  <Row label={<>effective <Tex t="L_\mathrm{eff}" /></>} k="cavLeff" r={read} unit="nm" />
+                  <Row label={<>mirror <i>R</i></>} k="cavR" r={read} />
+                  <Row label={<>FSR</>} k="cavFSR" r={read} unit="THz" />
                   <Row label={<>finesse <i>F</i></>} k="cavF" r={read} />
-                  <Row label={<>Rabi split 2<i>g</i></>} k="cav2g" r={read} unit="κ" />
+                  <Row label={<>FWHM</>} k="cavFWHM" r={read} unit="THz" />
+                  <Row label={<>quality <i>Q</i></>} k="cavQ" r={read} />
+                  <Row label={<>photon <i>τ</i></>} k="cavTau" r={read} unit="fs" />
+                  <Row label={<><i>κ</i> <span style={{ color: DIM, fontWeight: 400 }}>· deferred</span></>} k="cavKappa" r={read} unit="meV" />
+                  <Row label={<>stopband Δf/f₀</>} k="cavStop" r={read} />
+                  <Row label={<><Tex t="V_m" /> <span style={{ color: DIM, fontWeight: 400 }}>· w₀=λ/2n</span></>} k="cavVm" r={read} unit="(λ/n)³" />
+                  <Row label={<><i>g</i> <span style={{ color: DIM, fontWeight: 400 }}>· µ=5 D</span></>} k="cavGd" r={read} unit="meV" />
                 </tbody></table>
               </div>
               {Hud}
