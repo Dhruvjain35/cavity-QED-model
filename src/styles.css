@@ -52,6 +52,11 @@ body { background: var(--bg); color: var(--ink); font-family: var(--mono); font-
    one-sided black gap between panels (single / collective / vibronic columns). */
 .center > .pane.grow { display: flex; flex-direction: column; }
 .center > .pane.grow > .plotwrap, .center > .pane.grow > .cv, .center > .pane.grow > .bloch-wrap { margin-top: auto; margin-bottom: auto; }
+/* CAVITY tab: two panels (R, N) side-by-side so they fill the column width instead of stacking small */
+.cav-row { display: flex; min-height: 0; border-bottom: 1px solid var(--rule); }
+.cav-row > .pane { flex: 1; min-width: 0; border-bottom: none; border-right: 1px solid var(--rule); display: flex; flex-direction: column; }
+.cav-row > .pane:last-child { border-right: none; }
+.cav-row > .pane > .cv { margin: auto; }
 /* 3.E · panel-header hierarchy — cyan hairline above every panel title */
 .pane-head { font-family: var(--mono); font-size: 9px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: #888; margin-bottom: 3px; line-height: 1.35; border-top: 1px solid #00ffff22; padding-top: 4px; }
 .pane-head i { font-style: normal; }
