@@ -8,8 +8,7 @@ import { OrbitControls, PerspectiveCamera } from "@react-three/drei";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { MutableRefObject, useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
-import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import { antinodes, beamRadius, CavityPost, DBRMirror, LightRig, STAGE_OFFSET, STAGE_SCALE, STAGE_TILT, W0 } from "./cavityKit";
+import { antinodes, beamRadius, DBRMirror, LightRig, STAGE_OFFSET, STAGE_SCALE, STAGE_TILT, W0 } from "./cavityKit";
 import { clusterLayout } from "./ensemble";
 
 type Dyn = { eigs: Float64Array; vecs: Float64Array; n: number; c: Float64Array; bright: Float64Array; modeAmp: Float64Array; hist: unknown } | null;
@@ -68,62 +67,19 @@ function SimSampler({ stateRef, tRef, inspectRef, liveRef, fieldAmpRef, m }: { s
 // Molecules as faceted emitters: base #3a1a2a (dim), emissive #ff3333 with per-frame intensity =
 // bright_weight·P_bright·4.0 (set straight on each material, no re-render). toneMapped off so the bright
 // ones cross the bloom threshold and glow; dark ones sit unlit and dim.
-// naphthalene carbon skeleton: two fused hexagons (10 carbons, bond-length units; long axis = x) + the 11
-// C–C bonds. Restored from commit 035e650 (the ball-and-stick render before the sphere simplification).
-const CARB = [
-  [0, 0.5], [-0.866, 1], [-1.732, 0.5], [-1.732, -0.5], [-0.866, -1], [0, -0.5],
-  [1.732, 0.5], [0.866, 1], [0.866, -1], [1.732, -0.5],
-] as const;
-const NAPH_BONDS: [number, number][] = [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 0], [0, 7], [7, 6], [6, 9], [9, 8], [8, 5]];
-const NAPH_S = 2.9, ATOM_R = 1.55, BOND_R = 0.5; // bond-length→world scale, atom & bond radii (enlarged for legibility; ~10u long, still < 12u cluster separation)
-
-// One merged ball-and-stick naphthalene geometry (spheres at carbons + cylinders along bonds), built once
-// and shared by every molecule mesh. SphereGeometry (indexed) matches CylinderGeometry so mergeGeometries
-// can combine them. Local long axis = +x → each molecule rotates +x onto its ensemble dipole μ̂_i.
-function naphthaleneGeometry(): THREE.BufferGeometry {
-  const pts = CARB.map(([x, y]) => new THREE.Vector3(x * NAPH_S, y * NAPH_S, 0));
-  const parts: THREE.BufferGeometry[] = [];
-  for (const p of pts) { const s = new THREE.SphereGeometry(ATOM_R, 12, 8); s.translate(p.x, p.y, p.z); parts.push(s); }
-  const up = new THREE.Vector3(0, 1, 0);
-  for (const [a, b] of NAPH_BONDS) {
-    const pa = pts[a]!, pb = pts[b]!, dir = new THREE.Vector3().subVectors(pb, pa), len = dir.length();
-    const cyl = new THREE.CylinderGeometry(BOND_R, BOND_R, len, 8);
-    cyl.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(up, dir.clone().normalize()));
-    const mid = new THREE.Vector3().addVectors(pa, pb).multiplyScalar(0.5);
-    cyl.translate(mid.x, mid.y, mid.z); parts.push(cyl);
-  }
-  return mergeGeometries(parts)!;
-}
-
-// Holstein vibration: ω_v ≈ 0.15 ω_c is the vibronic mode frequency (naphthalene ring/CC stretch scale). It
-// is animated against the dimensionless sim clock simT (NOT real time / not ω_c), and VIB_SPEED keeps the
-// per-frame phase step far below Nyquist (0.15·DT_DYN·6 ≈ 0.2 rad/frame ≪ π), so it never aliases.
-const OMEGA_V = 0.15, VIB_A = 3.0, VIB_SPEED = 6;
-
-// Molecules as oriented ball-and-stick naphthalene chromophores: each shares the merged geometry, sits at
-// its ensemble position, is rotated so its long axis lies along its transition dipole μ̂_i (NOT random),
-// and glows with its own live excitation (emissiveIntensity = min(1.4, |ψ_i|²·6) from molGlow). Excited
-// molecules also physically VIBRATE along their long axis (Holstein displacement ∝ excitation) — ground
-// molecules sit still. Dim purple base #2a1838; toneMapped off so peaks halo via bloom.
-function Molecules({ liveRef, film, scale, tRef }: { liveRef: MutableRefObject<Live>; film: Film; scale: number; tRef: MutableRefObject<number> }) {
-  const geo = useMemo(() => naphthaleneGeometry(), []);
-  const quats = useMemo(() => film.mols.map((mol) => new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(1, 0, 0), mol.dir)), [film]);
+// 2-level emitter glyphs — NOT a molecular structure (a 2-level emitter has no ball-and-stick to resolve).
+// The ONLY dynamic channel is glow = |ψ_i(t)|² (emissiveIntensity = min(1.4, |ψ_i|²·6) from molGlow): bright
+// when this emitter carries the excitation, dim when it doesn't. No vibration (the Tavis–Cummings model has
+// no phonon coordinate), no structure. Dim purple base #2a1838; toneMapped off so peaks halo via bloom.
+function Molecules({ liveRef, film, scale }: { liveRef: MutableRefObject<Live>; film: Film; scale: number }) {
   const mats = useRef<(THREE.MeshStandardMaterial | null)[]>([]);
-  const meshes = useRef<(THREE.Mesh | null)[]>([]);
-  useFrame(() => {
-    const mg = liveRef.current.molGlow, t = tRef.current, phase = Math.sin(OMEGA_V * t * VIB_SPEED);
-    for (let i = 0; i < film.mols.length; i++) {
-      const exc = Math.min(1, (mg[i] || 0) * 6.0); // normalised excitation [0,1]; 0 ⇒ dark ⇒ no glow, no vibration
-      const mt = mats.current[i]; if (mt) mt.emissiveIntensity = exc * 1.4;
-      const me = meshes.current[i];
-      if (me) { const mol = film.mols[i]!; me.position.copy(mol.pos).addScaledVector(mol.dir, VIB_A * exc * phase); } // Holstein displacement along μ̂_i
-    }
-  });
+  useFrame(() => { const mg = liveRef.current.molGlow; for (let i = 0; i < film.mols.length; i++) { const mt = mats.current[i]; if (mt) mt.emissiveIntensity = Math.min(1.4, (mg[i] || 0) * 6.0); } });
   return (
     <group>
       {film.mols.map((mol, i) => (
-        <mesh key={i} ref={(el) => { meshes.current[i] = el; }} geometry={geo} position={mol.pos} quaternion={quats[i]!} scale={scale} renderOrder={10}>
-          <meshStandardMaterial ref={(el) => { mats.current[i] = el; }} color="#2a1838" emissive="#ff2a2a" emissiveIntensity={0} roughness={0.4} metalness={0.1} toneMapped={false} />
+        <mesh key={i} position={mol.pos} scale={scale} renderOrder={10}>
+          <icosahedronGeometry args={[MOL_R, 1]} />
+          <meshStandardMaterial ref={(el) => { mats.current[i] = el; }} color="#2a1838" emissive="#ff2a2a" emissiveIntensity={0} roughness={0.4} metalness={0.1} toneMapped={false} transparent depthTest={false} depthWrite={false} />
         </mesh>
       ))}
     </group>
@@ -161,50 +117,6 @@ function Dipoles({ film, scale }: { film: Film; scale: number }) {
         <meshBasicMaterial toneMapped={false} transparent depthTest={false} depthWrite={false} />
       </instancedMesh>
     </group>
-  );
-}
-
-// Energy-flow pulses: make the field↔matter sloshing VISIBLE as motion. Each frame we finite-difference the
-// live photon population (dP = P_photon − P_photon_prev — a render-layer numerical diff of an existing value,
-// not new physics). dP<0 (photon energy draining out of the field) spawns CYAN pulses travelling from a field
-// antinode toward a molecule; dP>0 (energy returning) spawns RED pulses molecule→field. Spawn count ∝ |dP|;
-// pulses lerp source→target over PULSE_LIFE real seconds and fade (sin envelope). Pooled, no physics library.
-const PULSE_POOL = 48, PULSE_LIFE = 0.42, PULSE_THRESH = 0.004;
-const FIELD_SRC = antinodes().filter((z) => Math.abs(z) > 1).map((z) => new THREE.Vector3(0, 0, z)); // outer antinodes (skip centre — too close to the film)
-type Pulse = { active: boolean; t: number; src: THREE.Vector3; dst: THREE.Vector3; cyan: boolean };
-function EnergyPulses({ liveRef, film }: { liveRef: MutableRefObject<Live>; film: Film }) {
-  const meshRef = useRef<THREE.InstancedMesh>(null);
-  const prevPh = useRef(0);
-  const pool = useRef<Pulse[]>(Array.from({ length: PULSE_POOL }, () => ({ active: false, t: 0, src: new THREE.Vector3(), dst: new THREE.Vector3(), cyan: true })));
-  const dummy = useMemo(() => new THREE.Object3D(), []);
-  const cCyan = useMemo(() => new THREE.Color("#22e8ff"), []), cRed = useMemo(() => new THREE.Color("#ff5a3c"), []);
-  useFrame((_, delta) => {
-    const im = meshRef.current, mols = film.mols; if (!im || !mols.length || !FIELD_SRC.length) return;
-    const ph = liveRef.current.pPhoton, dP = ph - prevPh.current; prevPh.current = ph;
-    if (Math.abs(dP) > PULSE_THRESH) {
-      const toMol = dP < 0; // photon population falling → energy flowing into the molecules
-      let nSpawn = Math.min(6, Math.max(1, Math.floor(Math.abs(dP) * 140)));
-      for (const p of pool.current) {
-        if (nSpawn <= 0) break; if (p.active) continue;
-        const fld = FIELD_SRC[(Math.random() * FIELD_SRC.length) | 0]!, mol = mols[(Math.random() * mols.length) | 0]!.pos;
-        if (toMol) { p.src.copy(fld); p.dst.copy(mol); p.cyan = true; } else { p.src.copy(mol); p.dst.copy(fld); p.cyan = false; }
-        p.t = 0; p.active = true; nSpawn--;
-      }
-    }
-    for (let i = 0; i < pool.current.length; i++) {
-      const p = pool.current[i]!;
-      if (p.active) { p.t += delta / PULSE_LIFE; if (p.t >= 1) p.active = false; }
-      if (!p.active) { dummy.position.set(1e5, 0, 0); dummy.scale.setScalar(0); }
-      else { dummy.position.lerpVectors(p.src, p.dst, p.t); dummy.scale.setScalar(3.0 * Math.sin(Math.PI * p.t)); im.setColorAt(i, p.cyan ? cCyan : cRed); }
-      dummy.updateMatrix(); im.setMatrixAt(i, dummy.matrix);
-    }
-    im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true;
-  });
-  return (
-    <instancedMesh ref={meshRef} args={[undefined, undefined, PULSE_POOL]} renderOrder={11}>
-      <sphereGeometry args={[1, 8, 6]} />
-      <meshBasicMaterial toneMapped={false} transparent blending={THREE.AdditiveBlending} depthWrite={false} depthTest={false} />
-    </instancedMesh>
   );
 }
 
@@ -255,11 +167,10 @@ function FieldDiscsShader({ ampRef, visible = true }: { ampRef: MutableRefObject
   const meshes = useRef<(THREE.Mesh | null)[]>([]);
   useFrame(() => {
     const amp = Math.max(0, Math.min(1, ampRef.current));
-    // live P_photon(t) drives BOTH brightness and a small radial swell — P_photon already oscillates at Ω_R,
-    // so NO extra cos(ω_c·t)/cos(Ω_R·t) factor (that would double-count, and cos(ω_c·t) would alias at ~PHz).
-    const op = Math.min(0.92, 0.10 + 0.82 * amp);  // opacity breathes
-    const scl = 1.0 + 0.12 * amp;                  // the mode visibly swells when the photon population is high
-    for (let i = 0; i < mats.length; i++) { mats[i]!.uniforms.uOpacity!.value = op; const m = meshes.current[i]; if (m) m.scale.setScalar(scl); }
+    // disc OPACITY encodes P_photon(t) as field intensity — P_photon already oscillates at Ω_R, so NO extra
+    // factor. The mode geometry (radius) is FIXED: mode volume does not breathe, so brightness only.
+    const op = Math.min(0.92, 0.10 + 0.82 * amp);
+    for (let i = 0; i < mats.length; i++) mats[i]!.uniforms.uOpacity!.value = op;
   });
   if (!visible) return null;
   return (
@@ -296,12 +207,10 @@ export function LiveCavityScene({ stateRef, tRef, inspectRef, m, ensemble, polTh
           <DBRMirror side={-1} />
           <DBRMirror side={1} />
           <FieldDiscsShader ampRef={fieldAmpRef} visible={controls.showFieldDiscs} />
-          <Molecules liveRef={liveRef} film={film} scale={controls.moleculeScale} tRef={tRef} />
+          <Molecules liveRef={liveRef} film={film} scale={controls.moleculeScale} />
           {controls.showDipoleArrows ? <Dipoles film={film} scale={controls.moleculeScale} /> : null}
-          <EnergyPulses liveRef={liveRef} film={film} />
           <PolarizationAxis theta={polTheta} />
         </group>
-        <CavityPost bloomIntensity={controls.bloomIntensity} />
         <OrbitControls makeDefault enablePan={false} autoRotate={false} enableDamping dampingFactor={0.05} minDistance={150} maxDistance={600} target={[0, 0, 0]} />
       </Canvas>
     </div>
