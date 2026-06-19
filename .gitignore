@@ -7,7 +7,6 @@ dist/
 # Rust / wasm build artifacts
 wasm/target/
 wasm/pkg/
-wasm/pkg-web/
 
 # Python golden-generator venv (the committed goldens under wasm/golden/ are kept)
 golden/.venv/
@@ -21,3 +20,7 @@ __pycache__/
 # screenshot tool output (npm run screenshot) + throwaway verification scripts
 screenshots/
 scratch/
+
+# WASM web build committed so Vercel/any clone can build without a Rust toolchain
+!wasm/pkg-web/
+!wasm/pkg-web/**

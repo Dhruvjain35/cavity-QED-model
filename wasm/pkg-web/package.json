@@ -1,0 +1,17 @@
+{
+  "name": "cqed_core",
+  "type": "module",
+  "description": "Open-quantum cavity-QED compute core (Lindblad + Wigner), validated bit-for-bit against QuTiP",
+  "version": "0.1.0",
+  "license": "MIT",
+  "files": [
+    "cqed_core_bg.wasm",
+    "cqed_core.js",
+    "cqed_core.d.ts"
+  ],
+  "main": "cqed_core.js",
+  "types": "cqed_core.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}
