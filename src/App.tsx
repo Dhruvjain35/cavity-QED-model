@@ -15,6 +15,15 @@ function Tex({ t }: { t: string }) {
   return <span className="tex" dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
+// PERF: returns `value` only after it has stopped changing for `delay` ms. The heavy per-tab recomputes key
+// off the debounced inputs, so dragging a slider does NO synchronous physics on the main thread — the
+// expensive solve runs once, after the drag settles.
+function useDebounced<T>(value: T, delay: number): T {
+  const [v, setV] = useState(value);
+  useEffect(() => { const id = setTimeout(() => setV(value), delay); return () => clearTimeout(id); }, [value, delay]);
+  return v;
+}
+
 // three.js is heavy and only used by the cavity regime — load it on demand
 const LiveCavityScene = lazy(() => import("./cavity/LiveCavityScene").then((m) => ({ default: m.LiveCavityScene })));
 
@@ -128,6 +137,12 @@ export function App() {
   const [inspect, setInspect] = useState<number | null>(null); // clicked dressed eigenstate (UI badge)
   const [dynSweep, setDynSweep] = useState(false); // coupling-sweep dispersion mode (replaces the 3D)
   const [wcEv, setWcEv] = useState(2.0); // physical cavity-photon energy ℏω_c in eV (display scale only)
+  // PERF: the heavy per-tab recomputes (ODE integration, arrowhead diagonalization, TMM sweeps) key off the
+  // DEFERRED parameter values, so dragging a slider stays smooth (React reruns the expensive effect once the
+  // drag settles, at low priority) instead of firing a full synchronous recompute on every input tick.
+  const dParams = useDebounced(params, 180), dSp = useDebounced(sp, 180), dCav = useDebounced(cav, 180);
+  const dCavN = useDebounced(cavN, 180), dDyn = useDebounced(dyn, 180), dHtc = useDebounced(htc, 180);
+  const singleDirty = useRef(true), singleFrame = useRef(0); // PERF: gate/throttle the SINGLE phase-space redraws
   const [regLog, setRegLog] = useState<string[]>([]); // in-browser regression console output
   const [polAnim, setPolAnim] = useState(false); // polarization-sweep animation active
   const polRaf = useRef(0);
@@ -203,13 +218,13 @@ export function App() {
       if (!alive) return;
       quantum.current?.dispose();
       quantum.current = new Quantum({ ...BASE, ...params });
-      series.current = []; setReady(true);
+      series.current = []; setReady(true); singleDirty.current = true; // PERF: force one redraw after a param change (even when paused)
       // FIX 3 · analytic Bloch spiral: integrate a fresh copy of the open system over [0,T] (T ≫ 1/(κ+γ))
       // and sample (2 Im ρ_01, ρ_00−ρ_11) at 600 points — the radius shrinks with decoherence → visible spiral.
       const merged = { ...BASE, ...params };
       const tmp = new Quantum(merged); tmp.reset();
-      const NB = 600, TB = 60, dtb = TB / NB, bd = new Float32Array(NB * 2);
-      for (let i = 0; i < NB; i++) { const b = tmp.emitterBloch(); bd[i * 2] = b[1]!; bd[i * 2 + 1] = b[2]!; tmp.advance(dtb, 1e-6, 1e-6); }
+      const NB = 220, TB = 60, dtb = TB / NB, bd = new Float32Array(NB * 2);
+      for (let i = 0; i < NB; i++) { const b = tmp.emitterBloch(); bd[i * 2] = b[1]!; bd[i * 2 + 1] = b[2]!; tmp.advance(dtb, 1e-4, 1e-4); } // PERF: display curve — looser tol, fewer points
       tmp.dispose();
       blochCurve.current = { n: NB, T: TB, data: bd };
       // FIX 4 · analytic population window over [0,T_LOOP=45]: integrate a fresh copy and sample photon
@@ -217,13 +232,15 @@ export function App() {
       // cycles (Ω_R=2g) IMMEDIATELY — robust to the slow headless RAF (the live loop only reaches t≈8 by
       // screenshot time). A live cursor (wrapped mod T) marks where the running system currently sits.
       const tp = new Quantum(merged); tp.reset();
-      const NP = 300, TP = T_LOOP, dtp = TP / NP, pd = new Float32Array(NP * 4);
-      for (let i = 0; i < NP; i++) { pd[i * 4] = tp.photon; pd[i * 4 + 1] = tp.excited; pd[i * 4 + 2] = tp.purity; pd[i * 4 + 3] = tp.entropy; tp.advance(dtp, 1e-6, 1e-6); }
+      const NP = 160, TP = T_LOOP, dtp = TP / NP, pd = new Float32Array(NP * 4);
+      for (let i = 0; i < NP; i++) { pd[i * 4] = tp.photon; pd[i * 4 + 1] = tp.excited; pd[i * 4 + 2] = tp.purity; pd[i * 4 + 3] = tp.entropy; tp.advance(dtp, 1e-4, 1e-4); } // PERF: display curve — looser tol, fewer points
       tp.dispose();
       popSeries.current = { n: NP, T: TP, Trabi: Math.PI / Math.max(1e-6, merged.g), data: pd };
     });
     return () => { alive = false; };
-  }, [params]);
+  }, [dParams]);
+
+  useEffect(() => { if (regime === "single") singleDirty.current = true; }, [regime]); // PERF: redraw on tab switch even if paused
 
   useEffect(() => {
     if (regime !== "collective") return;
@@ -241,13 +258,13 @@ export function App() {
       renderSpectrum();
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [regime, sp]);
+  }, [regime, dSp]);
 
   useEffect(() => {
     if (regime !== "cavity") return;
     loadWasm().then(() => { drawCavity(); drawStopband(); drawTransfer(); drawCollective(); });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [regime, cav, cavN]);
+  }, [regime, dCav, dCavN]);
 
   useEffect(() => {
     if (regime !== "dynamics") return;
@@ -272,7 +289,7 @@ export function App() {
       if (dynSweep) sweepData.current = couplingSweepGi(WA, WA, dyn.sigma, dyn.seed, ensemble.factors, 0, SWEEP_GMAX, SWEEP_STEPS); // 90 diagonalizations — only when displayed
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [regime, dyn, dynSweep]);
+  }, [regime, dDyn, dynSweep]);
 
   useEffect(() => {
     if (regime !== "vibronic") return;
@@ -299,7 +316,7 @@ export function App() {
       drawHtc(); drawMatrix(); drawVibronicCompare(); drawDisorder(); updateHtcReadouts();
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [regime, htc, wcEv]);
+  }, [regime, dHtc, wcEv]);
 
   useEffect(() => {
     dpr.current = Math.min(window.devicePixelRatio || 1, 2);
@@ -307,13 +324,21 @@ export function App() {
     const loop = () => {
       const q = quantum.current;
       if (q && regimeRef.current === "single") {
+        let adv = false;
         if (playingRef.current) {
           q.advance(DT_FRAME, tolRef.current.atol, tolRef.current.rtol);
           series.current.push({ t: q.time, n: q.photon, pe: q.excited, pur: q.purity, s: q.entropy });
           if (series.current.length > SERIES_MAX) series.current.shift();
           if (q.time > T_LOOP) { q.reset(); series.current = []; }
+          adv = true;
         }
-        drawWigner(q); drawHusimi(q); drawSeries(); drawRho(q); drawDecohere(); drawBloch(); updateReadouts(q);
+        // PERF: only redraw when the state advanced (playing) or a param just changed (dirty) — never burn CPU
+        // on a paused tab; throttle the 100×100 Wigner/Husimi grids to every other frame during playback.
+        if (adv || singleDirty.current) {
+          drawSeries(); drawRho(q); drawDecohere(); drawBloch(); updateReadouts(q);
+          if (singleDirty.current || singleFrame.current % 2 === 0) { drawWigner(q); drawHusimi(q); }
+          singleFrame.current++; singleDirty.current = false;
+        }
       } else if (regimeRef.current === "dynamics" && dynState.current) {
         if (playingRef.current && !scrubbing.current) simT.current += DT_DYN * speedRef.current;
         const d = decompAt(simT.current);
