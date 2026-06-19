@@ -76,8 +76,17 @@ body { background: var(--bg); color: var(--ink); font-family: var(--mono); font-
 .dyn-bento .cv { margin-top: auto; margin-bottom: auto; }
 /* FIX 3 · center the (enlarged) plots in their bento quadrants so they fill the space, not float */
 .dyn-bento .plotwrap { margin: auto; }
-.bento-3d { padding-bottom: 8px; position: relative; }
-.live3d { flex: 1; width: 100%; min-height: 240px; overflow: hidden; background: #050708; }
+.bento-3d { padding-bottom: 0; position: relative; }
+.live3d { flex: 1; width: 100%; min-height: 220px; overflow: hidden; background: #050708; }
+/* DYNAMICS transport bar — thin industrial controls, zero radius, cyan accents */
+.transport { flex-shrink: 0; display: flex; align-items: center; gap: 6px; padding: 5px 8px; border-top: 1px solid var(--rule-2); background: var(--panel); }
+.transport .tp-btn { font-family: var(--mono); font-size: 10px; line-height: 1; width: 26px; height: 22px; padding: 0; border: 1px solid var(--rule); border-radius: 0; background: transparent; color: var(--dim); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.transport .tp-btn:hover { background: var(--rule); color: var(--ink); }
+.transport .tp-scrub { flex: 1; height: 3px; min-width: 60px; -webkit-appearance: none; appearance: none; background: var(--rule-2); border-radius: 0; cursor: pointer; }
+.transport .tp-scrub::-webkit-slider-thumb { -webkit-appearance: none; width: 9px; height: 15px; border-radius: 0; background: var(--cyan); cursor: pointer; }
+.transport .tp-scrub::-moz-range-thumb { width: 9px; height: 15px; border: none; border-radius: 0; background: var(--cyan); cursor: pointer; }
+.transport .tp-time { font-family: var(--mono); font-size: 9px; letter-spacing: 0.03em; color: var(--cyan); min-width: 58px; text-align: right; }
+.transport .tp-speed { font-family: var(--mono); font-size: 9px; padding: 3px 4px; border: 1px solid var(--rule); border-radius: 0; background: var(--panel); color: var(--dim); cursor: pointer; }
 /* 3.B · Leva 3D-scene controls — docked top-right of the 3D viewport */
 .leva-host { position: absolute; top: 36px; right: 8px; width: 214px; z-index: 40; font-size: 10px; }
 .leva-host .leva-c-kWgxhW, .leva-host > div { width: 214px; }

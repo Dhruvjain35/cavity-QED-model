@@ -3,8 +3,8 @@
 // cyan discs at the antinodes (brightness rising with the light–matter coupling g), and a single
 // molecular emitter at the central antinode. Structural, not a live state. No cylinders, no chrome.
 import { OrbitControls, PerspectiveCamera } from "@react-three/drei";
-import { Canvas } from "@react-three/fiber";
-import { useRef } from "react";
+import { Canvas, useFrame } from "@react-three/fiber";
+import { MutableRefObject, useRef } from "react";
 import { CavityPost, DBRMirror, FieldStack, LightRig, STAGE_OFFSET, STAGE_SCALE, STAGE_TILT, W0 } from "./cavityKit";
 
 // A single emitter at the cavity centre: dim maroon base, emissive red rising with the coupling g so the
@@ -25,9 +25,20 @@ function Emitter({ g }: { g: number }) {
   );
 }
 
+// Decorative looping breath for the optics schematic: the optical cavity is steady-state (no time
+// dynamics), so this is a slow, real-time sine envelope that makes the resonant mode pulse — purely
+// cosmetic, NOT the TC P_photon(t). Slow (~0.14 Hz of phase) so it never approaches ω_c / aliasing.
+function FieldBreath({ ampRef, g }: { ampRef: MutableRefObject<number>; g: number }) {
+  useFrame((state) => {
+    const base = Math.min(1, Math.max(0, g) / 5);                 // field strength ∝ coupling
+    ampRef.current = base * (0.45 + 0.55 * (0.5 + 0.5 * Math.sin(state.clock.elapsedTime * 0.9)));
+  });
+  return null;
+}
+
 export function CavityScene({ g }: { g: number }) {
   const fieldAmpRef = useRef(0);
-  fieldAmpRef.current = Math.min(1, Math.max(0, g) / 5); // field strength ∝ coupling (g in units of κ, 0…5)
+  fieldAmpRef.current = Math.min(1, Math.max(0, g) / 5); // initial field strength ∝ coupling (FieldBreath animates it)
   return (
     <div className="cav-stage">
       <div className="cav-tag cav-tag-l">DBR mirror</div>
@@ -38,6 +49,7 @@ export function CavityScene({ g }: { g: number }) {
         <color attach="background" args={["#05070e"]} />
         <PerspectiveCamera makeDefault fov={54} position={[0, 40, 300]} />
         <LightRig />
+        <FieldBreath ampRef={fieldAmpRef} g={g} />
         <group rotation={STAGE_TILT} scale={STAGE_SCALE} position={STAGE_OFFSET}>
           <DBRMirror side={-1} />
           <DBRMirror side={1} />

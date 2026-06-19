@@ -145,6 +145,7 @@ export function App() {
   }, { store: sceneStore });
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [playing, setPlaying] = useState(true);
+  const [simSpeed, setSimSpeed] = useState(1); // DYNAMICS transport playback rate (×)
   const [fixedScale, setFixedScale] = useState(true);
   const [ready, setReady] = useState(false);
   const [copied, setCopied] = useState(false); // 3.F · COPY LINK flash
@@ -166,6 +167,8 @@ export function App() {
   const hopCanvas = useRef<HTMLCanvasElement>(null);
   const dynState = useRef<{ eigs: Float64Array; vecs: Float64Array; n: number; c: Float64Array; bright: Float64Array; modeAmp: Float64Array; hist: Float64Array[] } | null>(null);
   const simT = useRef(0);
+  const speedRef = useRef(1), scrubbing = useRef(false); // transport: playback rate + scrub-drag latch
+  const scrubRef = useRef<HTMLInputElement>(null), tpTimeRef = useRef<HTMLSpanElement>(null);
   const popCurve = useRef<{ T: number; split: number; n: number; data: Float32Array } | null>(null); // FIX 3 · analytic population trajectory over 6 Rabi cycles
   const hopMarks = useRef<{ x: number; y: number; k: number }[]>([]);
   const inspectRef = useRef<number | null>(null); // dressed eigenstate frozen onto the 3D (null = live)
@@ -189,7 +192,7 @@ export function App() {
   const specMap = useRef({ emin: 0, emax: 1, R: 6 });
   const read = useRef<Record<string, HTMLSpanElement | null>>({});
 
-  regimeRef.current = regime; playingRef.current = playing; scaleRef.current = fixedScale; tolRef.current = tol;
+  regimeRef.current = regime; playingRef.current = playing; scaleRef.current = fixedScale; tolRef.current = tol; speedRef.current = simSpeed;
   sweepRef.current = dynSweep; dynGRef.current = dyn.g; wcRef.current = wcEv;
   const toggle = (k: string) => setCollapsed((c) => ({ ...c, [k]: !c[k] }));
 
@@ -311,8 +314,12 @@ export function App() {
         }
         drawWigner(q); drawHusimi(q); drawSeries(); drawRho(q); drawDecohere(); drawBloch(); updateReadouts(q);
       } else if (regimeRef.current === "dynamics" && dynState.current) {
-        if (playingRef.current) simT.current += DT_DYN;
+        if (playingRef.current && !scrubbing.current) simT.current += DT_DYN * speedRef.current;
         const d = decompAt(simT.current);
+        // transport sync (DOM, no React re-render): scrub slider tracks simT over the 6-cycle window; τ readout
+        const pc = popCurve.current, T = pc ? pc.T : 1, sc = scrubRef.current;
+        if (sc) { sc.max = String(T); if (!scrubbing.current) sc.value = String(((simT.current % T) + T) % T); }
+        if (tpTimeRef.current) tpTimeRef.current.textContent = `τ ${(pc ? pc.split * simT.current / (2 * Math.PI) : 0).toFixed(2)} cyc`;
         drawPopTraces(); drawDressed(); drawPowerSpectrum(); drawMatrix(); updateSimReadouts(d);
         if (sweepRef.current) drawSweep();
       }
@@ -1467,6 +1474,18 @@ export function App() {
               <div className="pane bento-3d">
                 <div className="pane-head">Live cavity · {dyn.m} naphthalene emitters + 1 photon{inspect != null ? <> · <i style={{ color: "#fff", fontStyle: "normal" }}>inspecting eigenstate #{inspect}</i></> : <> · matter <i style={{ color: RED, fontStyle: "normal" }}>red</i> · field <i style={{ color: CYAN, fontStyle: "normal" }}>cyan</i> · μ̂ shade = coupling</>}</div>
                 <div className="live3d"><Suspense fallback={<div className="cv-loading">loading 3D…</div>}><LiveCavityScene stateRef={dynState} tRef={simT} m={dyn.m} inspectRef={inspectRef} ensemble={ensemble} waist={MODE_WAIST} polTheta={dyn.theta * Math.PI / 180} controls={scene3d} /></Suspense></div>
+                <div className="transport">
+                  <button className="tp-btn" title={playing ? "Pause" : "Play"} onClick={() => setPlaying((p) => !p)}>{playing ? "❚❚" : "▶"}</button>
+                  <button className="tp-btn" title="Step +0.1 ω_c⁻¹ (while paused)" onClick={() => { simT.current += 0.1; }}>▶❘</button>
+                  <button className="tp-btn" title="Reset to t = 0" onClick={() => { simT.current = 0; if (dynState.current) dynState.current.hist = []; }}>⟲</button>
+                  <input ref={scrubRef} className="tp-scrub" type="range" min={0} max={1} step={0.001} defaultValue={0} aria-label="scrub time"
+                    onPointerDown={() => { scrubbing.current = true; }} onPointerUp={() => { scrubbing.current = false; }} onPointerCancel={() => { scrubbing.current = false; }}
+                    onChange={(e) => { simT.current = Number(e.target.value); }} />
+                  <span ref={tpTimeRef} className="tp-time">τ 0.00 cyc</span>
+                  <select className="tp-speed" aria-label="playback speed" value={simSpeed} onChange={(e) => setSimSpeed(Number(e.target.value))}>
+                    {[0.25, 0.5, 1, 2, 4].map((s) => <option key={s} value={s}>{s}×</option>)}
+                  </select>
+                </div>
                 <div className="leva-host"><LevaPanel store={sceneStore} fill flat collapsed={{ collapsed: levaCollapsed, onChange: setLevaCollapsed }} titleBar={{ title: "3D SCENE CONTROLS", drag: false, filter: false }} /></div>
               </div>
               <div className="pane">
