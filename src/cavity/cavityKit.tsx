@@ -35,30 +35,28 @@ export function antinodes(): number[] {
   return out;
 }
 
-// ── DBR mirror: a stack of N_PAIRS flat discs (alternating high/low-index layers) + a mounting rim ────
-const N_PAIRS = 8, LAYER_T = 6;
-// matte, fully non-emissive layers — they must read as dark structure and NEVER trigger bloom.
-const MAT_A = { color: "#1a1a2e", roughness: 0.85, metalness: 0.1 } as const; // "high index" layer
-const MAT_B = { color: "#0d0d1a", roughness: 0.85, metalness: 0.1 } as const; // "low index" layer
+// ── DBR mirror: a THIN flat Bragg stack — N_PAIRS very-thin dielectric disc layers (1.5 units each)
+// stacked face-to-face along the optical axis with zero gap, total ≈6 units against a ~200-unit cavity
+// gap. A real DBR reads as a thin layered disc, not a fat ribbed drum: keeping the layers thin means the
+// camera sees the flat face with subtle two-tone banding, never a tall ribbed sidewall. Slight metalness
+// gives a faint specular sheen from the LightRig (no emissive). Flat faces ⟂ the cavity (z) axis.
+const N_PAIRS = 4, LAYER_T = 1.5, DBR_R = 95;
+const MAT_A = { color: "#1a1a2e", roughness: 0.5, metalness: 0.4 } as const; // "high index" layer
+const MAT_B = { color: "#252540", roughness: 0.4, metalness: 0.5 } as const; // "low index" layer
 
 export function DBRMirror({ side }: { side: 1 | -1 }) {
   return (
     <group>
       {Array.from({ length: N_PAIRS }, (_, d) => {
-        const z = side * (HALF + LAYER_T / 2 + d * LAYER_T); // stacked outward; innermost face sits at z = ±HALF
+        const z = side * (HALF + LAYER_T / 2 + d * LAYER_T); // innermost face at z = ±HALF, stacked outward, zero gap
         const m = d % 2 === 0 ? MAT_A : MAT_B;
         return (
           <mesh key={d} position={[0, 0, z]} rotation={[Math.PI / 2, 0, 0]}>
-            <cylinderGeometry args={[MIRROR_R, MIRROR_R, LAYER_T, 64]} />
-            <meshStandardMaterial color={m.color} roughness={m.roughness} metalness={m.metalness} emissive="#000000" emissiveIntensity={0} />
+            <cylinderGeometry args={[DBR_R, DBR_R, LAYER_T, 96]} />
+            <meshStandardMaterial color={m.color} roughness={m.roughness} metalness={m.metalness} />
           </mesh>
         );
       })}
-      {/* thin mounting rim disc, slightly larger aperture, on the inner face */}
-      <mesh position={[0, 0, side * (HALF + 1)]} rotation={[Math.PI / 2, 0, 0]}>
-        <cylinderGeometry args={[MIRROR_R + 5, MIRROR_R + 5, 2, 64]} />
-        <meshStandardMaterial color="#333355" roughness={0.7} metalness={0.1} emissive="#000000" emissiveIntensity={0} />
-      </mesh>
     </group>
   );
 }
