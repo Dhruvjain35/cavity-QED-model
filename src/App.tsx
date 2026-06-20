@@ -136,7 +136,7 @@ export function App() {
   const [cav, setCav] = useState({ lambda: 550, nHi: 2.5, nLo: 1.46, pairs: 4, nCav: 1.6, g: 1.6 });
   const [cavN, setCavN] = useState(1); // CAVITY: emitter ensemble size N for the 2g√N-vs-κ collective-coupling demo
   const [htc, setHtc] = useState({ wv: 0.15, S: 1.0, g: 0.05, N: 3, gamma: 0.012 }); // HTC: ω_v, Huang-Rhys S, cavity g, collective N, broadening γ (units of ω_c). N=3 (the explicit-diagonalization cap) so the disorder panel opens in the collective regime where motional narrowing actually dominates (Ω_R=0.17 ⇒ crossover σ=Ω_R sits mid-plot), not the N=1 sliver where σ²/2Ω_R blows up.
-  const [dyn, setDyn] = useState({ m: 12, g: 0.06, sigma: 0.0, seed: 1, init: 0, order: 1.0, gamma: 0.022, theta: 0 });
+  const [dyn, setDyn] = useState({ m: 12, g: 0.06, sigma: 0.03, seed: 1, init: 0, order: 1.0, gamma: 0.022, theta: 0 }); // CANONICAL DEFAULT — σ=0.03 locks the clean strong-coupling regime; τ resets to 0; populations show 0–6 Rabi cycles
   const [inspect, setInspect] = useState<number | null>(null); // clicked dressed eigenstate (UI badge)
   const [dynSweep, setDynSweep] = useState(false); // coupling-sweep dispersion mode (replaces the 3D)
   const [wcEv, setWcEv] = useState(2.0); // physical cavity-photon energy ℏω_c in eV (display scale only)
