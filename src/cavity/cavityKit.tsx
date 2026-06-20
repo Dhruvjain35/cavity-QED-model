@@ -40,9 +40,13 @@ export function antinodes(): number[] {
 // gap. A real DBR reads as a thin layered disc, not a fat ribbed drum: keeping the layers thin means the
 // camera sees the flat face with subtle two-tone banding, never a tall ribbed sidewall. Slight metalness
 // gives a faint specular sheen from the LightRig (no emissive). Flat faces ⟂ the cavity (z) axis.
-const N_PAIRS = 4, LAYER_T = 1.5, DBR_R = 95;
-const MAT_A = { color: "#1a1a2e", roughness: 0.5, metalness: 0.4 } as const; // "high index" layer
-const MAT_B = { color: "#252540", roughness: 0.4, metalness: 0.5 } as const; // "low index" layer
+const N_PAIRS = 4, LAYER_T = 1.7, DBR_R = 95;
+// Real DBRs are highly reflective dielectric stacks — render them as polished steel-blue layers (high
+// metalness, low roughness) with a faint emissive floor so they never sink to pure black against the dark
+// stage, and a bright cavity-facing aperture rim so each mirror is unmistakably outlined.
+const MAT_A = { color: "#46598c", roughness: 0.26, metalness: 0.78 } as const; // "high index" layer
+const MAT_B = { color: "#6f86bd", roughness: 0.22, metalness: 0.7 } as const;  // "low index" layer
+const MIRROR_EMISSIVE = "#14233f";
 
 export function DBRMirror({ side }: { side: 1 | -1 }) {
   return (
@@ -53,10 +57,15 @@ export function DBRMirror({ side }: { side: 1 | -1 }) {
         return (
           <mesh key={d} position={[0, 0, z]} rotation={[Math.PI / 2, 0, 0]}>
             <cylinderGeometry args={[DBR_R, DBR_R, LAYER_T, 96]} />
-            <meshStandardMaterial color={m.color} roughness={m.roughness} metalness={m.metalness} />
+            <meshStandardMaterial color={m.color} roughness={m.roughness} metalness={m.metalness} emissive={MIRROR_EMISSIVE} emissiveIntensity={0.7} />
           </mesh>
         );
       })}
+      {/* bright aperture rim on the cavity-facing face — outlines the mirror clearly in the profile view */}
+      <mesh position={[0, 0, side * (HALF - 0.4)]}>
+        <ringGeometry args={[DBR_R * 0.9, DBR_R, 96]} />
+        <meshBasicMaterial color="#a9ccff" transparent opacity={0.55} side={THREE.DoubleSide} depthWrite={false} toneMapped={false} />
+      </mesh>
     </group>
   );
 }
@@ -97,9 +106,10 @@ export function FieldStack({ ampRef, opacityBase = 0.15, visible = true }: { amp
 export function LightRig() {
   return (
     <>
-      <ambientLight intensity={0.12} />
-      <directionalLight intensity={1.4} position={[3, 5, 3]} color="#ffffff" />
-      <directionalLight intensity={0.35} position={[-2, -1, -3]} color="#6688ff" />
+      <ambientLight intensity={0.26} />
+      <directionalLight intensity={1.5} position={[3, 5, 3]} color="#ffffff" />
+      <directionalLight intensity={0.5} position={[-2, -1, -3]} color="#7fa0ff" />
+      <directionalLight intensity={0.7} position={[0, 2, 6]} color="#cdddff" />{/* fill aimed at the mirror faces so they catch light */}
       <pointLight position={[0, 0, 0]} intensity={0.8} color="#00ffff" distance={200} decay={2} />
     </>
   );
