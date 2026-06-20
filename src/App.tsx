@@ -1387,10 +1387,10 @@ export function App() {
 
   const Hud = (
     <div className="pane hud">
-      <div className="pane-head">Validation · QuTiP / numpy golden</div>
+      <div className="pane-head">Validation · max |error| vs QuTiP / NumPy golden (dimensionless)</div>
       <table className="metrics"><tbody>
-        <Row label={<>operators</>} v="1e−16" /><Row label={<>mesolve ⟨·⟩</>} v="7e−9" />
-        <Row label={<>Wigner</>} v="2e−16" /><Row label={<>arrowhead</>} v="1e−10" />
+        <Row label={<>operators</>} v="≤1e−16" tip="max abs error of the tensor operators vs QuTiP golden (dimensionless)" /><Row label={<>mesolve ⟨·⟩</>} v="≤7e−9" tip="max abs error of the Lindblad expectation values vs QuTiP mesolve" />
+        <Row label={<>Wigner</>} v="≤2e−16" tip="max abs error of the Wigner function vs QuTiP golden" /><Row label={<>arrowhead</>} v="≤1e−10" tip="max abs error of the Tavis–Cummings eigenspectrum vs numpy.linalg.eigh" />
       </tbody></table>
       <div className="btn-row">
         <button onClick={runRegression} title="recompute closed-form results across the WASM boundary">RUN REGRESSION</button>
@@ -1467,13 +1467,18 @@ export function App() {
             </Group>
           ) : regime === "cavity" ? (
             <Group title="CAVITY HARDWARE" k="cavh" c={collapsed} t={toggle}>
-              <Field sym="λ" label="design wavelength" value={cav.lambda} min={400} max={800} step={5} unit="nm" onChange={(lambda) => setCav((s) => ({ ...s, lambda }))} />
-              <Field sym="n_H" label="DBR high index" value={cav.nHi} min={1.6} max={3.0} step={0.05} unit="" onChange={(nHi) => setCav((s) => ({ ...s, nHi }))} />
-              <Field sym="n_L" label="DBR low index" value={cav.nLo} min={1.3} max={2.0} step={0.02} unit="" onChange={(nLo) => setCav((s) => ({ ...s, nLo }))} />
-              <Field sym="N" label="mirror pairs" value={cav.pairs} min={2} max={16} step={1} unit="" int onChange={(pairs) => setCav((s) => ({ ...s, pairs: Math.round(pairs) }))} />
-              <Field sym="n_c" label="cavity index" value={cav.nCav} min={1.3} max={2.5} step={0.05} unit="" onChange={(nCav) => setCav((s) => ({ ...s, nCav }))} />
-              <Field sym="g" label="atom–cavity coupling" value={cav.g} min={0} max={5} step={0.1} unit="κ" onChange={(g) => setCav((s) => ({ ...s, g }))} />
-              <Field sym="N" texSym="(\log_{10}N)" label="emitter number (log₁₀)" value={Math.log10(Math.max(1, cavN))} min={0} max={8} step={0.2} unit="" onChange={(v) => setCavN(Math.round(Math.pow(10, v)))} />
+              <Field sym="λ" label="design wavelength" value={cav.lambda} min={400} max={800} step={5} unit="nm" tip="cavity resonance / Bragg design wavelength λ₀" onChange={(lambda) => setCav((s) => ({ ...s, lambda }))} />
+              <Field sym="n_H" label="DBR high index" value={cav.nHi} min={1.6} max={3.0} step={0.05} unit="" tip="refractive index of the high-index mirror layers (dimensionless)" onChange={(nHi) => setCav((s) => ({ ...s, nHi }))} />
+              <Field sym="n_L" label="DBR low index" value={cav.nLo} min={1.3} max={2.0} step={0.02} unit="" tip="refractive index of the low-index mirror layers (dimensionless)" onChange={(nLo) => setCav((s) => ({ ...s, nLo }))} />
+              <Field sym="N_pairs" texSym="N_{\mathrm{pairs}}" label="mirror pairs" value={cav.pairs} min={2} max={16} step={1} unit="" int tip="number of high/low index layer pairs per DBR mirror — more pairs ⇒ higher reflectance R" onChange={(pairs) => setCav((s) => ({ ...s, pairs: Math.round(pairs) }))} />
+              <Field sym="n_c" label="cavity index" value={cav.nCav} min={1.3} max={2.5} step={0.05} unit="" tip="refractive index of the cavity spacer (dimensionless)" onChange={(nCav) => setCav((s) => ({ ...s, nCav }))} />
+              <div className="knob" title="number of emitters N for the collective 2g√N-vs-κ demo (log scale, 1 to 10⁸)">
+                <div className="knob-top">
+                  <span className="knob-name">emitter number <i>N</i> <span className="knob-sub">(log scale)</span></span>
+                  <span className="knob-entry"><span className="knob-readout">{cavN < 1e4 ? cavN.toLocaleString() : cavN.toExponential(0)}</span></span>
+                </div>
+                <input type="range" min={0} max={8} step={0.2} value={Math.log10(Math.max(1, cavN))} onChange={(e) => setCavN(Math.round(Math.pow(10, Number(e.target.value))))} />
+              </div>
             </Group>
           ) : regime === "dynamics" ? (
             <Group title="MOLECULAR ENSEMBLE" k="dyn" c={collapsed} t={toggle}>
@@ -1596,20 +1601,24 @@ export function App() {
             <>
               <div className="pane grow">
                 <div className="pane-head">Panel E · |E(z)|² standing-wave mode over the real DBR stack · refractive-index n(z) staircase (right axis) · emitter pinned to argmax|E|² · L_DBR / L_eff penetration</div>
+                <div className="pane-sub"><b>What:</b> the optical field piles up into a standing wave between the mirrors and peaks at the centre antinode (dashed line). Put the molecule there — that maximizes the single-emitter coupling g. The mirror stack's index contrast sets the reflectance, mode volume, and thus g.</div>
                 <canvas ref={cavCanvas} className="cv" />
                 <div className="legend">
-                  <span className="leg leg-band">n(z) layers</span>
-                  <span className="leg leg-field">|E(z)|² mode</span>
+                  <span className="leg"><i className="lsw" style={{ background: "rgba(56,84,150,0.85)" }} />high-index n_H</span>
+                  <span className="leg"><i className="lsw" style={{ background: "rgba(40,52,74,0.85)" }} />low-index n_L</span>
+                  <span className="leg"><i className="lsw" style={{ background: "rgba(245,158,11,0.28)" }} />λ/2 spacer n_c</span>
+                  <span className="leg leg-field">|E(z)|² field</span>
                   <span className="leg leg-mol">emitter @ antinode</span>
                 </div>
               </div>
               <div className="cav-row">
                 <div className="pane">
-                  <div className="pane-head">Panel R · cavity reflectance R(λ) · stopband / photonic bandgap <i style={{ color: CYAN, fontStyle: "normal" }}>━</i> · resonance dip at λ₀ <i style={{ color: AMBER, fontStyle: "normal" }}>┆</i> · width set by index contrast, not pairs</div>
+                  <div className="pane-head">Panel R · cavity reflectance R(λ) · stopband / photonic bandgap <i style={{ color: CYAN, fontStyle: "normal" }}>━</i> · resonance dip at λ₀ <i style={{ color: AMBER, fontStyle: "normal" }}>┆</i> · width set by index contrast, not pairs · <span style={{ color: "#6e7681", fontWeight: 400 }}>lossless mirrors, normal incidence (TMM)</span></div>
                   <canvas ref={stopCanvas} className="cv" />
                 </div>
                 <div className="pane">
-                  <div className="pane-head">Panel N · collective coupling Ω<sub>R</sub>=2g√N <i style={{ color: CYAN, fontStyle: "normal" }}>━</i> vs cavity loss κ <i style={{ color: "#ff7080", fontStyle: "normal" }}>┄</i> · single-molecule g(µ=5D) is WEAK; strong coupling reached only collectively at N*</div>
+                  <div className="pane-head">Panel N · collective coupling Ω<sub>R</sub>=2g√N <i style={{ color: CYAN, fontStyle: "normal" }}>━</i> vs cavity loss κ <i style={{ color: "#ff7080", fontStyle: "normal" }}>┄</i> · markers: <i style={{ color: "#fff", fontStyle: "normal" }}>● N* crossover</i> <i style={{ color: "#ff9b50", fontStyle: "normal" }}>● current N (weak)</i> <i style={{ color: CYAN, fontStyle: "normal" }}>● current N (strong)</i></div>
+                  <div className="pane-sub"><b>What:</b> one molecule (N=1) is too weakly coupled to beat the cavity loss κ — Purcell/weak regime. Strong coupling (2g√N {">"} κ) is reached only collectively, above the crossover N* where the cyan line crosses κ.</div>
                   <canvas ref={collCanvas} className="cv" />
                 </div>
               </div>
@@ -1724,23 +1733,24 @@ export function App() {
             <>
               <div className="pane">
                 <div className="pane-head">Hardware → coupling chain · every value derived from the geometry</div>
+                <div className="pane-sub">drag the hardware sliders → watch each row update; the chain ends at the single-emitter coupling g and the collective crossover N*.</div>
                 <table className="metrics"><tbody>
-                  <Row label={<>resonance <i>λ</i></>} k="cavLam" r={read} unit="nm" />
-                  <Row label={<>photon <Tex t="\hbar\omega_c" /></>} k="cavWc" r={read} unit="eV" />
-                  <Row label={<>spacer <Tex t="L_\mathrm{cav}" /></>} k="cavGap" r={read} unit="nm" />
-                  <Row label={<>stack length</>} k="cavTotal" r={read} unit="nm" />
-                  <Row label={<>penetration <Tex t="L_\mathrm{DBR}" /></>} k="cavLdbr" r={read} unit="nm" />
-                  <Row label={<>effective <Tex t="L_\mathrm{eff}" /></>} k="cavLeff" r={read} unit="nm" />
-                  <Row label={<>mirror <i>R</i></>} k="cavR" r={read} />
-                  <Row label={<>FSR</>} k="cavFSR" r={read} unit="THz" />
-                  <Row label={<>finesse <i>F</i></>} k="cavF" r={read} />
-                  <Row label={<>FWHM</>} k="cavFWHM" r={read} unit="THz" />
-                  <Row label={<>quality <i>Q</i></>} k="cavQ" r={read} />
-                  <Row label={<>photon <i>τ</i></>} k="cavTau" r={read} unit="fs" />
-                  <Row label={<><i>κ</i> <span style={{ color: DIM, fontWeight: 400 }}>· deferred</span></>} k="cavKappa" r={read} unit="meV" />
-                  <Row label={<>stopband Δf/f₀</>} k="cavStop" r={read} />
-                  <Row label={<><Tex t="V_m" /> <span style={{ color: DIM, fontWeight: 400 }}>· w₀=λ/2n</span></>} k="cavVm" r={read} unit="(λ/n)³" />
-                  <Row label={<><i>g</i> <span style={{ color: DIM, fontWeight: 400 }}>· µ=5 D</span></>} k="cavGd" r={read} unit="meV" />
+                  <Row label={<>resonance <i>λ</i></>} k="cavLam" r={read} unit="nm" tip="cavity resonance wavelength" />
+                  <Row label={<>photon <Tex t="\hbar\omega_c" /></>} k="cavWc" r={read} unit="eV" tip="cavity photon energy ħω_c = hc/λ" />
+                  <Row label={<>spacer <Tex t="L_\mathrm{cav}" /></>} k="cavGap" r={read} unit="nm" tip="physical λ/2 spacer thickness between the mirrors" />
+                  <Row label={<>stack length</>} k="cavTotal" r={read} unit="nm" tip="total length of the full DBR+spacer+DBR stack" />
+                  <Row label={<>penetration <Tex t="L_\mathrm{DBR}" /></>} k="cavLdbr" r={read} unit="nm" tip="field penetration depth into each Bragg mirror (vacuum-k₀ phase-penetration approximation)" />
+                  <Row label={<>effective <Tex t="L_\mathrm{eff}" /></>} k="cavLeff" r={read} unit="nm" tip="effective cavity length L_eff = L_cav + 2·L_DBR (sets the mode volume)" />
+                  <Row label={<>mirror <i>R</i></>} k="cavR" r={read} tip="mirror power reflectance R (dimensionless, 0–1); higher R ⇒ higher finesse, longer photon lifetime" />
+                  <Row label={<>FSR</>} k="cavFSR" r={read} unit="THz" tip="free spectral range — frequency spacing between longitudinal cavity modes" />
+                  <Row label={<>finesse <i>F</i></>} k="cavF" r={read} tip="cavity finesse F = π√R/(1−R) (dimensionless) = FSR/linewidth" />
+                  <Row label={<>FWHM</>} k="cavFWHM" r={read} unit="THz" tip="cavity resonance linewidth (full width at half maximum)" />
+                  <Row label={<>quality <i>Q</i></>} k="cavQ" r={read} tip="quality factor Q = ω_c/κ (dimensionless); photons live ~Q oscillations" />
+                  <Row label={<>photon <i>τ</i></>} k="cavTau" r={read} unit="fs" tip="cavity photon lifetime τ = Q/ω_c" />
+                  <Row label={<>cavity loss <i>κ</i></>} k="cavKappa" r={read} unit="meV" tip="cavity photon-loss rate κ = ω_c/Q (mirror leakage). Shown here for the 2g√N-vs-κ comparison; the live single-emitter dynamics run lossless." />
+                  <Row label={<>stopband Δf/f₀</>} k="cavStop" r={read} tip="DBR photonic-bandgap width as a fraction of f₀ (dimensionless, shown in %); set by index contrast, not mirror-pair count" />
+                  <Row label={<><Tex t="V_m" /></>} k="cavVm" r={read} unit="(λ/n)³" tip="cavity mode volume — ASSUMES a diffraction-limited mode waist w₀=λ/2n; g and N* scale with 1/√V_m" />
+                  <Row label={<>coupling <i>g</i></>} k="cavGd" r={read} unit="meV" tip="single-emitter vacuum-Rabi coupling g = µ·E_vac/ħ — ASSUMES a µ=5 D transition dipole; g and N* scale with µ" />
                 </tbody></table>
               </div>
               {Hud}
