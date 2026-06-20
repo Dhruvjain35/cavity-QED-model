@@ -72,6 +72,27 @@ body { background: var(--bg); color: var(--ink); font-family: var(--mono); font-
 /* 3.E · panel-header hierarchy — cyan hairline above every panel title */
 .pane-head { font-family: var(--mono); font-size: 9px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: #888; margin-bottom: 3px; line-height: 1.35; border-top: 1px solid #00ffff22; padding-top: 4px; }
 .pane-head i { font-style: normal; }
+/* plain-language one-liner under a technical pane title (Standard 4) */
+.pane-sub { font-family: var(--mono); font-size: 9px; font-weight: 400; line-height: 1.35; color: var(--faint); text-transform: none; letter-spacing: 0.01em; margin: 0 0 4px; }
+.pane-sub b { color: var(--dim); font-weight: 600; }
+/* dotted-underline affordance for rows/labels that carry a hover tooltip */
+.has-tip { border-bottom: 1px dotted var(--faint); cursor: help; }
+tr[title] { cursor: help; }
+/* live coupling-regime badge (Standard 5) */
+.regime-badge { border: 1px solid var(--rule-2); padding: 6px 8px; margin: 0 0 7px; font-family: var(--mono); }
+.regime-badge .rb-top { display: flex; align-items: center; gap: 6px; }
+.regime-badge .rb-dot { width: 8px; height: 8px; display: inline-block; }
+.regime-badge .rb-label { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; }
+.regime-badge .rb-ratios { display: flex; gap: 12px; font-size: 9.5px; color: var(--dim); margin-top: 4px; font-variant-numeric: tabular-nums; }
+.regime-badge .rb-note { font-size: 8.5px; color: var(--faint); margin-top: 3px; line-height: 1.3; text-transform: none; }
+.regime-badge.rb-wk { border-color: #1e6b3a; } .rb-wk .rb-dot, .rb-wk .rb-label { background: none; color: var(--green); } .rb-wk .rb-dot { background: var(--green); }
+.regime-badge.rb-st { border-color: #1e6b7a; } .rb-st .rb-dot, .rb-st .rb-label { color: var(--cyan); } .rb-st .rb-dot { background: var(--cyan); }
+.regime-badge.rb-us { border-color: #8a6a13; } .rb-us .rb-dot, .rb-us .rb-label { color: var(--amber); } .rb-us .rb-dot { background: var(--amber); }
+.rb-chk { font-size: 8px; color: var(--green); font-weight: 600; margin-left: 3px; vertical-align: middle; }
+/* tab subtitle — the one-line "what is this tab" entry point (Standard 8) */
+.tab-sub { font-family: var(--mono); font-size: 9.5px; line-height: 1.4; color: var(--dim); padding: 5px 8px 6px; border-bottom: 1px solid var(--rule); background: #0a0d12; }
+.tab-sub b { color: var(--ink); font-weight: 700; }
+.tab-sub .ts-watch { color: var(--cyan); }
 .cv { display: block; max-width: 100%; }
 /* center single-canvas plots in their pane at native size (no upscaling) */
 .center > .pane > .plotwrap { display: block; width: fit-content; max-width: 100%; margin: 0 auto; }

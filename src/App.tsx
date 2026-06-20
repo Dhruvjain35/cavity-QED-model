@@ -506,7 +506,8 @@ export function App() {
     }
     ctx.lineWidth = 0.75; ctx.strokeStyle = AXIS; ctx.strokeRect(S_ML, S_MT, S_PW, S_PH);
     ctx.fillStyle = INK; ctx.font = "600 12px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
-    ctx.fillText("t  (ω_c⁻¹)", S_ML + S_PW / 2, S_CH - 4);
+    ctx.fillText("time  t   (units of ω_c⁻¹, dimensionless)", S_ML + S_PW / 2, S_CH - 4);
+    ctx.save(); ctx.translate(12, S_MT + S_PH / 2); ctx.rotate(-Math.PI / 2); ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.font = "600 11px 'JetBrains Mono','SF Mono',monospace"; ctx.fillText("population / probability  (dimensionless)", 0, 0); ctx.restore();
   }
 
   // FIX 4 (SINGLE) · decoherence panel: purity Tr(ρ²) and von Neumann entropy S(t) together — the
@@ -1434,12 +1435,12 @@ export function App() {
                 <Field sym="γ" label="emitter decay" value={params.gamma} min={0} max={0.3} step={0.005} unit="ω_c" onChange={(gamma) => setParams((p) => ({ ...p, gamma }))} />
               </Group>
               <Group title="NUMERICAL ENGINE BOUNDS" k="num" c={collapsed} t={toggle}>
-                <NumField sym="atol" value={tol.atol} onChange={(atol) => setTol((s) => ({ ...s, atol: clamp(atol, 1e-12, 1e-2) }))} />
-                <NumField sym="rtol" value={tol.rtol} onChange={(rtol) => setTol((s) => ({ ...s, rtol: clamp(rtol, 1e-12, 1e-2) }))} />
+                <NumField sym="atol" value={tol.atol} tip="ODE solver absolute tolerance (dimensionless); lower = more accurate, slower. Range 1e-12–1e-2." onChange={(atol) => setTol((s) => ({ ...s, atol: clamp(atol, 1e-12, 1e-2) }))} />
+                <NumField sym="rtol" value={tol.rtol} tip="ODE solver relative tolerance (dimensionless); lower = more accurate, slower. Range 1e-12–1e-2." onChange={(rtol) => setTol((s) => ({ ...s, rtol: clamp(rtol, 1e-12, 1e-2) }))} />
                 <div className="btn-row">
                   <button onClick={() => setPlaying((p) => !p)}>{playing ? "PAUSE" : "PLAY"}</button>
                   <button onClick={() => { quantum.current?.reset(); series.current = []; }}>RE-EXCITE</button>
-                  <button className={fixedScale ? "on" : ""} onClick={() => setFixedScale((s) => !s)}>{fixedScale ? "1/π" : "AUTO"}</button>
+                  <button className={fixedScale ? "on" : ""} title="Wigner colour scale: fix to the ±1/π vacuum floor (compare negativity), or AUTO-scale to the current peak" onClick={() => setFixedScale((s) => !s)}>W-SCALE: {fixedScale ? "1/π" : "AUTO"}</button>
                 </div>
               </Group>
             </>
@@ -1507,16 +1508,25 @@ export function App() {
 
         {/* CENTER */}
         <main className="center">
+          <div className="tab-sub">
+            {regime === "single" ? <><b>Single emitter in a lossy cavity (open Jaynes–Cummings).</b> <span className="ts-watch">Watch:</span> one quantum oscillating photon↔atom at the vacuum-Rabi rate 2g (Panel C) and decohering (Panels E/F). <span className="ts-watch">Drag:</span> g sets the oscillation speed, κ/γ set the decay.</>
+              : regime === "collective" ? <><b>N emitters sharing one cavity mode (Tavis–Cummings).</b> <span className="ts-watch">Watch:</span> the avoided crossing — 2 bright polaritons split by 2g√N, the N−1 dark states pinned at ω_a. <span className="ts-watch">Drag:</span> N/g set the splitting; σ adds emitter disorder. Click any eigenstate to see its photon content.</>
+              : regime === "cavity" ? <><b>The optical hardware behind the coupling (DBR Fabry–Pérot cavity).</b> <span className="ts-watch">Watch:</span> the standing-wave field |E(z)|² and how the mirror stack sets the mode volume → the single-emitter coupling g. <span className="ts-watch">Drag:</span> wavelength, mirror pairs, and indices to retune the cavity.</>
+              : regime === "dynamics" ? <><b>Live many-emitter dynamics (Tavis–Cummings, real-time).</b> <span className="ts-watch">Watch:</span> one excitation sloshing photon↔molecules in 3D + the doublet in transmission. <span className="ts-watch">Drag:</span> N/g set Ω_R=2g√N; the dynamics are closed (unitary, lossless) — Γ only broadens the spectrum.</>
+              : <><b>Vibronic coupling — molecules with vibrations in a cavity (Holstein–Tavis–Cummings).</b> <span className="ts-watch">Watch:</span> the Franck–Condon vibrational comb (bare) reshaped into polaritons in-cavity. <span className="ts-watch">Drag:</span> Huang–Rhys S, vibrational mode ω_v, coupling g, ensemble N.</>}
+          </div>
           {regime === "single" ? (
             <>
               <div className="pane">
                 <div className="pane-head">Panel C · observables ⟨a†a⟩ <i style={{ color: COBALT }}>—</i> ⟨P_e⟩ <i style={{ color: CRIMSON }}>—</i> purity <i style={{ color: EMERALD }}>—</i></div>
+                <div className="pane-sub"><b>What:</b> one quantum sloshes photon↔atom — the cyan/red anti-phase wiggle is the vacuum-Rabi oscillation at frequency 2g; the envelope decays as κ,γ leak it out. ⟨a†a⟩=mean photon number, ⟨P_e⟩=excited-state prob, all dimensionless ∈[0,1] here.</div>
                 <PlotWrap cw={S_CW} ch={S_CH} area={{ ml: S_ML, mt: S_MT, pw: S_PW, ph: S_PH }} inv={(px, py) => { const T = popSeries.current?.T ?? T_LOOP; return [(((px - S_ML) / S_PW) * T).toFixed(1), (1 - (py - S_MT) / S_PH).toFixed(2)]; }}>
                   <canvas ref={seriesCanvas} className="cv" />
                 </PlotWrap>
               </div>
               <div className="pane">
                 <div className="pane-head">Panel B · phase space — Wigner <em>W</em> (signed · red = negativity) | Husimi <em>Q</em> (≥ 0)</div>
+                <div className="pane-sub"><b>What:</b> quasi-probability portrait of the cavity field in the x–p plane. <b>W</b> can go negative (red) — a non-classical signature; <b>Q</b> is a Gaussian-smoothed W that is always ≥0. Both are dimensionless densities.</div>
                 <div className="phase-row">
                   <canvas ref={wigCanvas} className="cv" />
                   <canvas ref={husimiCanvas} className="cv" />
@@ -1524,12 +1534,14 @@ export function App() {
               </div>
               <div className="pane">
                 <div className="pane-head">Panel E · decoherence — purity Tr(ρ²) <i style={{ color: GREEN, fontStyle: "normal" }}>—</i> von Neumann entropy S(t) <i style={{ color: AMBER, fontStyle: "normal" }}>—</i> (open-system mixing under κ,γ)</div>
+                <div className="pane-sub"><b>What:</b> the state starts pure (purity→1, entropy→0) and mixes into the environment over time. <b>Green</b>=purity Tr ρ²∈[0,1] (left axis); <b>amber</b>=entropy S in nats (scaled to its peak ≈ln2). Falling purity = decoherence.</div>
                 <PlotWrap cw={DC_CW} ch={DC_CH} area={{ ml: DC_ML, mt: DC_MT, pw: DC_PW, ph: DC_PH }} inv={(px, py) => { const T = popSeries.current?.T ?? T_LOOP; return [(((px - DC_ML) / DC_PW) * T).toFixed(1), (1 - (py - DC_MT) / DC_PH).toFixed(2)]; }}>
                   <canvas ref={decohereCanvas} className="cv" />
                 </PlotWrap>
               </div>
               <div className="pane">
                 <div className="pane-head">Panel F · quantum trajectory — Bloch vector projection · single-excitation qubit {"{|0,e⟩,|1,g⟩}"} · spirals inward under κ,γ</div>
+                <div className="pane-sub"><b>What:</b> the {"{|0,e⟩,|1,g⟩}"} qubit drawn as a Bloch vector. Rabi oscillation = rotation around the circle; the inward spiral toward the centre = decoherence, shown geometrically (a pure state sits on the rim, a fully mixed one at the centre).</div>
                 <div className="bloch-wrap" style={{ textAlign: "center" }}>
                   <PlotWrap cw={BL_CW} ch={BL_CH} area={{ ml: BL_ML, mt: BL_MT, pw: BL_S, ph: BL_S }} inv={(px, py) => { const R = (BL_S / 2) / 1.12, cx = BL_ML + BL_S / 2, cy = BL_MT + BL_S / 2; return [((px - cx) / R).toFixed(3), ((cy - py) / R).toFixed(3)]; }}>
                     <canvas ref={blochCanvas} className="cv" />
@@ -1656,19 +1668,22 @@ export function App() {
             <>
               <div className="pane">
                 <div className="pane-head">Panel A · joint density matrix ρ · |ρ_ij| brightness · sign <i style={{ color: "#00ffff", fontStyle: "normal" }}>+ ▪</i> <i style={{ color: "#ff3333", fontStyle: "normal" }}>− ▪</i> · coherence = cyan/red pair</div>
+                <div className="pane-sub"><b>What:</b> each cell is one matrix element of the joint atom⊗cavity state. <b>Diagonal</b>=populations; the off-diagonal <b>cyan/red pair</b> at (|0,e⟩,|1,g⟩) is the vacuum-Rabi coherence, flipping sign as the quantum sloshes. <b>Approx:</b> single-excitation subspace — the full 32×32 ρ is cropped to its populated 8×8 block.</div>
                 <canvas ref={rhoCanvas} className="cv" />
               </div>
+              <RegimeBadge gEff={params.g} wc={1} loss={Math.max(params.kappa, params.gamma)} lossSym="κ,γ" />
               <div className="pane">
-                <div className="pane-head">Observables</div>
+                <div className="pane-head">Live observables · open Jaynes–Cummings (RWA)</div>
+                <div className="pane-sub">one two-level emitter + one lossy cavity mode; rotating-wave approximation, single-excitation dynamics.</div>
                 <table className="metrics"><tbody>
-                  <Row label={<>time <i>t</i></>} k="t" r={read} unit="ω_c⁻¹" />
-                  <Row label={<>⟨<i>a</i>†<i>a</i>⟩</>} k="n" r={read} />
-                  <Row label={<>⟨<i>P</i>ₑ⟩</>} k="pe" r={read} />
-                  <Row label={<>purity Tr<i>ρ</i>²</>} k="pur" r={read} />
-                  <Row label={<>entropy <i>S</i></>} k="ent" r={read} />
-                  <Row label={<><i>g</i>²/<i>κγ</i></>} k="coop" r={read} />
-                  <Row label={<>Tr <i>ρ</i></>} k="tr" r={read} />
-                  <Row label={<>min eig</>} k="eig" r={read} />
+                  <Row label={<>time <i>t</i></>} k="t" r={read} unit="ω_c⁻¹" tip="elapsed time, in units of inverse cavity frequency (1/ω_c) — dimensionless" />
+                  <Row label={<>photon ⟨<i>a</i>†<i>a</i>⟩</>} k="n" r={read} tip="mean intracavity photon number ⟨a†a⟩ (dimensionless; ≤1 in this single-excitation manifold)" />
+                  <Row label={<>excited ⟨<i>P</i>ₑ⟩</>} k="pe" r={read} tip="emitter excited-state probability ⟨P_e⟩ ∈ [0,1] (dimensionless)" />
+                  <Row label={<>purity Tr<i>ρ</i>²</>} k="pur" r={read} tip="state purity Tr(ρ²) ∈ [0,1]: 1 = pure, <1 = mixed (decohered)" />
+                  <Row label={<>entropy <i>S</i></>} k="ent" r={read} unit="nats" tip="von Neumann entropy S = −Tr(ρ ln ρ), in nats; rises as the state decoheres (max ln2≈0.69)" />
+                  <Row label={<>cooperativity <i>C</i></>} k="coop" r={read} tip="single-atom cooperativity C = g²/κγ (dimensionless); C≫1 ⇒ strong light–matter coupling" />
+                  <Row label={<>Tr <i>ρ</i> <span className="rb-chk">✓1</span></>} k="tr" r={read} tip="trace of ρ — must stay 1 (probability conservation); numerical-health check" />
+                  <Row label={<>min eig(<i>ρ</i>) <span className="rb-chk">✓≈0</span></>} k="eig" r={read} tip="smallest eigenvalue of ρ — ≈0 confirms a physically valid (positive-semidefinite) density matrix" />
                 </tbody></table>
               </div>
               {Hud}
@@ -1834,8 +1849,26 @@ function downloadNpy(name: string, data: Float64Array, shape: number[]) {
   const url = URL.createObjectURL(new Blob([buf], { type: "application/octet-stream" }));
   const a = document.createElement("a"); a.href = url; a.download = name; a.click(); URL.revokeObjectURL(url);
 }
-function Row({ label, k, r, unit, v }: { label: React.ReactNode; k?: string; r?: React.MutableRefObject<Record<string, HTMLSpanElement | null>>; unit?: string; v?: string }) {
-  return (<tr><td className="k">{label}</td><td className="v">{k && r ? <span ref={(el) => { r.current[k] = el; }}>—</span> : v}{unit ? <span className="u"> {unit}</span> : null}</td></tr>);
+function Row({ label, k, r, unit, v, tip }: { label: React.ReactNode; k?: string; r?: React.MutableRefObject<Record<string, HTMLSpanElement | null>>; unit?: string; v?: string; tip?: string }) {
+  return (<tr title={tip}><td className="k">{tip ? <span className="has-tip">{label}</span> : label}</td><td className="v">{k && r ? <span ref={(el) => { r.current[k] = el; }}>—</span> : v}{unit ? <span className="u"> {unit}</span> : null}</td></tr>);
+}
+// Live coupling-regime classifier. gEff = effective light-matter coupling (g for one emitter, g√N collective);
+// loss = the linewidth (max κ,γ) used for the strong-coupling onset 2gEff>loss; η=gEff/ω_c sets ultrastrong.
+function regimeClass(gEff: number, wc: number, loss: number) {
+  const eta = gEff / wc;
+  if (2 * gEff <= loss) return { label: "WEAK", cls: "wk", note: "2g ≤ κ — Purcell regime, no resolvable splitting" };
+  if (eta >= 0.1) return { label: "ULTRASTRONG", cls: "us", note: "η = g/ω_c ≥ 0.1 — RWA corrections become significant" };
+  return { label: "STRONG", cls: "st", note: "2g > κ, η < 0.1 — resolvable vacuum-Rabi doublet, RWA valid" };
+}
+function RegimeBadge({ gEff, wc, loss, lossSym = "κ" }: { gEff: number; wc: number; loss: number; lossSym?: string }) {
+  const r = regimeClass(gEff, wc, loss);
+  return (
+    <div className={"regime-badge rb-" + r.cls} title={"coupling regime from η=g/ω_c and 2g/" + lossSym + ". " + r.note}>
+      <div className="rb-top"><span className="rb-dot" /><span className="rb-label">{r.label} COUPLING</span></div>
+      <div className="rb-ratios"><span>η = g/ω_c = {(gEff / wc).toFixed(2)}</span><span>2g/{lossSym} = {(2 * gEff / Math.max(1e-9, loss)).toFixed(loss < 0.1 ? 0 : 1)}</span></div>
+      <div className="rb-note">{r.note}</div>
+    </div>
+  );
 }
 function Group({ title, k, c, t, children }: { title: string; k: string; c: Record<string, boolean>; t: (k: string) => void; children: React.ReactNode }) {
   const open = !c[k];
@@ -1846,10 +1879,11 @@ function Group({ title, k, c, t, children }: { title: string; k: string; c: Reco
     </div>
   );
 }
-function Field(props: { sym: string; texSym?: string; label: string; value: number; min: number; max: number; step: number; unit: string; int?: boolean; onChange: (v: number) => void }) {
+function Field(props: { sym: string; texSym?: string; label: string; value: number; min: number; max: number; step: number; unit: string; int?: boolean; tip?: string; onChange: (v: number) => void }) {
   const show = props.int ? `${Math.round(props.value)}` : `${props.value}`;
+  const title = (props.tip ? props.tip + " · " : "") + `range ${props.min}–${props.max}${props.unit ? " " + props.unit : ""}`;
   return (
-    <div className="knob">
+    <div className="knob" title={title}>
       <div className="knob-top">
         <span className="knob-name">{props.label} {props.texSym ? <span className="knob-sym"><Tex t={props.texSym} /></span> : <i>{props.sym}</i>}</span>
         <span className="knob-entry">
@@ -1862,10 +1896,10 @@ function Field(props: { sym: string; texSym?: string; label: string; value: numb
     </div>
   );
 }
-function NumField(props: { sym: string; value: number; onChange: (v: number) => void }) {
+function NumField(props: { sym: string; value: number; tip?: string; onChange: (v: number) => void }) {
   return (
-    <div className="knob num-only">
-      <span className="knob-name"><i>{props.sym}</i></span>
+    <div className="knob num-only" title={props.tip}>
+      <span className={"knob-name" + (props.tip ? " has-tip" : "")}><i>{props.sym}</i></span>
       <input className="knob-input wide" type="number" step={1e-7} value={props.value}
         onChange={(e) => { const v = Number(e.target.value); if (!Number.isNaN(v) && e.target.value !== "") props.onChange(v); }} />
     </div>
