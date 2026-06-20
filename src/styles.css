@@ -61,8 +61,9 @@ body { background: var(--bg); color: var(--ink); font-family: var(--mono); font-
 /* 2.3 / 2.4 · center the plot inside grow panes so leftover height is symmetric padding, never a
    one-sided black gap between panels (single / collective / vibronic columns). */
 .center > .pane.grow { display: flex; flex-direction: column; }
-/* hero canvases fit within the grow pane (fill whichever dimension binds, keep aspect, no overflow/distortion) */
-.center > .pane.grow > .plotwrap, .center > .pane.grow > .cv, .center > .pane.grow > .bloch-wrap { margin: auto; width: auto; height: auto; max-width: 100%; max-height: 100%; min-height: 0; }
+/* hero canvases are CENTERED at their native size inside the grow pane (never CSS-upscaled — upscaling a
+   fixed buffer both blurs the plot and balloons its fonts). max-* only ever scales DOWN on a tight pane. */
+.center > .pane.grow > .plotwrap, .center > .pane.grow > .cv, .center > .pane.grow > .bloch-wrap { align-self: center; margin: auto; max-width: 100%; max-height: 100%; min-height: 0; }
 /* CAVITY tab: two panels (R, N) side-by-side so they fill the column width instead of stacking small */
 .cav-row { display: flex; min-height: 0; border-bottom: 1px solid var(--rule); }
 .cav-row > .pane { flex: 1; min-width: 0; border-bottom: none; border-right: 1px solid var(--rule); display: flex; flex-direction: column; }
@@ -71,13 +72,10 @@ body { background: var(--bg); color: var(--ink); font-family: var(--mono); font-
 /* 3.E · panel-header hierarchy — cyan hairline above every panel title */
 .pane-head { font-family: var(--mono); font-size: 9px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: #888; margin-bottom: 3px; line-height: 1.35; border-top: 1px solid #00ffff22; padding-top: 4px; }
 .pane-head i { font-style: normal; }
-.cv { display: block; width: 100%; height: auto; max-width: 100%; }
-/* desktop: single-canvas time-series / spectrum panels stretch to fill the column width (kills the
-   right-hand black gap). Scoped to a plotwrap that is a DIRECT child of a center pane — so the phase-row
-   (two maps), the bridge, and the square Bloch (all nested differently) are untouched. !important beats
-   the inline px sized() writes; the backing store stays fixed and PlotWrap rescales hover by cw/rect. */
-.center > .pane > .plotwrap { display: block; width: 100%; }
-.center > .pane > .plotwrap > .cv { width: 100% !important; height: auto !important; }
+.cv { display: block; max-width: 100%; }
+/* center single-canvas plots in their pane at native size (no upscaling) */
+.center > .pane > .plotwrap { display: block; width: fit-content; max-width: 100%; margin: 0 auto; }
+.center > .pane > .cv { display: block; margin: 0 auto; }
 .tex { display: inline-block; line-height: 1; }
 .tex .katex { font-size: 1.0em; color: inherit; }
 .cv.click { cursor: crosshair; }

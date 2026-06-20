@@ -37,19 +37,19 @@ const WA = 1.0, N_DELTA = 121, N_FOCK = 16, NB = 80;
 // ── figure layouts (logical px) ──
 const W_ML = 42, W_MR = 66, W_MT = 14, W_MB = 34, W_S = 236, NHG = 72; // W_MR holds the colorbar + its tick labels
 const W_CW = W_ML + W_S + W_MR, W_CH = W_MT + W_S + W_MB, W_TICKS = [-4, -2, 0, 2, 4];
-const S_ML = 38, S_MR = 10, S_MT = 10, S_PW = 512, S_PH = 118, S_MB = 22;
+const S_ML = 44, S_MR = 14, S_MT = 12, S_PW = 808, S_PH = 176, S_MB = 26;
 const S_CW = S_ML + S_PW + S_MR, S_CH = S_MT + S_PH + S_MB;
-const DC_ML = 46, DC_MR = 14, DC_MT = 14, DC_PW = 1040, DC_PH = 250, DC_MB = 28;
+const DC_ML = 46, DC_MR = 14, DC_MT = 14, DC_PW = 806, DC_PH = 200, DC_MB = 28;
 const DC_CW = DC_ML + DC_PW + DC_MR, DC_CH = DC_MT + DC_PH + DC_MB;
 const BL_ML = 46, BL_MR = 16, BL_MT = 16, BL_MB = 30, BL_S = 380; // 4.A Bloch-projection square (fills its panel)
 const BL_CW = BL_ML + BL_S + BL_MR, BL_CH = BL_MT + BL_S + BL_MB;
 const DI_ML = 54, DI_MR = 16, DI_MT = 18, DI_MB = 34, DI_PW = 520, DI_PH = 184; // 4.C disorder broadening
 const DI_CW = DI_ML + DI_PW + DI_MR, DI_CH = DI_MT + DI_PH + DI_MB;
-const HB_ML = 14, HB_MR = 14, HB_MT = 30, HB_PW = 1040, HB_PH = 200, HB_MB = 26; // fits Panel G with the x-axis label inside the 900px fold (FIX 5)
+const HB_ML = 16, HB_MR = 16, HB_MT = 30, HB_PW = 836, HB_PH = 210, HB_MB = 26;
 const HB_CW = HB_ML + HB_PW + HB_MR, HB_CH = HB_MT + HB_PH + HB_MB;
 const VB_ML = 14, VB_MR = 14, VB_MT = 28, VB_PW = 1040, VB_PH = 230, VB_MB = 30;
 const VB_CW = VB_ML + VB_PW + VB_MR, VB_CH = VB_MT + VB_PH + VB_MB;
-const P_ML = 54, P_MR = 14, P_MT = 14, P_MB = 38, P_W = 500, P_H = 288;
+const P_ML = 56, P_MR = 16, P_MT = 16, P_MB = 40, P_W = 794, P_H = 424;
 const P_CW = P_ML + P_W + P_MR, P_CH = P_MT + P_H + P_MB;
 const B_ML = 24, B_MR = 8, B_MT = 8, B_MB = 20, B_S = 176;
 const B_CW = B_ML + B_S + B_MR, B_CH = B_MT + B_S + B_MB;
@@ -397,18 +397,14 @@ export function App() {
     navigator.clipboard?.writeText(window.location.href).catch(() => { });
   }
 
-  // HIGH-DPI CRISP RENDER: the backing store is sized to the canvas's ACTUAL displayed size × dpr (not the
-  // fixed logical size), so a pane that CSS-stretches a plot to fill the column still renders 1:1 with device
-  // pixels instead of upscaling a small buffer (the old cause of blurry graphs). The fixed logical coordinate
-  // system [0..w]×[0..h] is mapped onto the full buffer via setTransform, so every draw call is unchanged.
+  // Each plot is drawn at a FIXED logical size w×h; the backing store is w×h×dpr (so it is crisp at 1:1 on a
+  // retina display) and the canvas is shown at exactly w×h CSS px (inline). Panes are laid out around these
+  // sizes — canvases are NEVER CSS-upscaled to "fill" (that both blurs and balloons the fonts).
   function sized(cv: HTMLCanvasElement, w: number, h: number): CanvasRenderingContext2D {
-    if (cv.style.width !== w + "px") { cv.style.width = w + "px"; cv.style.height = h + "px"; } // logical hint; !important CSS overrides for stretched panes
-    const rect = cv.getBoundingClientRect();
-    const dw = rect.width > 0 ? rect.width : w, dh = rect.height > 0 ? rect.height : h;
-    const bw = Math.max(1, Math.round(dw * dpr.current)), bh = Math.max(1, Math.round(dh * dpr.current));
-    if (cv.width !== bw || cv.height !== bh) { cv.width = bw; cv.height = bh; }
+    const bw = Math.round(w * dpr.current), bh = Math.round(h * dpr.current);
+    if (cv.width !== bw || cv.height !== bh) { cv.width = bw; cv.height = bh; cv.style.width = w + "px"; cv.style.height = h + "px"; }
     const ctx = cv.getContext("2d")!;
-    ctx.setTransform(bw / w, 0, 0, bh / h, 0, 0);
+    ctx.setTransform(dpr.current, 0, 0, dpr.current, 0, 0);
     ctx.lineJoin = "round"; ctx.lineCap = "round"; // smooth curve joints
     return ctx;
   }
@@ -712,8 +708,8 @@ export function App() {
     for (const e of yticks) { seg(ctx, P_ML, yOf(e), P_ML - 3, yOf(e)); ctx.fillText(fmt(e, 2), P_ML - 6, yOf(e)); }
     ctx.fillStyle = INK; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
     ctx.font = "13px 'JetBrains Mono','SF Mono',monospace"; ctx.fillText("detuning  (ω_c − ω_a) / g", P_ML + P_W / 2, P_CH - 7);
-    ctx.save(); ctx.translate(13, P_MT + P_H / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top";
-    ctx.font = "600 14px 'JetBrains Mono','SF Mono',monospace"; ctx.fillText("E  (ω_a)", 0, 0); ctx.restore();
+    ctx.save(); ctx.translate(15, P_MT + P_H / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top"; ctx.textAlign = "center";
+    ctx.font = "600 13px 'JetBrains Mono','SF Mono',monospace"; ctx.fillText("E  (ω_a)", 0, 0); ctx.restore();
   }
 
   function drawBridge() {
@@ -1562,7 +1558,7 @@ export function App() {
                   </tbody></table>
                 </div>
               </div>
-              <div className="pane grow">
+              <div className="pane">
                 <div className="pane-head">Panel G · Hopfield composition (selected) + photon-weight distribution — bright <i style={{ color: CYAN, fontStyle: "normal" }}>▪</i> matter <i style={{ color: RED, fontStyle: "normal" }}>▪</i> dark <i style={{ color: PURPLE, fontStyle: "normal" }}>▪</i></div>
                 <canvas ref={hopBarsCanvas} className="cv" />
               </div>
