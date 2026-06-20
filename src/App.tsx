@@ -689,6 +689,17 @@ export function App() {
     let ndark = 0;
     for (let k = 0; k < midCol.eigs.length; k++) { if (midCol.photon[k]! >= 0.02) continue; seg(ctx, xOf(-R), yOf(midCol.eigs[k]!), xOf(R), yOf(midCol.eigs[k]!)); ndark++; }
     ctx.globalAlpha = 1;
+    // label the two bright polariton branches LP / UP at the right edge, and the uncoupled asymptotes
+    {
+      const rc = sweep.current[sweep.current.length - 1]!;
+      let lo = Infinity, hi = -Infinity;
+      for (let k = 0; k < rc.eigs.length; k++) { if (rc.photon[k]! < 0.02) continue; const e = rc.eigs[k]!; if (e < lo) lo = e; if (e > hi) hi = e; }
+      ctx.font = "700 11px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "right"; ctx.textBaseline = "middle";
+      ctx.fillStyle = CYAN; ctx.fillText("UP", xOf(R) - 5, yOf(hi) - 9);
+      ctx.fillStyle = "#ff7a5c"; ctx.fillText("LP", xOf(R) - 5, yOf(lo) + 9);
+      ctx.font = "500 8px 'JetBrains Mono','SF Mono',monospace"; ctx.fillStyle = "rgba(148,163,184,0.75)"; ctx.textAlign = "left"; ctx.textBaseline = "bottom";
+      ctx.fillText("bare cavity ω_c", xOf(R * 0.55) + 2, yOf(WA + R * 0.55 * sp.g) - 2);
+    }
     if (ndark > 0) {
       const txt = `${ndark} dark / subradiant reservoir`, yLab = yOf(WA) - 3;
       ctx.font = "600 8.5px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "right"; ctx.textBaseline = "bottom";
@@ -708,9 +719,12 @@ export function App() {
     ctx.textAlign = "right"; ctx.textBaseline = "middle";
     for (const e of yticks) { seg(ctx, P_ML, yOf(e), P_ML - 3, yOf(e)); ctx.fillText(fmt(e, 2), P_ML - 6, yOf(e)); }
     ctx.fillStyle = INK; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
-    ctx.font = "13px 'JetBrains Mono','SF Mono',monospace"; ctx.fillText("detuning  (ω_c − ω_a) / g", P_ML + P_W / 2, P_CH - 7);
+    ctx.font = "13px 'JetBrains Mono','SF Mono',monospace"; ctx.fillText("cavity–emitter detuning  (ω_c − ω_a) / g   (dimensionless)", P_ML + P_W / 2, P_CH - 7);
     ctx.save(); ctx.translate(15, P_MT + P_H / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top"; ctx.textAlign = "center";
-    ctx.font = "600 13px 'JetBrains Mono','SF Mono',monospace"; ctx.fillText("E  (ω_a)", 0, 0); ctx.restore();
+    ctx.font = "600 13px 'JetBrains Mono','SF Mono',monospace"; ctx.fillText("energy  E / ω_a   (dimensionless)", 0, 0); ctx.restore();
+    // approximations footnote
+    ctx.fillStyle = DIM; ctx.font = "500 8px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+    ctx.fillText("single-excitation Tavis–Cummings · RWA · ideal degenerate dark states", P_ML + 2, P_CH - 7);
   }
 
   function drawBridge() {
@@ -1446,10 +1460,10 @@ export function App() {
             </>
           ) : regime === "collective" ? (
             <Group title="EMITTER ENSEMBLE" k="ens" c={collapsed} t={toggle}>
-              <Field sym="N" label="emitters" value={sp.m} min={1} max={80} step={1} unit="" int onChange={(m) => setSp((s) => ({ ...s, m: Math.round(m) }))} />
-              <Field sym="g" label="coupling" value={sp.g} min={0.01} max={0.15} step={0.005} unit="ω_a" onChange={(g) => setSp((s) => ({ ...s, g }))} />
-              <Field sym="σ" label="disorder" value={sp.sigma} min={0} max={0.2} step={0.005} unit="ω_a" onChange={(sigma) => setSp((s) => ({ ...s, sigma }))} />
-              <div className="btn-row"><button onClick={() => setSp((s) => ({ ...s, seed: s.seed + 1 }))}>RE-ROLL σ</button></div>
+              <Field sym="N" label="emitters" value={sp.m} min={1} max={80} step={1} unit="" int tip="number of identical two-level emitters sharing the cavity mode" onChange={(m) => setSp((s) => ({ ...s, m: Math.round(m) }))} />
+              <Field sym="g" label="coupling" value={sp.g} min={0.01} max={0.15} step={0.005} unit="ω_a" tip="single-emitter light–matter coupling, in units of ω_a (dimensionless). Collective splitting = 2g√N." onChange={(g) => setSp((s) => ({ ...s, g }))} />
+              <Field sym="σ" label="disorder" value={sp.sigma} min={0} max={0.2} step={0.005} unit="ω_a" tip="static Gaussian spread of emitter energies, in units of ω_a (dimensionless). σ/Ω_R>1 smears out the polaritons." onChange={(sigma) => setSp((s) => ({ ...s, sigma }))} />
+              <div className="btn-row"><button disabled={sp.sigma === 0} title={sp.sigma === 0 ? "set disorder σ>0 to randomize the ensemble" : "draw a new random disorder realization"} onClick={() => setSp((s) => ({ ...s, seed: s.seed + 1 }))}>RE-ROLL σ</button></div>
             </Group>
           ) : regime === "cavity" ? (
             <Group title="CAVITY HARDWARE" k="cavh" c={collapsed} t={toggle}>
@@ -1552,26 +1566,29 @@ export function App() {
           ) : regime === "collective" ? (
             <>
               <div className="pane">
-                <div className="pane-head">Panel D · polariton spectrum (N = {sp.m}) · click an eigenstate</div>
+                <div className="pane-head">Panel D · polariton spectrum (N = {sp.m}) · click an eigenstate · dot colour = photon fraction <i style={{ color: RED, fontStyle: "normal" }}>matter ▸</i> <i style={{ color: CYAN, fontStyle: "normal" }}>▸ photon</i> · <i style={{ color: PURPLE, fontStyle: "normal" }}>━ N−1 dark</i></div>
+                <div className="pane-sub"><b>What:</b> each curve is a polariton energy as the cavity is detuned through the emitters; the two bright bands that repel are the <b>LP/UP</b> polaritons (split by 2g√N), the flat purple line is the <b>N−1 dark states</b> that don't couple to light. <b>Change → watch:</b> raise N → the LP/UP gap Ω_R grows as 2g√N; raise σ → polaritons broaden, the dark band spreads. <b>Approx:</b> single-excitation Tavis–Cummings · RWA · dark states ideal/degenerate.</div>
                 <PlotWrap cw={P_CW} ch={P_CH} area={{ ml: P_ML, mt: P_MT, pw: P_W, ph: P_H }} inv={(px, py) => { const { emin, emax, R } = specMap.current; return [fmt(((px - P_ML) / P_W) * 2 * R - R, 2), fmt(emax - ((py - P_MT) / P_H) * (emax - emin), 3)]; }}>
                   <canvas ref={specCanvas} className="cv click" onClick={onSpecClick} />
                 </PlotWrap>
               </div>
               <div className="pane">
                 <div className="pane-head">Panel D · Wigner of selected eigenstate</div>
+                <div className="pane-sub"><b>What:</b> phase-space portrait of the polariton you clicked. A red dip at the centre = negative Wigner value = non-classical light; a purely positive blob = classical-like. x,p are dimensionless field quadratures.</div>
                 <div className="bridge">
                   <canvas ref={bridgeCanvas} className="cv" />
                   <table className="metrics"><tbody>
-                    <Row label={<>state</>} k="selKind" r={read} />
-                    <Row label={<><i>E</i></>} k="selE" r={read} unit="ω_a" />
-                    <Row label={<>|<i>C</i>|²</>} k="selC" r={read} />
-                    <Row label={<>|<i>X</i>|²</>} k="selX" r={read} />
-                    <Row label={<><i>W</i>(0,0)</>} k="selW0" r={read} unit="" />
+                    <Row label={<>state</>} k="selKind" r={read} tip="classification of the clicked eigenstate (lower/upper polariton or dark)" />
+                    <Row label={<><i>E</i></>} k="selE" r={read} unit="ω_a" tip="eigen-energy of the selected state, in units of the emitter frequency ω_a (dimensionless)" />
+                    <Row label={<>|<i>C</i>|²</>} k="selC" r={read} tip="photon (cavity) fraction of the state — dimensionless, 0–1; |C|²+|X|²=1" />
+                    <Row label={<>|<i>X</i>|²</>} k="selX" r={read} tip="matter (exciton) fraction of the state — dimensionless, 0–1; |C|²+|X|²=1" />
+                    <Row label={<><i>W</i>(0,0)</>} k="selW0" r={read} unit="" tip="Wigner value at the phase-space origin; negative = non-classical (vacuum floor is +1/π≈0.318)" />
                   </tbody></table>
                 </div>
               </div>
               <div className="pane">
-                <div className="pane-head">Panel G · Hopfield composition (selected) + photon-weight distribution — bright <i style={{ color: CYAN, fontStyle: "normal" }}>▪</i> matter <i style={{ color: RED, fontStyle: "normal" }}>▪</i> dark <i style={{ color: PURPLE, fontStyle: "normal" }}>▪</i></div>
+                <div className="pane-head">Panel G · Hopfield composition + photon-weight distribution · left bars: photon <i style={{ color: CYAN, fontStyle: "normal" }}>▪</i> / matter <i style={{ color: RED, fontStyle: "normal" }}>▪</i> · right histogram: bright polariton <i style={{ color: CYAN, fontStyle: "normal" }}>▪</i> / dark <i style={{ color: PURPLE, fontStyle: "normal" }}>▪</i></div>
+                <div className="pane-sub"><b>What:</b> <b>left</b> — is the clicked state more photon or matter (the two add to 1)? <b>right</b> — of all N+1 eigenstates, only 2 carry photon weight (the bright polaritons); the rest are dark and invisible to light.</div>
                 <canvas ref={hopBarsCanvas} className="cv" />
               </div>
             </>
@@ -1690,13 +1707,15 @@ export function App() {
             </>
           ) : regime === "collective" ? (
             <>
+              <RegimeBadge gEff={sp.g * Math.sqrt(sp.m)} wc={1} loss={Math.max(sp.sigma, 1e-9)} lossSym="σ" splitSym="2g√N" />
               <div className="pane">
-                <div className="pane-head">Spectrum at resonance</div>
+                <div className="pane-head">Spectrum at resonance · measured vs theory</div>
+                <div className="pane-sub">Ω_R (measured LP–UP gap) should equal 2g√N (theory) — they match here. All energies in units of ω_a (dimensionless).</div>
                 <table className="metrics"><tbody>
-                  <Row label={<>Ω<sub>R</sub></>} k="rabi" r={read} unit="ω_a" />
-                  <Row label={<>2<i>g</i>√<i>N</i></>} k="rabiT" r={read} unit="ω_a" />
-                  <Row label={<>dark states</>} k="ndark" r={read} />
-                  <Row label={<><i>σ</i>/Ω<sub>R</sub></>} k="ratio" r={read} />
+                  <Row label={<>Ω<sub>R</sub></>} k="rabi" r={read} unit="ω_a" tip="vacuum-Rabi (LP–UP) splitting MEASURED from the spectrum, in units of ω_a" />
+                  <Row label={<>2<i>g</i>√<i>N</i></>} k="rabiT" r={read} unit="ω_a" tip="collective Rabi splitting, THEORY (2g√N); should equal Ω_R — a self-consistency check" />
+                  <Row label={<>dark states</>} k="ndark" r={read} tip="number of subradiant 'dark' states (= N−1) that do not couple to the cavity photon" />
+                  <Row label={<><i>σ</i>/Ω<sub>R</sub></>} k="ratio" r={read} tip="disorder ÷ Rabi splitting (dimensionless); >1 ⇒ disorder smears out the polaritons" />
                 </tbody></table>
               </div>
               {Hud}
@@ -1860,12 +1879,13 @@ function regimeClass(gEff: number, wc: number, loss: number) {
   if (eta >= 0.1) return { label: "ULTRASTRONG", cls: "us", note: "η = g/ω_c ≥ 0.1 — RWA corrections become significant" };
   return { label: "STRONG", cls: "st", note: "2g > κ, η < 0.1 — resolvable vacuum-Rabi doublet, RWA valid" };
 }
-function RegimeBadge({ gEff, wc, loss, lossSym = "κ" }: { gEff: number; wc: number; loss: number; lossSym?: string }) {
+function RegimeBadge({ gEff, wc, loss, lossSym = "κ", splitSym = "2g" }: { gEff: number; wc: number; loss: number; lossSym?: string; splitSym?: string }) {
   const r = regimeClass(gEff, wc, loss);
+  const r2 = 2 * gEff / Math.max(1e-12, loss);
   return (
-    <div className={"regime-badge rb-" + r.cls} title={"coupling regime from η=g/ω_c and 2g/" + lossSym + ". " + r.note}>
+    <div className={"regime-badge rb-" + r.cls} title={"coupling regime from η=g/ω_c and " + splitSym + "/" + lossSym + ". " + r.note}>
       <div className="rb-top"><span className="rb-dot" /><span className="rb-label">{r.label} COUPLING</span></div>
-      <div className="rb-ratios"><span>η = g/ω_c = {(gEff / wc).toFixed(2)}</span><span>2g/{lossSym} = {(2 * gEff / Math.max(1e-9, loss)).toFixed(loss < 0.1 ? 0 : 1)}</span></div>
+      <div className="rb-ratios"><span>η = {splitSym === "2g" ? "g" : "g√N"}/ω_c = {(gEff / wc).toFixed(2)}</span><span>{splitSym}/{lossSym} = {r2 > 999 ? "≫1" : r2.toFixed(loss < 0.1 ? 0 : 1)}</span></div>
       <div className="rb-note">{r.note}</div>
     </div>
   );

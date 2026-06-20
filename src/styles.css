@@ -216,6 +216,7 @@ input[type="range"]:active::-moz-range-thumb { background: #ffffff; }
 .btn-row button:last-child { border-right: none; }
 .btn-row button:hover { background: var(--rule); color: var(--ink); }
 .btn-row button.on { background: var(--cyan); color: #000; font-weight: 700; }
+.btn-row button:disabled { opacity: 0.35; cursor: not-allowed; }
 
 /* tables / live diagnostics */
 table.metrics { width: 100%; border-collapse: collapse; }
