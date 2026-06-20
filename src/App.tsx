@@ -1308,7 +1308,7 @@ export function App() {
     ctx.lineWidth = 0.75; ctx.strokeStyle = AXIS; ctx.strokeRect(PP_ML, PP_MT, PP_PW, PP_PH);
     ctx.fillStyle = INK; ctx.font = "600 11px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
     ctx.fillText("time   t Ω_R / 2π   (Rabi cycles)", PP_ML + PP_PW / 2, PP_CH - 8);
-    ctx.save(); ctx.translate(13, PP_MT + PP_PH / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top"; ctx.fillText("population", 0, 0); ctx.restore();
+    ctx.save(); ctx.translate(13, PP_MT + PP_PH / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top"; ctx.fillText("population  P  (dimensionless, Σ=1)", 0, 0); ctx.restore();
   }
 
   function updateSimReadouts(d: { ph: number; br: number; dk: number }) {
@@ -1482,13 +1482,13 @@ export function App() {
             </Group>
           ) : regime === "dynamics" ? (
             <Group title="MOLECULAR ENSEMBLE" k="dyn" c={collapsed} t={toggle}>
-              <Field sym="N" texSym="(N)" label="ensemble size" value={dyn.m} min={2} max={40} step={1} unit="" int onChange={(m) => setDyn((s) => ({ ...s, m: Math.round(m) }))} />
-              <Field sym="g" texSym="(g_0/\omega_c)" label="Bare Vacuum Rabi Coupling" value={dyn.g} min={0.01} max={0.2} step={0.005} unit="" onChange={(g) => setDyn((s) => ({ ...s, g }))} />
-              <Field sym="σ" texSym="(\sigma_\omega/\omega_c)" label="Inhomogeneous Linewidth" value={dyn.sigma} min={0} max={0.25} step={0.005} unit="" onChange={(sigma) => setDyn((s) => ({ ...s, sigma }))} />
-              <Field sym="ω" texSym="(\hbar\omega_c)" label="Cavity Resonance Energy" value={wcEv} min={0.5} max={4} step={0.05} unit="eV" onChange={setWcEv} />
-              <Field sym="η" texSym="(\eta)" label="Orientational Order" value={dyn.order} min={0} max={1} step={0.02} unit="" onChange={(order) => setDyn((s) => ({ ...s, order }))} />
-              <Field sym="Γ" texSym="\Gamma_{\mathrm{spec}}/\omega_c" label="spectral linewidth (transmission only)" value={dyn.gamma} min={0.003} max={0.06} step={0.002} unit="" onChange={(gamma) => setDyn((s) => ({ ...s, gamma }))} />
-              <Field sym="θ" texSym="(\theta_E)" label="Transverse Polarization Angle" value={dyn.theta} min={0} max={90} step={1} unit="°" onChange={(theta) => setDyn((s) => ({ ...s, theta }))} />
+              <Field sym="N" texSym="(N)" label="ensemble size" value={dyn.m} min={2} max={40} step={1} unit="" int tip="number of two-level emitters N sharing the cavity (count). Ω_R = 2g√N grows with N." onChange={(m) => setDyn((s) => ({ ...s, m: Math.round(m) }))} />
+              <Field sym="g" texSym="(g_0/\omega_c)" label="bare Rabi coupling" value={dyn.g} min={0.01} max={0.2} step={0.005} unit="" tip="single-emitter light–matter coupling g₀ in units of ω_c (dimensionless). Collective splitting Ω_R = 2g₀√N." onChange={(g) => setDyn((s) => ({ ...s, g }))} />
+              <Field sym="σ" texSym="(\sigma_\omega/\omega_c)" label="inhomogeneous linewidth" value={dyn.sigma} min={0} max={0.25} step={0.005} unit="" tip="static spread of emitter energies in units of ω_c (dimensionless); locked at 0.03 by default for a clean doublet" onChange={(sigma) => setDyn((s) => ({ ...s, sigma }))} />
+              <Field sym="ω" texSym="(\hbar\omega_c)" label="cavity resonance energy" value={wcEv} min={0.5} max={4} step={0.05} unit="eV" tip="cavity photon energy ħω_c — sets the absolute meV scale for the readouts" onChange={setWcEv} />
+              <Field sym="η" texSym="(\eta)" label="orientational order" value={dyn.order} min={0} max={1} step={0.02} unit="" tip="alignment of the molecular transition dipoles (dimensionless, 0=random, 1=fully aligned); lower order = weaker collective coupling" onChange={(order) => setDyn((s) => ({ ...s, order }))} />
+              <Field sym="Γ" texSym="\Gamma_{\mathrm{spec}}/\omega_c" label="spectral linewidth (transmission only)" value={dyn.gamma} min={0.003} max={0.06} step={0.002} unit="" tip="peak width Γ in the transmission spectrum (dimensionless). NOTE: spectral-only — the live 3D/populations stay lossless." onChange={(gamma) => setDyn((s) => ({ ...s, gamma }))} />
+              <Field sym="θ" texSym="(\theta_E)" label="polarization angle" value={dyn.theta} min={0} max={90} step={1} unit="°" tip="angle of the cavity field polarization vs the dipoles (degrees); at 90° the coupling vanishes" onChange={(theta) => setDyn((s) => ({ ...s, theta }))} />
               <div className="btn-row">
                 <button className={polAnim ? "on" : ""} onClick={animatePol}>{polAnim ? "■ SWEEPING θ…" : "▶ ANIMATE θ SWEEP 0→90°"}</button>
               </div>
@@ -1651,6 +1651,7 @@ export function App() {
             <div className="dyn-bento">
               <div className="pane bento-3d">
                 <div className="pane-head">Live cavity · {dyn.m} two-level emitters + 1 photon · ψ(t)=Σ<sub>k</sub> c<sub>k</sub> e<sup>−iE<sub>k</sub>t</sup>φ<sub>k</sub>{inspect != null ? <> · <i style={{ color: "#fff", fontStyle: "normal" }}>inspecting eigenstate #{inspect}</i></> : <> · field <i style={{ color: CYAN, fontStyle: "normal" }}>cyan</i> · bright <i style={{ color: RED, fontStyle: "normal" }}>red</i> · dark <i style={{ color: PURPLE, fontStyle: "normal" }}>purple</i> · glow ∝ |ψ<sub>i</sub>(t)|²</>}</div>
+                <div className="pane-sub"><b>What:</b> one quantum sloshing photon↔molecules in real time — the cavity fills with cyan light when it holds the energy, the molecules glow red when they do. <b>Approx:</b> single-excitation subspace (1 photon total) · RWA · ideal mirrors (κ=0 — the live evolution is lossless).</div>
                 <div className="live3d"><Suspense fallback={<div className="cv-loading">loading 3D…</div>}><LiveCavityScene stateRef={dynState} tRef={simT} m={dyn.m} inspectRef={inspectRef} ensemble={ensemble} waist={MODE_WAIST} polTheta={dyn.theta * Math.PI / 180} controls={scene3d} /></Suspense></div>
                 <div className="transport">
                   <button className="tp-btn" title={playing ? "Pause" : "Play"} onClick={() => setPlaying((p) => !p)}>{playing ? "❚❚" : "▶"}</button>
@@ -1667,19 +1668,22 @@ export function App() {
                 <div className="leva-host"><LevaPanel store={sceneStore} fill flat collapsed={{ collapsed: levaCollapsed, onChange: setLevaCollapsed }} titleBar={{ title: "3D SCENE CONTROLS", drag: false, filter: false }} /></div>
               </div>
               <div className="pane">
-                <div className="pane-head">Populations — photon <i style={{ color: CYAN, fontStyle: "normal" }}>━</i> bright/superradiant <i style={{ color: RED, fontStyle: "normal" }}>━</i> dark/subradiant <i style={{ color: PURPLE, fontStyle: "normal" }}>━</i> · <i style={{ color: "#8b949e", fontStyle: "normal" }}>closed unitary evolution (Σ P<sub>k</sub>≡1); Γ enters the transmission spectrum only</i></div>
+                <div className="pane-head">Populations — photon <i style={{ color: CYAN, fontStyle: "normal" }}>━</i> bright/superradiant <i style={{ color: RED, fontStyle: "normal" }}>━</i> dark/subradiant <i style={{ color: PURPLE, fontStyle: "normal" }}>━</i> · <i style={{ color: "#8b949e", fontStyle: "normal" }}>closed unitary evolution (κ=γ=0 here); Γ enters the transmission spectrum only</i></div>
+                <div className="pane-sub"><b>What:</b> where the single excitation lives vs time — it sloshes photon↔bright at the vacuum-Rabi frequency Ω_R; the dark fraction stays flat (it doesn't couple to light). Undamped because the live model is lossless.</div>
                 <PlotWrap cw={PP_CW} ch={PP_CH} area={{ ml: PP_ML, mt: PP_MT, pw: PP_PW, ph: PP_PH }} inv={(px, py) => [(((px - PP_ML) / PP_PW) * 6).toFixed(2), (1 - (py - PP_MT) / PP_PH).toFixed(2)]}>
                   <canvas ref={popCanvas} className="cv" />
                 </PlotWrap>
               </div>
               <div className="pane">
                 <div className="pane-head">Dressed states · E<sub>k</sub> vs photon fraction · {inspect != null ? <span style={{ color: "#fff" }}>▸ #{inspect} on 3D · click to release</span> : <span>click a state to project onto molecules</span>}</div>
+                <div className="pane-sub"><b>What:</b> each dot is an eigenstate (polariton). The two at the right edge (photon-like) are the bright LP/UP polaritons; the dense stack pinned at the bare energy is the N−1 dark/invisible states. Click one to highlight it in 3D.</div>
                 <PlotWrap cw={HP_CW} ch={HP_CH} area={{ ml: HP_ML, mt: HP_MT, pw: HP_PW, ph: HP_PH }} inv={(px, py) => { const ds = dynState.current; if (!ds) return null; const emin = ds.eigs[0]!, emax = ds.eigs[ds.n - 1]!, pad = (emax - emin) * 0.14 + 1e-4, elo = emin - pad, ehi = emax + pad; return [((px - HP_ML) / HP_PW).toFixed(2), fmt(elo + (1 - (py - HP_MT) / HP_PH) * (ehi - elo), 3)]; }}>
                   <canvas ref={hopCanvas} className="cv click" onClick={onHopClick} />
                 </PlotWrap>
               </div>
               <div className="pane">
                 <div className="pane-head">Transmission S(ω) · |FFT of the photon return amplitude ⟨0|ψ(t)⟩, e<sup>−Γt</sup>-windowed|² · Lorentzian vacuum-Rabi doublet weighted by photon fraction</div>
+                <div className="pane-sub"><b>What:</b> what a transmission/PL spectrometer would measure — two polariton peaks (LP and UP); their separation is the Rabi splitting Ω_R. The width Γ is set by the spectral-linewidth slider (this is the only place loss enters).</div>
                 <PlotWrap cw={FF_CW} ch={FF_CH} area={{ ml: FF_ML, mt: FF_MT, pw: FF_PW, ph: FF_PH }} inv={(px, py) => { const ds = dynState.current; if (!ds) return null; const lo = ds.eigs[0]!, hi = ds.eigs[ds.n - 1]!, hw = Math.max(0.5, (hi - lo) * 0.7 + 0.08), wlo = WA - hw, whi = WA + hw; return [(wlo + ((px - FF_ML) / FF_PW) * (whi - wlo)).toFixed(3), (1 - (py - FF_MT) / FF_PH).toFixed(2)]; }}>
                   <canvas ref={fftCanvas} className="cv" />
                 </PlotWrap>
@@ -1757,21 +1761,24 @@ export function App() {
             </>
           ) : regime === "dynamics" ? (
             <>
+              <RegimeBadge gEff={dyn.g * Math.sqrt(dyn.m)} wc={1} loss={Math.max(dyn.sigma, 1e-9)} lossSym="σ" splitSym="2g√N" />
               <div className="pane">
-                <div className="pane-head">Live observables</div>
+                <div className="pane-head">Live observables · closed unitary Tavis–Cummings</div>
+                <div className="pane-sub">one excitation shared among 1 photon + N emitters; populations conserve Σ P_k = 1.</div>
                 <table className="metrics"><tbody>
-                  <Row label={<Tex t="\tau = \Omega_R t/2\pi" />} k="simTau" r={read} unit="cyc" />
-                  <Row label={<Tex t="t" />} k="simTfs" r={read} unit="fs" />
-                  <Row label={<Tex t="P_{\mathrm{photon}}" />} k="simPh" r={read} />
-                  <Row label={<Tex t="P_{\mathrm{bright}}" />} k="simBr" r={read} />
-                  <Row label={<Tex t="P_{\mathrm{dark}}" />} k="simDk" r={read} />
-                  <Row label={<Tex t="\Omega_R" />} k="simRabi" r={read} unit="ω_c" />
-                  <Row label={<Tex t="\Omega_R" />} k="simRabiMeV" r={read} unit="meV" />
-                  <Row label={<Tex t="\textstyle\sum_k P_k" />} k="simNorm" r={read} />
+                  <Row label={<Tex t="\tau = \Omega_R t/2\pi" />} k="simTau" r={read} unit="cyc" tip="elapsed time in vacuum-Rabi cycles (τ = Ω_R·t/2π); the master clock" />
+                  <Row label={<Tex t="t" />} k="simTfs" r={read} unit="fs" tip="elapsed physical time in femtoseconds" />
+                  <Row label={<Tex t="P_{\mathrm{photon}}" />} k="simPh" r={read} tip="probability the excitation is in the cavity photon (dimensionless, 0–1)" />
+                  <Row label={<Tex t="P_{\mathrm{bright}}" />} k="simBr" r={read} tip="probability in the bright/superradiant collective state that couples to light (dimensionless)" />
+                  <Row label={<Tex t="P_{\mathrm{dark}}" />} k="simDk" r={read} tip="probability in the dark/subradiant manifold (N−1 states invisible to the photon)" />
+                  <Row label={<>Ω<sub>R</sub> <span className="rb-chk" style={{ color: "var(--dim)" }}>norm.</span></>} k="simRabi" r={read} unit="ω_c" tip="vacuum-Rabi splitting (LP→UP gap = 2g√N on resonance), in units of ω_c (dimensionless)" />
+                  <Row label={<>Ω<sub>R</sub> <span className="rb-chk" style={{ color: "var(--dim)" }}>phys.</span></>} k="simRabiMeV" r={read} unit="meV" tip="the same vacuum-Rabi splitting in physical energy units (meV)" />
+                  <Row label={<Tex t="\textstyle\sum_k P_k" />} k="simNorm" r={read} tip="total probability — must stay 1 (closed unitary evolution, no loss)" />
                 </tbody></table>
               </div>
               <div className="pane">
-                <div className="pane-head">⟨i|Ĥ|j⟩ arrowhead · live · diag = ωᵢ, arrow = gᵢ (<i style={{ color: CYAN, fontStyle: "normal" }}>+</i>/<i style={{ color: RED, fontStyle: "normal" }}>−</i>)</div>
+                <div className="pane-head">⟨i|Ĥ|j⟩ arrowhead Hamiltonian · live</div>
+                <div className="pane-sub">diagonal = site energies ω<sub>i</sub> (photon + each emitter); the arrow row/column = couplings g<sub>i</sub>. Colour: <b style={{ color: CYAN }}>cyan +</b> / <b style={{ color: RED }}>red −</b>, brightness ∝ √|H<sub>ij</sub>|.</div>
                 <canvas ref={matCanvas} className="cv" style={{ margin: "0 auto" }} />
               </div>
               {Hud}

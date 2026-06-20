@@ -274,11 +274,11 @@ function CavReadout({ liveRef, stateRef, tRef }: { liveRef: MutableRefObject<Liv
   const R = (k: string) => (n: HTMLElement | null) => { el.current[k] = n; };
   return (
     <div className="cav-readout">
-      <div className="cr-title">VACUUM-RABI EXCHANGE</div>
+      <div className="cr-title" title="live energy exchange between the cavity photon and the molecules at the vacuum-Rabi frequency Ω_R">VACUUM-RABI EXCHANGE</div>
       <div className="cr-nums">
-        <span>Ω<sub>R</sub> <b ref={R("omR")}>—</b></span>
-        <span>T <b ref={R("per")}>—</b></span>
-        <span>φ <b ref={R("phi")}>—</b></span>
+        <span title="vacuum-Rabi splitting Ω_R = LP→UP gap = 2g√N, in units of ω_c">Ω<sub>R</sub> <b ref={R("omR")}>—</b> ω<sub>c</sub></span>
+        <span title="Rabi period T = 2π/Ω_R, in units of 1/ω_c">T <b ref={R("per")}>—</b> ω<sub>c</sub>⁻¹</span>
+        <span title="fraction through the current Rabi cycle (0–1)">φ <b ref={R("phi")}>—</b> cyc</span>
         <span className="cr-flow" ref={R("flow")}>—</span>
       </div>
       <div className="cr-bar">
