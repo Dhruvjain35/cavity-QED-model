@@ -10,7 +10,7 @@ import { OrbitControls, PerspectiveCamera } from "@react-three/drei";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { MutableRefObject, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
-import { antinodes, beamRadius, DBRMirror, LightRig, STAGE_OFFSET, STAGE_SCALE, W0 } from "./cavityKit";
+import { antinodes, beamRadius, DBRMirror, HALF, LightRig, STAGE_OFFSET, STAGE_SCALE, W0 } from "./cavityKit";
 import { clusterLayout } from "./ensemble";
 
 type Dyn = { eigs: Float64Array; vecs: Float64Array; n: number; c: Float64Array; bright: Float64Array; modeAmp: Float64Array; hist: unknown } | null;
@@ -191,7 +191,7 @@ uniform float uOpacity;
 uniform vec3  uColor;
 void main() {
   float rho = length(vUv - 0.5) * 2.0;
-  float intensity = exp(-12.5 * rho * rho);
+  float intensity = exp(-7.0 * rho * rho);   // fuller bright core so the lit antinodes read as solid light
   if (intensity < 0.004) discard;
   gl_FragColor = vec4(uColor, intensity * uOpacity);
 }`;
@@ -200,6 +200,22 @@ const makeFieldMaterial = () => new THREE.ShaderMaterial({
   uniforms: { uOpacity: { value: 0.12 }, uColor: { value: new THREE.Color(0x00ffff) } },
   transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending,
 });
+
+// Soft axial mode-glow filling the inter-mirror volume: a stretched ellipsoid whose OPACITY (not size)
+// tracks P_photon, so the cavity visibly "fills with light" as the excitation enters the field and goes dark
+// as it drains into the molecules — the energy sloshing made visceral while staying honest (intensity only,
+// mode volume fixed, the single delocalized photon occupies the whole standing wave at once).
+function ModeGlow({ ampRef, visible = true }: { ampRef: MutableRefObject<number>; visible?: boolean }) {
+  const ref = useRef<THREE.Mesh>(null);
+  useFrame(() => { const m = ref.current; if (m) (m.material as THREE.MeshBasicMaterial).opacity = 0.015 + 0.13 * Math.min(1, Math.max(0, ampRef.current)); });
+  if (!visible) return null;
+  return (
+    <mesh ref={ref} scale={[W0 * 1.7, W0 * 1.7, HALF * 0.92]}>
+      <sphereGeometry args={[1, 28, 20]} />
+      <meshBasicMaterial color="#15e8ff" transparent opacity={0} blending={THREE.AdditiveBlending} depthWrite={false} depthTest={false} toneMapped={false} />
+    </mesh>
+  );
+}
 
 function FieldDiscsShader({ ampRef, visible = true }: { ampRef: MutableRefObject<number>; visible?: boolean }) {
   const discs = useMemo(() => antinodes().map((z) => ({ z, r: beamRadius(z) * 2.2 })), []);
@@ -316,6 +332,7 @@ export function LiveCavityScene({ stateRef, tRef, inspectRef, m, ensemble, polTh
         <group rotation={LIVE_TILT} scale={STAGE_SCALE} position={STAGE_OFFSET}>
           <DBRMirror side={-1} />
           <DBRMirror side={1} />
+          <ModeGlow ampRef={fieldAmpRef} visible={controls.showFieldDiscs} />
           <NodalRings />
           <FieldDiscsShader ampRef={fieldAmpRef} visible={controls.showFieldDiscs} />
           <Molecules liveRef={liveRef} film={film} scale={controls.moleculeScale} />

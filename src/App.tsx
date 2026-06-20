@@ -146,6 +146,7 @@ export function App() {
   const dParams = useDebounced(params, 180), dSp = useDebounced(sp, 180), dCav = useDebounced(cav, 180);
   const dCavN = useDebounced(cavN, 180), dDyn = useDebounced(dyn, 180), dHtc = useDebounced(htc, 180);
   const singleDirty = useRef(true), singleFrame = useRef(0); // PERF: gate/throttle the SINGLE phase-space redraws
+  const redrawCurrent = useRef<() => void>(() => { }); // latest-closure redraw of the active regime (for resize)
   const [regLog, setRegLog] = useState<string[]>([]); // in-browser regression console output
   const [polAnim, setPolAnim] = useState(false); // polarization-sweep animation active
   const polRaf = useRef(0);
@@ -243,6 +244,25 @@ export function App() {
   }, [dParams]);
 
   useEffect(() => { if (regime === "single") singleDirty.current = true; }, [regime]); // PERF: redraw on tab switch even if paused
+
+  // Keep a fresh-closure redraw of the active regime so a window/layout resize re-renders the stretched
+  // plots at the new displayed resolution (sized() reads getBoundingClientRect, so a redraw = crisp re-fit).
+  redrawCurrent.current = () => {
+    if (!ready) return;
+    const r = regimeRef.current;
+    if (r === "collective") renderSpectrum();
+    else if (r === "cavity") { drawCavity(); drawStopband(); drawCollective(); }
+    else if (r === "vibronic") { drawHtc(); drawMatrix(); drawVibronicCompare(); drawDisorder(); }
+    else singleDirty.current = true; // single + dynamics run a RAF loop that redraws on the next frame
+  };
+  useEffect(() => {
+    let raf = 0;
+    const onResize = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(() => redrawCurrent.current()); };
+    window.addEventListener("resize", onResize);
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(onResize) : null;
+    const center = document.querySelector(".center"); if (ro && center) ro.observe(center);
+    return () => { window.removeEventListener("resize", onResize); ro?.disconnect(); cancelAnimationFrame(raf); };
+  }, []);
 
   useEffect(() => {
     if (regime !== "collective") return;
@@ -377,11 +397,19 @@ export function App() {
     navigator.clipboard?.writeText(window.location.href).catch(() => { });
   }
 
+  // HIGH-DPI CRISP RENDER: the backing store is sized to the canvas's ACTUAL displayed size × dpr (not the
+  // fixed logical size), so a pane that CSS-stretches a plot to fill the column still renders 1:1 with device
+  // pixels instead of upscaling a small buffer (the old cause of blurry graphs). The fixed logical coordinate
+  // system [0..w]×[0..h] is mapped onto the full buffer via setTransform, so every draw call is unchanged.
   function sized(cv: HTMLCanvasElement, w: number, h: number): CanvasRenderingContext2D {
-    const bw = Math.round(w * dpr.current);
-    if (cv.width !== bw) { cv.width = bw; cv.height = Math.round(h * dpr.current); cv.style.width = w + "px"; cv.style.height = h + "px"; }
+    if (cv.style.width !== w + "px") { cv.style.width = w + "px"; cv.style.height = h + "px"; } // logical hint; !important CSS overrides for stretched panes
+    const rect = cv.getBoundingClientRect();
+    const dw = rect.width > 0 ? rect.width : w, dh = rect.height > 0 ? rect.height : h;
+    const bw = Math.max(1, Math.round(dw * dpr.current)), bh = Math.max(1, Math.round(dh * dpr.current));
+    if (cv.width !== bw || cv.height !== bh) { cv.width = bw; cv.height = bh; }
     const ctx = cv.getContext("2d")!;
-    ctx.setTransform(dpr.current, 0, 0, dpr.current, 0, 0);
+    ctx.setTransform(bw / w, 0, 0, bh / h, 0, 0);
+    ctx.lineJoin = "round"; ctx.lineCap = "round"; // smooth curve joints
     return ctx;
   }
 
