@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "An open-source, in-browser cavity-QED simulator (Rust→WASM), validated bit-for-bit against QuTiP and numpy.",
+  "description": "An open-source, in-browser cavity-QED instrument (Rust→WASM): quantum core validated against QuTiP 5.3 / NumPy goldens; transfer-matrix optics & Holstein–Tavis–Cummings vibronics against closed-form analytic benchmarks.",
   "license": "MIT",
   "scripts": {
     "dev": "vite",

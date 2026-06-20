@@ -3,14 +3,23 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Cavity-QED phase-space simulator</title>
+    <title>Polariton Cavity-QED Lab — in-browser, validation-first</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=B612:ital,wght@0,400;0,700;1,400;1,700&family=B612+Mono:ital,wght@0,400;0,700;1,400&display=swap"
       rel="stylesheet"
     />
-    <meta name="description" content="An open-quantum-systems cavity-QED instrument: a single emitter in a lossy cavity, evolving under the Lindblad master equation, with its Wigner phase-space function computed live in a Rust→WASM core validated bit-for-bit against QuTiP." />
+    <meta name="description" content="An in-browser cavity-QED instrument. Quantum core (Jaynes–Cummings Lindblad, Tavis–Cummings spectrum, Wigner, partial trace) validated against QuTiP 5.3 / NumPy goldens; transfer-matrix optics & Holstein–Tavis–Cummings vibronics against closed-form analytic benchmarks. Rust→WebAssembly." />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Polariton Cavity-QED Lab" />
+    <meta property="og:description" content="In-browser cavity-QED: QuTiP-golden quantum core + analytic-validated optics & vibronics, compiled Rust→WASM. Live polariton spectra, Wigner phase space, and the 2g√N collective-coupling crossover." />
+    <meta property="og:image" content="https://sim-woad.vercel.app/og-card.png" />
+    <meta property="og:url" content="https://sim-woad.vercel.app" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Polariton Cavity-QED Lab" />
+    <meta name="twitter:description" content="In-browser cavity-QED: QuTiP-golden quantum core + analytic-validated optics & vibronics (Rust→WASM)." />
+    <meta name="twitter:image" content="https://sim-woad.vercel.app/og-card.png" />
   </head>
   <body>
     <div id="root"></div>

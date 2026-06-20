@@ -614,7 +614,7 @@ export function App() {
     // RIGHT — photon-weight distribution across all eigenstates
     const rx = HB_ML + HB_PW * 0.40, rw = HB_PW * 0.60, ry = HB_MT, rh = HB_PH, bw = rw / n;
     ctx.fillStyle = INK; ctx.textAlign = "left"; ctx.textBaseline = "bottom"; ctx.font = "600 9.5px 'JetBrains Mono','SF Mono',monospace";
-    ctx.fillText("PHOTON WEIGHT |⟨a|ψ_k⟩|² PER EIGENSTATE  ·  2 bright polaritons + M−1 dark", rx, ry - 6);
+    ctx.fillText("PHOTON WEIGHT |⟨a|ψ_k⟩|² PER EIGENSTATE  ·  2 bright polaritons + N−1 dark", rx, ry - 6);
     const yb = (p: number) => ry + rh - p * rh;
     for (const p of [0, 0.5, 1]) { ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5; seg(ctx, rx, yb(p), rx + rw, yb(p)); ctx.fillStyle = DIM; ctx.font = "500 8px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(p.toFixed(1), rx - 4, yb(p)); }
     for (let k = 0; k < n; k++) {
@@ -1230,7 +1230,7 @@ export function App() {
     ctx.fillStyle = INK; ctx.font = "600 11px 'JetBrains Mono','SF Mono',monospace"; ctx.textBaseline = "alphabetic"; ctx.fillText("inhomogeneous disorder  σ / ω_c", DI_ML + DI_PW / 2, DI_CH - 6);
     ctx.save(); ctx.translate(13, DI_MT + DI_PH / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top"; ctx.fillText("Γ_LP  (linewidth)", 0, 0); ctx.restore();
     ctx.font = "600 8.5px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "left"; ctx.textBaseline = "top";
-    ctx.fillStyle = CYAN; ctx.fillText("Γ_LP = κ/2 + γ/2 + σ²/2Ω_R", DI_ML + 6, DI_MT + 4);
+    ctx.fillStyle = CYAN; ctx.fillText("Γ_LP = γ + σ²/2Ω_R   (κ≈γ here)", DI_ML + 6, DI_MT + 4);
     ctx.fillStyle = "#8b949e"; ctx.fillText("bare  γ + σ", DI_ML + 6, DI_MT + 16);
   }
 
@@ -1310,9 +1310,9 @@ export function App() {
       };
       const M = 8, g = 0.05, gi = new Float64Array(M).fill(g); // identical resonant aligned emitters
       const md = arrowheadModesGi(WA, WA, 0, 1, gi);
-      check("Rabi split Ω_R=2g√M", md.eigs[md.n - 1]! - md.eigs[0]!, 2 * g * Math.sqrt(M), 1e-9);
+      check("Rabi split Ω_R=2g√N", md.eigs[md.n - 1]! - md.eigs[0]!, 2 * g * Math.sqrt(M), 1e-9);
       let nd = 0; for (let k = 0; k < md.n; k++) if (Math.abs(md.eigs[k]! - WA) < 1e-9 && md.vecs[k]! ** 2 < 1e-9) nd++;
-      check("dark states = M−1", nd, M - 1, 0.5);
+      check("dark states = N−1", nd, M - 1, 0.5);
       const S = 1, wv = 0.2, h0 = htcSpectrum(WA, WA, wv, Math.sqrt(S), 0, 28);
       let bi = 0, asum = 0; for (let i = 0; i < h0.eigs.length; i++) { asum += h0.absorption[i]!; if (h0.absorption[i]! > h0.absorption[bi]!) bi = i; }
       check("HTC 0–0 = ω_x−Sω_v", h0.eigs[bi]!, WA - S * wv, 1e-3);
@@ -1383,11 +1383,11 @@ export function App() {
             <div className="about-val-head">VALIDATION SCOPE — every module states its arbiter, nothing is asserted from memory</div>
             <div className="about-val-row"><span>JC Lindblad · TC arrowhead spectrum · Wigner · partial trace</span><span className="ok">QuTiP 5.3 / NumPy golden (≤ 1e-9)</span></div>
             <div className="about-val-row"><span>DBR transfer-matrix optics · HTC vibronics · FFT transmission</span><span className="an">closed-form analytic benchmark</span></div>
-            <div className="about-val-note">Full receipts: <span className="about-link">docs/VALIDATION.md</span> · 9 cargo tests + WASM-boundary recheck.</div>
+            <div className="about-val-note">Full receipts: <a className="about-link" href="https://github.com/Dhruvjain35/cavity-QED-model/blob/main/docs/VALIDATION.md" target="_blank" rel="noopener">docs/VALIDATION.md</a> · 22 cargo tests (11 QuTiP/NumPy-golden + 11 analytic) + the Node WASM-boundary recheck.</div>
           </div>
           <p>Model references: Sharma &amp; Chen, <i>J. Chem. Phys.</i> <b>161</b>, 104102 (2024); Mandal et al., <i>Chem. Rev.</i> <b>123</b>, 9786 (2023, HTC).</p>
-          <p>Developed in collaboration with Shravan Kumar Sharma, PhD Candidate, Dept. of Chemistry, University of Notre Dame — polariton chemistry + machine learning.</p>
-          <p>Dhruv Jain — independent researcher. <span className="about-link">github.com/Dhruvjain35/cavity-QED-model</span></p>
+          <p>Developed in collaboration with Shravan Kumar Sharma (PhD candidate, Hsing-Ta Chen group, Dept. of Chemistry, University of Notre Dame) — polariton chemistry + machine learning.</p>
+          <p>Dhruv Jain — independent researcher. <a className="about-link" href="https://github.com/Dhruvjain35/cavity-QED-model" target="_blank" rel="noopener">github.com/Dhruvjain35/cavity-QED-model</a></p>
         </div>
       ) : null}
 
@@ -1421,7 +1421,7 @@ export function App() {
             </>
           ) : regime === "collective" ? (
             <Group title="EMITTER ENSEMBLE" k="ens" c={collapsed} t={toggle}>
-              <Field sym="M" label="emitters" value={sp.m} min={1} max={80} step={1} unit="" int onChange={(m) => setSp((s) => ({ ...s, m: Math.round(m) }))} />
+              <Field sym="N" label="emitters" value={sp.m} min={1} max={80} step={1} unit="" int onChange={(m) => setSp((s) => ({ ...s, m: Math.round(m) }))} />
               <Field sym="g" label="coupling" value={sp.g} min={0.01} max={0.15} step={0.005} unit="ω_a" onChange={(g) => setSp((s) => ({ ...s, g }))} />
               <Field sym="σ" label="disorder" value={sp.sigma} min={0} max={0.2} step={0.005} unit="ω_a" onChange={(sigma) => setSp((s) => ({ ...s, sigma }))} />
               <div className="btn-row"><button onClick={() => setSp((s) => ({ ...s, seed: s.seed + 1 }))}>RE-ROLL σ</button></div>
@@ -1438,12 +1438,12 @@ export function App() {
             </Group>
           ) : regime === "dynamics" ? (
             <Group title="MOLECULAR ENSEMBLE" k="dyn" c={collapsed} t={toggle}>
-              <Field sym="N" texSym="(N)" label="Ensemble Dimension" value={dyn.m} min={2} max={40} step={1} unit="" int onChange={(m) => setDyn((s) => ({ ...s, m: Math.round(m) }))} />
+              <Field sym="N" texSym="(N)" label="ensemble size" value={dyn.m} min={2} max={40} step={1} unit="" int onChange={(m) => setDyn((s) => ({ ...s, m: Math.round(m) }))} />
               <Field sym="g" texSym="(g_0/\omega_c)" label="Bare Vacuum Rabi Coupling" value={dyn.g} min={0.01} max={0.2} step={0.005} unit="" onChange={(g) => setDyn((s) => ({ ...s, g }))} />
               <Field sym="σ" texSym="(\sigma_\omega/\omega_c)" label="Inhomogeneous Linewidth" value={dyn.sigma} min={0} max={0.25} step={0.005} unit="" onChange={(sigma) => setDyn((s) => ({ ...s, sigma }))} />
               <Field sym="ω" texSym="(\hbar\omega_c)" label="Cavity Resonance Energy" value={wcEv} min={0.5} max={4} step={0.05} unit="eV" onChange={setWcEv} />
               <Field sym="η" texSym="(\eta)" label="Orientational Order" value={dyn.order} min={0} max={1} step={0.02} unit="" onChange={(order) => setDyn((s) => ({ ...s, order }))} />
-              <Field sym="Γ" texSym="(\Gamma{=}\kappa{+}\gamma)" label="Total Dissipation Rate" value={dyn.gamma} min={0.003} max={0.06} step={0.002} unit="" onChange={(gamma) => setDyn((s) => ({ ...s, gamma }))} />
+              <Field sym="Γ" texSym="\Gamma_{\mathrm{spec}}/\omega_c" label="spectral linewidth (transmission only)" value={dyn.gamma} min={0.003} max={0.06} step={0.002} unit="" onChange={(gamma) => setDyn((s) => ({ ...s, gamma }))} />
               <Field sym="θ" texSym="(\theta_E)" label="Transverse Polarization Angle" value={dyn.theta} min={0} max={90} step={1} unit="°" onChange={(theta) => setDyn((s) => ({ ...s, theta }))} />
               <div className="btn-row">
                 <button className={polAnim ? "on" : ""} onClick={animatePol}>{polAnim ? "■ SWEEPING θ…" : "▶ ANIMATE θ SWEEP 0→90°"}</button>
@@ -1516,7 +1516,7 @@ export function App() {
           ) : regime === "collective" ? (
             <>
               <div className="pane">
-                <div className="pane-head">Panel D · polariton spectrum (M = {sp.m}) · click an eigenstate</div>
+                <div className="pane-head">Panel D · polariton spectrum (N = {sp.m}) · click an eigenstate</div>
                 <PlotWrap cw={P_CW} ch={P_CH} area={{ ml: P_ML, mt: P_MT, pw: P_W, ph: P_H }} inv={(px, py) => { const { emin, emax, R } = specMap.current; return [fmt(((px - P_ML) / P_W) * 2 * R - R, 2), fmt(emax - ((py - P_MT) / P_H) * (emax - emin), 3)]; }}>
                   <canvas ref={specCanvas} className="cv click" onClick={onSpecClick} />
                 </PlotWrap>
@@ -1582,7 +1582,7 @@ export function App() {
             </>
           ) : dynSweep ? (
             <div className="pane grow">
-              <div className="pane-head">Coupling sweep · polariton dispersion E(g) · {SWEEP_STEPS} diagonalizations · bright split as 2g√M, dark flat at ω_a · amber = live g</div>
+              <div className="pane-head">Coupling sweep · polariton dispersion E(g) · {SWEEP_STEPS} diagonalizations · bright split as 2g√N, dark flat at ω_a · amber = live g</div>
               <canvas ref={sweepCanvas} className="cv" />
             </div>
           ) : (
@@ -1605,7 +1605,7 @@ export function App() {
                 <div className="leva-host"><LevaPanel store={sceneStore} fill flat collapsed={{ collapsed: levaCollapsed, onChange: setLevaCollapsed }} titleBar={{ title: "3D SCENE CONTROLS", drag: false, filter: false }} /></div>
               </div>
               <div className="pane">
-                <div className="pane-head">Populations — photon <i style={{ color: CYAN, fontStyle: "normal" }}>━</i> bright/superradiant <i style={{ color: RED, fontStyle: "normal" }}>━</i> dark/subradiant <i style={{ color: PURPLE, fontStyle: "normal" }}>━</i></div>
+                <div className="pane-head">Populations — photon <i style={{ color: CYAN, fontStyle: "normal" }}>━</i> bright/superradiant <i style={{ color: RED, fontStyle: "normal" }}>━</i> dark/subradiant <i style={{ color: PURPLE, fontStyle: "normal" }}>━</i> · <i style={{ color: "#8b949e", fontStyle: "normal" }}>closed unitary evolution (Σ P<sub>k</sub>≡1); Γ enters the transmission spectrum only</i></div>
                 <PlotWrap cw={PP_CW} ch={PP_CH} area={{ ml: PP_ML, mt: PP_MT, pw: PP_PW, ph: PP_PH }} inv={(px, py) => [(((px - PP_ML) / PP_PW) * 6).toFixed(2), (1 - (py - PP_MT) / PP_PH).toFixed(2)]}>
                   <canvas ref={popCanvas} className="cv" />
                 </PlotWrap>
@@ -1617,7 +1617,7 @@ export function App() {
                 </PlotWrap>
               </div>
               <div className="pane">
-                <div className="pane-head">Transmission S(ω) · FFT of ⟨a†(t)a(0)⟩ with e<sup>−Γt</sup> damping · Lorentzian vacuum-Rabi doublet</div>
+                <div className="pane-head">Transmission S(ω) · |FFT of the photon return amplitude ⟨0|ψ(t)⟩, e<sup>−Γt</sup>-windowed|² · Lorentzian vacuum-Rabi doublet weighted by photon fraction</div>
                 <PlotWrap cw={FF_CW} ch={FF_CH} area={{ ml: FF_ML, mt: FF_MT, pw: FF_PW, ph: FF_PH }} inv={(px, py) => { const ds = dynState.current; if (!ds) return null; const lo = ds.eigs[0]!, hi = ds.eigs[ds.n - 1]!, hw = Math.max(0.5, (hi - lo) * 0.7 + 0.08), wlo = WA - hw, whi = WA + hw; return [(wlo + ((px - FF_ML) / FF_PW) * (whi - wlo)).toFixed(3), (1 - (py - FF_MT) / FF_PH).toFixed(2)]; }}>
                   <canvas ref={fftCanvas} className="cv" />
                 </PlotWrap>
@@ -1655,7 +1655,7 @@ export function App() {
                 <div className="pane-head">Spectrum at resonance</div>
                 <table className="metrics"><tbody>
                   <Row label={<>Ω<sub>R</sub></>} k="rabi" r={read} unit="ω_a" />
-                  <Row label={<>2<i>g</i>√<i>M</i></>} k="rabiT" r={read} unit="ω_a" />
+                  <Row label={<>2<i>g</i>√<i>N</i></>} k="rabiT" r={read} unit="ω_a" />
                   <Row label={<>dark states</>} k="ndark" r={read} />
                   <Row label={<><i>σ</i>/Ω<sub>R</sub></>} k="ratio" r={read} />
                 </tbody></table>
