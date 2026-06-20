@@ -118,6 +118,27 @@ body { background: var(--bg); color: var(--ink); font-family: var(--mono); font-
 .cav-tag-r { top: 10px; right: 10px; }
 .cav-tag-mode { top: 10px; left: 50%; transform: translateX(-50%); color: var(--cyan); }
 .cav-tag-mol { bottom: 10px; left: 50%; transform: translateX(-50%); color: var(--red); }
+/* docked live readout — the on-scene vacuum-Rabi energy partition (instrument CSS only: mono, tabular-nums,
+   hairlines, zero radius, no glassmorphism) */
+.cav-readout { position: absolute; left: 8px; bottom: 8px; width: 212px; background: rgba(8, 11, 17, 0.85); border: 1px solid var(--rule-2); padding: 6px 7px 7px; font-family: var(--mono); pointer-events: none; z-index: 30; }
+.cr-title { font-size: 8.5px; font-weight: 700; letter-spacing: 0.07em; color: var(--cyan); text-transform: uppercase; margin-bottom: 5px; }
+.cr-nums { display: flex; flex-wrap: wrap; gap: 8px; font-size: 9px; color: var(--dim); margin-bottom: 5px; }
+.cr-nums b { color: var(--ink); font-variant-numeric: tabular-nums; font-weight: 700; }
+.cr-nums sub { font-size: 0.74em; }
+.cr-flow { color: var(--amber); font-weight: 700; }
+.cr-bar { display: flex; width: 100%; height: 12px; border: 1px solid #000; margin-bottom: 5px; overflow: hidden; }
+.cr-seg { height: 100%; transition: width 0.05s linear; }
+.cr-seg.cr-p { background: var(--cyan); }
+.cr-seg.cr-b { background: var(--red); }
+.cr-seg.cr-d { background: var(--purple); }
+.cr-seg + .cr-seg { border-left: 1px solid #000; }
+.cr-legend { display: flex; flex-wrap: wrap; gap: 6px 9px; font-size: 8.5px; color: var(--dim); margin-bottom: 5px; }
+.cr-legend b { color: var(--ink); font-variant-numeric: tabular-nums; font-weight: 700; }
+.cr-legend i { display: inline-block; width: 8px; height: 8px; margin-right: 3px; vertical-align: middle; }
+.cr-legend .sw-p { background: var(--cyan); }
+.cr-legend .sw-b { background: var(--red); }
+.cr-legend .sw-d { background: var(--purple); }
+.cr-spark { display: block; width: 100%; height: 46px; border: 1px solid var(--rule); }
 @media (max-width: 1180px) { .dyn-bento { grid-template-columns: 1fr; grid-template-rows: auto auto auto auto; } .dyn-bento > .pane { border-right: none; } }
 
 /* legends */

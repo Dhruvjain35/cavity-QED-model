@@ -1588,7 +1588,7 @@ export function App() {
           ) : (
             <div className="dyn-bento">
               <div className="pane bento-3d">
-                <div className="pane-head">Live cavity · {dyn.m} naphthalene emitters + 1 photon{inspect != null ? <> · <i style={{ color: "#fff", fontStyle: "normal" }}>inspecting eigenstate #{inspect}</i></> : <> · matter <i style={{ color: RED, fontStyle: "normal" }}>red</i> · field <i style={{ color: CYAN, fontStyle: "normal" }}>cyan</i> · μ̂ shade = coupling</>}</div>
+                <div className="pane-head">Live cavity · {dyn.m} two-level emitters + 1 photon · ψ(t)=Σ<sub>k</sub> c<sub>k</sub> e<sup>−iE<sub>k</sub>t</sup>φ<sub>k</sub>{inspect != null ? <> · <i style={{ color: "#fff", fontStyle: "normal" }}>inspecting eigenstate #{inspect}</i></> : <> · field <i style={{ color: CYAN, fontStyle: "normal" }}>cyan</i> · bright <i style={{ color: RED, fontStyle: "normal" }}>red</i> · dark <i style={{ color: PURPLE, fontStyle: "normal" }}>purple</i> · glow ∝ |ψ<sub>i</sub>(t)|²</>}</div>
                 <div className="live3d"><Suspense fallback={<div className="cv-loading">loading 3D…</div>}><LiveCavityScene stateRef={dynState} tRef={simT} m={dyn.m} inspectRef={inspectRef} ensemble={ensemble} waist={MODE_WAIST} polTheta={dyn.theta * Math.PI / 180} controls={scene3d} /></Suspense></div>
                 <div className="transport">
                   <button className="tp-btn" title={playing ? "Pause" : "Play"} onClick={() => setPlaying((p) => !p)}>{playing ? "❚❚" : "▶"}</button>

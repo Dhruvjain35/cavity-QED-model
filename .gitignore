@@ -28,3 +28,6 @@ scratch/
 
 # throwaway verification scripts
 .ver/
+
+# temp workflow scripts
+.wf/
