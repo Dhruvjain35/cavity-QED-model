@@ -28,11 +28,20 @@ body { background: var(--bg); color: var(--ink); font-family: var(--mono); font-
 .copy-link:hover { background: #555; }
 .about-btn { width: 18px; height: 18px; background: #21262d; color: #888; border: 1px solid #30363d; cursor: pointer; font-size: 11px; line-height: 1; display: inline-flex; align-items: center; justify-content: center; padding: 0; }
 .about-btn:hover { color: #fff; }
-.about-overlay { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 400px; background: #0c0f12; border: 1px solid #30363d; padding: 16px; z-index: 1000; font-family: var(--mono); text-transform: none; }
+.about-overlay { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(440px, calc(100vw - 24px)); max-height: 90vh; overflow-y: auto; background: #0c0f12; border: 1px solid #30363d; padding: 16px; z-index: 1000; font-family: var(--mono); text-transform: none; }
 .about-overlay .about-title { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; color: var(--cyan); margin-bottom: 10px; }
 .about-overlay p { font-size: 10.5px; line-height: 1.55; color: var(--dim); margin: 0 0 9px; }
 .about-overlay p:last-child { margin-bottom: 0; }
 .about-link { color: var(--green); }
+/* honest, in-app validation scope — every module → its arbiter, mirroring docs/VALIDATION.md */
+.about-val { border: 1px solid var(--rule-2); margin: 0 0 10px; }
+.about-val-head { font-size: 8.5px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--faint); padding: 5px 7px; border-bottom: 1px solid var(--rule); }
+.about-val-row { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; padding: 5px 7px; font-size: 9.5px; line-height: 1.4; }
+.about-val-row + .about-val-row { border-top: 1px solid var(--rule-soft); }
+.about-val-row > span:first-child { color: var(--dim); }
+.about-val-row .ok { color: var(--green); font-weight: 600; white-space: nowrap; }
+.about-val-row .an { color: var(--amber); font-weight: 600; white-space: nowrap; }
+.about-val-note { font-size: 9px; color: var(--faint); padding: 5px 7px; border-top: 1px solid var(--rule); }
 .about-x { position: absolute; top: 8px; right: 10px; background: transparent; border: none; color: var(--dim); font-size: 16px; cursor: pointer; line-height: 1; padding: 0; }
 .about-x:hover { color: #fff; }
 
@@ -61,7 +70,13 @@ body { background: var(--bg); color: var(--ink); font-family: var(--mono); font-
 /* 3.E · panel-header hierarchy — cyan hairline above every panel title */
 .pane-head { font-family: var(--mono); font-size: 9px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: #888; margin-bottom: 3px; line-height: 1.35; border-top: 1px solid #00ffff22; padding-top: 4px; }
 .pane-head i { font-style: normal; }
-.cv { display: block; width: 100%; height: auto; }
+.cv { display: block; width: 100%; height: auto; max-width: 100%; }
+/* desktop: single-canvas time-series / spectrum panels stretch to fill the column width (kills the
+   right-hand black gap). Scoped to a plotwrap that is a DIRECT child of a center pane — so the phase-row
+   (two maps), the bridge, and the square Bloch (all nested differently) are untouched. !important beats
+   the inline px sized() writes; the backing store stays fixed and PlotWrap rescales hover by cw/rect. */
+.center > .pane > .plotwrap { display: block; width: 100%; }
+.center > .pane > .plotwrap > .cv { width: 100% !important; height: auto !important; }
 .tex { display: inline-block; line-height: 1; }
 .tex .katex { font-size: 1.0em; color: inherit; }
 .cv.click { cursor: crosshair; }
@@ -184,3 +199,27 @@ table.metrics { width: 100%; border-collapse: collapse; }
 .rail::-webkit-scrollbar, .dock::-webkit-scrollbar, .center::-webkit-scrollbar, .reg-console::-webkit-scrollbar { width: 7px; height: 7px; }
 .rail::-webkit-scrollbar-thumb, .dock::-webkit-scrollbar-thumb, .center::-webkit-scrollbar-thumb, .reg-console::-webkit-scrollbar-thumb { background: var(--rule-2); }
 .rail::-webkit-scrollbar-track, .dock::-webkit-scrollbar-track, .center::-webkit-scrollbar-track { background: transparent; }
+
+/* ── responsive: phones & narrow windows ──────────────────────────────────────────────────────────
+   Root cause of the old horizontal-scroll/clip on phones: sized() writes a fixed inline px width on
+   every canvas, overriding the responsive stylesheet. Below the single-column breakpoint we force the
+   canvases back to fluid (100% of the column, auto height, aspect preserved) so the page only ever
+   scrolls vertically, and we enlarge the DYNAMICS transport to real touch targets. */
+@media (max-width: 1040px) {
+  .cv { width: 100% !important; height: auto !important; max-height: none !important; }
+  .center > .pane.grow { display: block; }                 /* size to content; the column scrolls */
+  .center > .pane.grow > .phase-row { flex-wrap: wrap; }
+  .center > .pane.grow > .phase-row > .cv { max-width: 100%; }
+  .phase-row { flex-direction: column; }
+  .bridge { flex-direction: column; }
+  .dyn-bento .cv, .dyn-bento .plotwrap { margin: 4px auto; }
+  .leva-host { width: min(214px, 46vw); }
+}
+@media (max-width: 640px) {
+  .topbar { height: auto; flex-wrap: wrap; padding: 3px 8px; row-gap: 2px; }
+  .topbar .status { font-size: 8.5px; }
+  .transport { flex-wrap: wrap; row-gap: 5px; }
+  .transport .tp-btn { width: 40px; height: 38px; font-size: 13px; }
+  .transport .tp-speed { font-size: 12px; padding: 6px 5px; }
+  .transport .tp-time { font-size: 11px; }
+}

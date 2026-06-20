@@ -24,3 +24,7 @@ scratch/
 # WASM web build committed so Vercel/any clone can build without a Rust toolchain
 !wasm/pkg-web/
 !wasm/pkg-web/**
+.vercel
+
+# throwaway verification scripts
+.ver/

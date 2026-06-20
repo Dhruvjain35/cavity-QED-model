@@ -35,7 +35,7 @@ const DFULL = 32; // 2·N_FOCK — full joint density matrix
 const WA = 1.0, N_DELTA = 121, N_FOCK = 16, NB = 80;
 
 // ── figure layouts (logical px) ──
-const W_ML = 42, W_MR = 12, W_MT = 14, W_MB = 34, W_S = 236, NHG = 72;
+const W_ML = 42, W_MR = 66, W_MT = 14, W_MB = 34, W_S = 236, NHG = 72; // W_MR holds the colorbar + its tick labels
 const W_CW = W_ML + W_S + W_MR, W_CH = W_MT + W_S + W_MB, W_TICKS = [-4, -2, 0, 2, 4];
 const S_ML = 38, S_MR = 10, S_MT = 10, S_PW = 512, S_PH = 118, S_MB = 22;
 const S_CW = S_ML + S_PW + S_MR, S_CH = S_MT + S_PH + S_MB;
@@ -43,8 +43,6 @@ const DC_ML = 46, DC_MR = 14, DC_MT = 14, DC_PW = 1040, DC_PH = 250, DC_MB = 28;
 const DC_CW = DC_ML + DC_PW + DC_MR, DC_CH = DC_MT + DC_PH + DC_MB;
 const BL_ML = 46, BL_MR = 16, BL_MT = 16, BL_MB = 30, BL_S = 380; // 4.A Bloch-projection square (fills its panel)
 const BL_CW = BL_ML + BL_S + BL_MR, BL_CH = BL_MT + BL_S + BL_MB;
-const TR_ML = 50, TR_MR = 16, TR_MT = 16, TR_MB = 32, TR_PW = 520, TR_PH = 168; // 4.B cavity transfer function
-const TR_CW = TR_ML + TR_PW + TR_MR, TR_CH = TR_MT + TR_PH + TR_MB;
 const DI_ML = 54, DI_MR = 16, DI_MT = 18, DI_MB = 34, DI_PW = 520, DI_PH = 184; // 4.C disorder broadening
 const DI_CW = DI_ML + DI_PW + DI_MR, DI_CH = DI_MT + DI_PH + DI_MB;
 const HB_ML = 14, HB_MR = 14, HB_MT = 30, HB_PW = 1040, HB_PH = 200, HB_MB = 26; // fits Panel G with the x-axis label inside the 900px fold (FIX 5)
@@ -95,27 +93,32 @@ const fmt = (v: number, d: number) => minus(v.toFixed(d));
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 const lin = (a: number, b: number, s: number) => Math.round(a + (b - a) * s);
 
-// dark diverging Wigner colormap: 0 → deep slate #101726, +W → cobalt, −W (non-classical) → crimson
+// dark diverging Wigner ramp (single source of truth for BOTH the field map and its colorbar):
+// t=0 → crimson (−W, non-classical), t=0.5 → deep slate, t=1 → cobalt (+W). t is the normalised
+// position in [−wmax,+wmax], i.e. t=(W+wmax)/2wmax.
+function wignerRGB(t: number): [number, number, number] {
+  t = clamp(t, 0, 1);
+  if (t < 0.5) { const s = t / 0.5; return [lin(255, 16, s), lin(45, 23, s), lin(85, 38, s)]; }
+  const s = (t - 0.5) / 0.5; return [lin(16, 56, s), lin(23, 122, s), lin(38, 246, s)];
+}
+// dark sequential Husimi ramp (Q ≥ 0): t=0 → panel slate, t=1 → pale cyan. t = Q/qmax.
+function husimiRGB(t: number): [number, number, number] {
+  t = clamp(t, 0, 1);
+  if (t < 0.5) { const s = t / 0.5; return [lin(11, 34, s), lin(16, 211, s), lin(28, 238, s)]; }
+  const s = (t - 0.5) / 0.5; return [lin(34, 224, s), lin(211, 247, s), lin(238, 255, s)];
+}
 function darkWigner(w: Float64Array, n: number, wmax: number): ImageData {
   const px = new Uint8ClampedArray(n * n * 4);
   for (let i = 0; i < w.length; i++) {
-    const t = clamp((w[i]! + wmax) / (2 * wmax), 0, 1);
-    let r: number, g: number, b: number;
-    if (t < 0.5) { const s = t / 0.5; r = lin(255, 16, s); g = lin(45, 23, s); b = lin(85, 38, s); }
-    else { const s = (t - 0.5) / 0.5; r = lin(16, 56, s); g = lin(23, 122, s); b = lin(38, 246, s); }
+    const [r, g, b] = wignerRGB((w[i]! + wmax) / (2 * wmax));
     const o = i * 4; px[o] = r; px[o + 1] = g; px[o + 2] = b; px[o + 3] = 255;
   }
   return new ImageData(px, n, n);
 }
-
-// dark sequential Husimi Q map (Q ≥ 0): 0 → panel slate, rising → cyan → pale
 function husimiImage(q: Float64Array, n: number, qmax: number): ImageData {
   const px = new Uint8ClampedArray(n * n * 4);
   for (let i = 0; i < q.length; i++) {
-    const t = clamp(q[i]! / qmax, 0, 1);
-    let r: number, g: number, b: number;
-    if (t < 0.5) { const s = t / 0.5; r = lin(11, 34, s); g = lin(16, 211, s); b = lin(28, 238, s); }
-    else { const s = (t - 0.5) / 0.5; r = lin(34, 224, s); g = lin(211, 247, s); b = lin(238, 255, s); }
+    const [r, g, b] = husimiRGB(q[i]! / qmax);
     const o = i * 4; px[o] = r; px[o + 1] = g; px[o + 2] = b; px[o + 3] = 255;
   }
   return new ImageData(px, n, n);
@@ -132,7 +135,7 @@ export function App() {
   const [sp, setSp] = useState({ m: 20, g: 0.1, sigma: 0.0, seed: 1 });
   const [cav, setCav] = useState({ lambda: 550, nHi: 2.5, nLo: 1.46, pairs: 4, nCav: 1.6, g: 1.6 });
   const [cavN, setCavN] = useState(1); // CAVITY: emitter ensemble size N for the 2g√N-vs-κ collective-coupling demo
-  const [htc, setHtc] = useState({ wv: 0.15, S: 1.0, g: 0.05, N: 1, gamma: 0.012 }); // HTC: ω_v, Huang-Rhys S, cavity g, collective N, broadening γ (units of ω_c)
+  const [htc, setHtc] = useState({ wv: 0.15, S: 1.0, g: 0.05, N: 3, gamma: 0.012 }); // HTC: ω_v, Huang-Rhys S, cavity g, collective N, broadening γ (units of ω_c). N=3 (the explicit-diagonalization cap) so the disorder panel opens in the collective regime where motional narrowing actually dominates (Ω_R=0.17 ⇒ crossover σ=Ω_R sits mid-plot), not the N=1 sliver where σ²/2Ω_R blows up.
   const [dyn, setDyn] = useState({ m: 12, g: 0.06, sigma: 0.0, seed: 1, init: 0, order: 1.0, gamma: 0.022, theta: 0 });
   const [inspect, setInspect] = useState<number | null>(null); // clicked dressed eigenstate (UI badge)
   const [dynSweep, setDynSweep] = useState(false); // coupling-sweep dispersion mode (replaces the 3D)
@@ -177,7 +180,6 @@ export function App() {
   const cavCanvas = useRef<HTMLCanvasElement>(null);
   const stopCanvas = useRef<HTMLCanvasElement>(null);   // R(λ) stopband
   const collCanvas = useRef<HTMLCanvasElement>(null);   // 2g√N vs κ collective coupling
-  const transferCanvas = useRef<HTMLCanvasElement>(null); // 4.B
   const disorderCanvas = useRef<HTMLCanvasElement>(null); // 4.C
   const popCanvas = useRef<HTMLCanvasElement>(null);
   const hopCanvas = useRef<HTMLCanvasElement>(null);
@@ -262,7 +264,7 @@ export function App() {
 
   useEffect(() => {
     if (regime !== "cavity") return;
-    loadWasm().then(() => { drawCavity(); drawStopband(); drawTransfer(); drawCollective(); });
+    loadWasm().then(() => { drawCavity(); drawStopband(); drawCollective(); });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [regime, dCav, dCavN]);
 
@@ -383,6 +385,17 @@ export function App() {
     return ctx;
   }
 
+  // vertical colorbar reusing the EXACT field ramp, so colour → value is readable (the ±1/π Fock floor
+  // for W; the auto-scaled peak for Q). `ticks` give the value label at fractional height f∈[0,1].
+  function colorbar(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, ramp: (t: number) => [number, number, number], ticks: { f: number; label: string }[], caption: string) {
+    for (let py = 0; py < h; py++) { const [r, g, b] = ramp(1 - py / (h - 1)); ctx.fillStyle = `rgb(${r},${g},${b})`; ctx.fillRect(x, y + py, w, 1); }
+    ctx.strokeStyle = AXIS; ctx.lineWidth = 0.75; ctx.strokeRect(x, y, w, h);
+    ctx.fillStyle = DIM; ctx.font = "500 8px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+    for (const tk of ticks) { const py = y + (1 - tk.f) * h; seg(ctx, x + w, py, x + w + 3, py); ctx.fillText(tk.label, x + w + 5, py); }
+    ctx.fillStyle = INK; ctx.font = "600 10px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+    ctx.fillText(caption, x + w / 2, y - 3);
+  }
+
   function drawWigner(q: Quantum) {
     const cv = wigCanvas.current, off = offscreen.current;
     if (!cv || !off) return;
@@ -393,6 +406,9 @@ export function App() {
     off.getContext("2d")!.putImageData(darkWigner(w, N_GRID, wmax), 0, 0);
     ctx.imageSmoothingEnabled = true;
     ctx.save(); ctx.translate(W_ML, W_MT + W_S); ctx.scale(W_S / N_GRID, -W_S / N_GRID); ctx.drawImage(off, 0, 0); ctx.restore();
+    colorbar(ctx, W_ML + W_S + 16, W_MT, 11, W_S, wignerRGB,
+      scaleRef.current ? [{ f: 1, label: "+1/π" }, { f: 0.5, label: "0" }, { f: 0, label: "−1/π" }]
+        : [{ f: 1, label: "+" + wmax.toFixed(2) }, { f: 0.5, label: "0" }, { f: 0, label: minus("-" + wmax.toFixed(2)) }], "W");
     const xPx = (x: number) => W_ML + ((x + X_RANGE) / (2 * X_RANGE)) * W_S;
     const pPx = (p: number) => W_MT + ((X_RANGE - p) / (2 * X_RANGE)) * W_S;
     ctx.lineWidth = 0.5; ctx.strokeStyle = GRIDLINE;
@@ -418,6 +434,8 @@ export function App() {
     off.getContext("2d")!.putImageData(husimiImage(qg, NHG, qmax), 0, 0);
     ctx.imageSmoothingEnabled = true;
     ctx.save(); ctx.translate(W_ML, W_MT + W_S); ctx.scale(W_S / NHG, -W_S / NHG); ctx.drawImage(off, 0, 0); ctx.restore();
+    colorbar(ctx, W_ML + W_S + 16, W_MT, 11, W_S, husimiRGB,
+      [{ f: 1, label: qmax.toFixed(2) }, { f: 0.5, label: (qmax / 2).toFixed(2) }, { f: 0, label: "0" }], "Q");
     const xPx = (x: number) => W_ML + ((x + X_RANGE) / (2 * X_RANGE)) * W_S;
     const pPx = (p: number) => W_MT + ((X_RANGE - p) / (2 * X_RANGE)) * W_S;
     ctx.lineWidth = 0.5; ctx.strokeStyle = GRIDLINE;
@@ -487,7 +505,7 @@ export function App() {
       trace(3, smax, AMBER);   // entropy S(t), normalized to its window max
       const q = quantum.current; if (q) { const tc = ((q.time % T) + T) % T; ctx.strokeStyle = "rgba(255,255,255,0.5)"; ctx.lineWidth = 1; seg(ctx, xOf(tc), DC_MT, xOf(tc), DC_MT + DC_PH); }
       ctx.fillStyle = DIM; ctx.textAlign = "center"; ctx.textBaseline = "top"; for (const t of [0, T / 3, (2 * T) / 3, T]) ctx.fillText(t.toFixed(0), xOf(t), DC_MT + DC_PH + 5);
-      ctx.fillStyle = AMBER; ctx.textAlign = "left"; ctx.textBaseline = "top"; ctx.fillText(`S max = ${smax.toFixed(2)}`, DC_ML + 5, DC_MT + 4);
+      ctx.fillStyle = AMBER; ctx.textAlign = "left"; ctx.textBaseline = "top"; ctx.fillText(`S (nats, ÷${smax.toFixed(2)} max=ln2)   ·   purity ∈ [0,1]`, DC_ML + 5, DC_MT + 4);
     }
     ctx.strokeStyle = AXIS; ctx.lineWidth = 0.75; ctx.strokeRect(DC_ML, DC_MT, DC_PW, DC_PH);
     ctx.fillStyle = INK; ctx.font = "600 11px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic"; ctx.fillText("time  t  (ω_c⁻¹)", DC_ML + DC_PW / 2, DC_CH - 5);
@@ -527,8 +545,10 @@ export function App() {
 
   // |ρ| of the joint cavity⊗emitter state. The single-excitation JC dynamics live in the low-Fock
   // manifold (|0,g⟩,|0,e⟩,|1,g⟩,…), so the full 32×32 is ~0 outside the top-left corner — we crop to
-  // that populated block (cavity-first index 2n+atom) and render it as an explicit grid. Normalized so
-  // the largest OFF-DIAGONAL coherence saturates (the "coherences pulse + decay" the panel promises).
+  // that populated block (cavity-first index 2n+atom) and render it as an explicit grid. Intensity is on
+  // a FAITHFUL global |ρ| scale — normalized to the largest |ρ_ij| in-frame (a population), so the
+  // diagonal reads brightest and the off-diagonal vacuum-Rabi coherence is the dimmer pair that pulses
+  // cyan↔red and fades as κ,γ damp it. (A faithful magnitude scale, not a per-element auto-stretch.)
   const RHO_BLOCK = 8;
   function drawRho(q: Quantum) {
     const cv = rhoCanvas.current; if (!cv) return;
@@ -699,7 +719,7 @@ export function App() {
     set("rabi", (mid.eigs[mid.eigs.length - 1]! - mid.eigs[0]!).toFixed(4));
     const theory = 2 * sp.g * Math.sqrt(sp.m);
     set("rabiT", theory.toFixed(4));
-    set("ndark", `${Array.from(mid.photon).filter((p) => p < 0.01).length}`);
+    set("ndark", `${Array.from(mid.photon).filter((p) => p < 0.02).length}`); // DARK_PF=0.02 — same threshold the dispersion fan + on-plot count use (lines ~654/665)
     set("ratio", (sp.sigma / (theory || 1e-9)).toFixed(3));
   }
 
@@ -889,51 +909,6 @@ export function App() {
     for (const p of [0, 2, 4, 6, 8]) { const x = xOf(p); seg(ctx, x, RB_MT + RB_PH, x, RB_MT + RB_PH + 3); ctx.fillText(`10${p === 0 ? "⁰" : p === 2 ? "²" : p === 4 ? "⁴" : p === 6 ? "⁶" : "⁸"}`, x, RB_MT + RB_PH + 6); }
     ctx.fillStyle = INK; ctx.font = "600 12px 'JetBrains Mono','SF Mono',monospace"; ctx.textBaseline = "alphabetic"; ctx.fillText("emitter number N", RB_ML + RB_PW / 2, RB_CH - 6);
     ctx.save(); ctx.translate(11, RB_MT + RB_PH / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top"; ctx.fillText("Ω_R = 2g√N (meV)", 0, 0); ctx.restore();
-  }
-
-  // 4.B (CAVITY) · cavity transfer function |T(ω)|² over 0.5→1.5 ω_c. The bare Fabry–Pérot resonance is
-  // a Lorentzian of linewidth κ set by the DBR finesse F (from the TMM reflectance); turning on the
-  // atom–cavity coupling g splits it into the vacuum-Rabi doublet at ω_c ± gκ (separation 2g). Faint
-  // FSR markers bracket the longitudinal-mode comb.
-  function drawTransfer() {
-    const cv = transferCanvas.current; if (!cv) return;
-    const ctx = sized(cv, TR_CW, TR_CH);
-    ctx.fillStyle = PANEL; ctx.fillRect(0, 0, TR_CW, TR_CH);
-    const wlo = 0.5, whi = 1.5, FSR = 0.5;
-    // Cavity linewidth κ from the DBR mirror finesse (R_mirror → 1 with more pairs × higher index
-    // contrast). cavityReflectance returns the cavity's ~transmissive on-resonance value, so the mirror
-    // reflectance is modelled here. κ is floored so the vacuum-Rabi doublet stays legible across 0.5–1.5.
-    const Rm = Math.max(0.05, Math.min(0.9995, 1 - 4 * Math.pow(cav.nLo / cav.nHi, 2 * cav.pairs)));
-    const Fmir = Math.PI * Math.sqrt(Rm) / (1 - Rm);
-    const kappa = clamp(FSR / Fmir, 0.018, 0.13);                 // cavity linewidth (FWHM, ω_c units)
-    const F = FSR / kappa;                                        // effective finesse for the shown κ
-    const g = cav.g * kappa;                                      // half-splitting (cav.g is in units of κ)
-    const xOf = (w: number) => TR_ML + (w - wlo) / (whi - wlo) * TR_PW, yOf = (t: number) => TR_MT + (1 - t) * TR_PH;
-    const lor = (w: number, c: number) => 1 / (1 + ((w - c) / (kappa / 2)) ** 2);
-    const bare = (w: number) => lor(w, 1.0), coupled = (w: number) => Math.max(lor(w, 1 - g), lor(w, 1 + g));
-    ctx.font = "500 9px 'JetBrains Mono','SF Mono',monospace";
-    for (const t of [0, 0.5, 1]) { ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5; seg(ctx, TR_ML, yOf(t), TR_ML + TR_PW, yOf(t)); ctx.fillStyle = DIM; ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(t.toFixed(1), TR_ML - 5, yOf(t)); }
-    // FSR markers (adjacent longitudinal modes at ω_c ± FSR) + central mode
-    for (const w of [wlo, 1.0, whi]) { ctx.strokeStyle = "#ffffff22"; ctx.setLineDash([3, 3]); ctx.lineWidth = 1; seg(ctx, xOf(w), TR_MT, xOf(w), TR_MT + TR_PH); ctx.setLineDash([]); }
-    ctx.fillStyle = "#ffffff55"; ctx.font = "500 8px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText("← FSR →", xOf(0.75), TR_MT + 2);
-    const SAMP = 600;
-    const plot = (fn: (w: number) => number, stroke: string, dash: boolean) => {
-      ctx.strokeStyle = stroke; ctx.lineWidth = dash ? 1.2 : 1.8; ctx.setLineDash(dash ? [4, 3] : []); ctx.beginPath();
-      for (let i = 0; i <= SAMP; i++) { const w = wlo + (whi - wlo) * i / SAMP, x = xOf(w), y = yOf(Math.min(1, fn(w))); i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); }
-      ctx.stroke(); ctx.setLineDash([]);
-    };
-    plot(bare, "rgba(148,163,184,0.7)", true);   // bare cavity
-    plot(coupled, CYAN, false);                   // coupled doublet
-    ctx.strokeStyle = AXIS; ctx.lineWidth = 0.75; ctx.strokeRect(TR_ML, TR_MT, TR_PW, TR_PH);
-    ctx.fillStyle = DIM; ctx.font = "500 9px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "center"; ctx.textBaseline = "top";
-    for (let w = 0.5; w <= 1.5001; w += 0.25) { seg(ctx, xOf(w), TR_MT + TR_PH, xOf(w), TR_MT + TR_PH + 3); ctx.fillText(w.toFixed(2), xOf(w), TR_MT + TR_PH + 6); }
-    ctx.fillStyle = INK; ctx.font = "600 11px 'JetBrains Mono','SF Mono',monospace"; ctx.textBaseline = "alphabetic"; ctx.fillText("ω / ω_c", TR_ML + TR_PW / 2, TR_CH - 6);
-    ctx.save(); ctx.translate(12, TR_MT + TR_PH / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top"; ctx.fillText("|T(ω)|²", 0, 0); ctx.restore();
-    // readout: finesse, linewidth, splitting
-    ctx.font = "600 9px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "right"; ctx.textBaseline = "top";
-    ctx.fillStyle = "#8b949e"; ctx.fillText("bare cavity", TR_ML + TR_PW - 4, TR_MT + 3);
-    ctx.fillStyle = CYAN; ctx.fillText(`coupled · 2g = ${(2 * g).toFixed(3)} ω_c`, TR_ML + TR_PW - 4, TR_MT + 15);
-    ctx.fillStyle = DIM; ctx.fillText(`F = ${Math.round(F)}   κ = ${kappa.toFixed(3)} ω_c`, TR_ML + TR_PW - 4, TR_MT + 27);
   }
 
   // ── live single-excitation dynamics: photon ⊕ N molecules in the dressed (polariton) basis ──
@@ -1264,6 +1239,7 @@ export function App() {
     const Er = htc.S * htc.wv;
     set("htS", htc.S.toFixed(3)); set("htEr", Math.round(toMeV(Er)).toString());
     set("htSbright", (htc.S / htc.N).toFixed(3)); set("htRabi", Math.round(toMeV(2 * htc.g * Math.sqrt(htc.N))).toString());
+    set("htRabiEff", Math.round(toMeV(2 * htc.g * Math.sqrt(htc.N) * Math.exp(-htc.S / 2))).toString()); // polaron-renormalized splitting actually drawn in the 0-0 doublet
     set("htNvib", String(htcData.current?.nVib ?? 0));
   }
 
@@ -1393,7 +1369,7 @@ export function App() {
       <div className="topbar">
         <span className="brand">POLARITON CAVITY-QED LAB</span>
         <span className="topbar-right">
-          <span className="status"><span className="live">●</span> {ready ? "WASM CORE LIVE" : "LOADING…"} · VALIDATED vs QuTiP 5.3 / NUMPY</span>
+          <span className="status"><span className="live">●</span> {ready ? "WASM CORE LIVE" : "LOADING…"} · QuTiP-GOLDEN CORE + ANALYTIC-VALIDATED OPTICS/VIBRONICS</span>
           <button className="copy-link" onClick={copyLink} title="copy a shareable link to this exact configuration">{copied ? "COPIED" : "COPY LINK"}</button>
           <button className="about-btn" onClick={() => setAbout(true)} title="about">?</button>
         </span>
@@ -1402,8 +1378,14 @@ export function App() {
         <div className="about-overlay">
           <button className="about-x" onClick={() => setAbout(false)} aria-label="close">×</button>
           <div className="about-title">POLARITON CAVITY-QED LAB</div>
-          <p>A research-grade cavity-QED simulator. Physics engine: Rust→WASM, validated bit-for-bit against QuTiP 5.3 / NumPy. Model: single-excitation Tavis–Cummings + Holstein–Tavis–Cummings vibronic coupling.</p>
-          <p>Physics reference: Dong, Zhang, Wu &amp; Wu — “On the Dynamics of the Tavis–Cummings Model”, IEEE Transactions on Automatic Control, 2023.</p>
+          <p>A research-grade cavity-QED instrument. Physics engine: Rust→WebAssembly. Model: single-excitation Tavis–Cummings (collective spectrum) + open Jaynes–Cummings (single-emitter Lindblad dynamics) + Holstein–Tavis–Cummings vibronic coupling, with a transfer-matrix optical cavity.</p>
+          <div className="about-val">
+            <div className="about-val-head">VALIDATION SCOPE — every module states its arbiter, nothing is asserted from memory</div>
+            <div className="about-val-row"><span>JC Lindblad · TC arrowhead spectrum · Wigner · partial trace</span><span className="ok">QuTiP 5.3 / NumPy golden (≤ 1e-9)</span></div>
+            <div className="about-val-row"><span>DBR transfer-matrix optics · HTC vibronics · FFT transmission</span><span className="an">closed-form analytic benchmark</span></div>
+            <div className="about-val-note">Full receipts: <span className="about-link">docs/VALIDATION.md</span> · 9 cargo tests + WASM-boundary recheck.</div>
+          </div>
+          <p>Model references: Sharma &amp; Chen, <i>J. Chem. Phys.</i> <b>161</b>, 104102 (2024); Mandal et al., <i>Chem. Rev.</i> <b>123</b>, 9786 (2023, HTC).</p>
           <p>Developed in collaboration with Shravan Kumar Sharma, PhD Candidate, Dept. of Chemistry, University of Notre Dame — polariton chemistry + machine learning.</p>
           <p>Dhruv Jain — independent researcher. <span className="about-link">github.com/Dhruvjain35/cavity-QED-model</span></p>
         </div>
@@ -1490,7 +1472,7 @@ export function App() {
               <Field sym="S" texSym="S=\lambda^2" label="Huang-Rhys factor" value={htc.S} min={0} max={3} step={0.05} unit="" onChange={(S) => setHtc((s) => ({ ...s, S }))} />
               <Field sym="g" texSym="g/\omega_c" label="Cavity coupling" value={htc.g} min={0} max={0.25} step={0.005} unit="" onChange={(g) => setHtc((s) => ({ ...s, g }))} />
               <Field sym="N" texSym="N" label="Ensemble size" value={htc.N} min={1} max={400} step={1} unit="" int onChange={(N) => setHtc((s) => ({ ...s, N: Math.round(N) }))} />
-              <Field sym="γ" texSym="\gamma/\omega_c" label="Linewidth (FWHM)" value={htc.gamma} min={0.004} max={0.04} step={0.002} unit="" onChange={(gamma) => setHtc((s) => ({ ...s, gamma }))} />
+              <Field sym="γ" texSym="\gamma/\omega_c" label="Linewidth (HWHM)" value={htc.gamma} min={0.004} max={0.04} step={0.002} unit="" onChange={(gamma) => setHtc((s) => ({ ...s, gamma }))} />
               <div className="btn-row">
                 <button className={htc.N <= 1 ? "on" : ""} onClick={() => setHtc((s) => ({ ...s, N: 1 }))}>N = 1</button>
                 <button className={htc.N >= 100 ? "on" : ""} onClick={() => setHtc((s) => ({ ...s, N: 200 }))}>N = 200 · decouple</button>
@@ -1548,7 +1530,7 @@ export function App() {
                     <Row label={<><i>E</i></>} k="selE" r={read} unit="ω_a" />
                     <Row label={<>|<i>C</i>|²</>} k="selC" r={read} />
                     <Row label={<>|<i>X</i>|²</>} k="selX" r={read} />
-                    <Row label={<><i>W</i>(0,0)</>} k="selW0" r={read} unit="1/π" />
+                    <Row label={<><i>W</i>(0,0)</>} k="selW0" r={read} unit="" />
                   </tbody></table>
                 </div>
               </div>
@@ -1581,17 +1563,17 @@ export function App() {
             </>
           ) : regime === "vibronic" ? (
             <>
-              <div className="pane">
+              <div className="pane grow">
                 <div className="pane-head">Holstein-TC absorption · bare molecule <i style={{ color: "#8b949e", fontStyle: "normal" }}>━</i> in-cavity / collective <i style={{ color: CYAN, fontStyle: "normal" }}>━</i> · solver: <i style={{ color: htc.N <= HTC_EXPLICIT_CAP ? GREEN : AMBER, fontStyle: "normal" }}>{htc.N <= HTC_EXPLICIT_CAP ? `exact ${htc.N}-body diagonalization` : "asymptotic 1/N"}</i></div>
                 <PlotWrap cw={HT_CW} ch={HT_CH} area={{ ml: HT_ML, mt: HT_MT, pw: HT_PW, ph: HT_PH }} inv={(px, py) => { const N = htc.N, split = 2 * htc.g * Math.sqrt(N), wlo = WA - htc.S * htc.wv - split * 0.7 - 0.12, whi = WA + 7 * htc.wv + 0.12; return [(wlo + ((px - HT_ML) / HT_PW) * (whi - wlo)).toFixed(3), (1 - (py - HT_MT) / HT_PH).toFixed(2)]; }}>
                   <canvas ref={htcCanvas} className="cv" />
                 </PlotWrap>
               </div>
-              <div className="pane">
+              <div className="pane grow">
                 <div className="pane-head">Panel V · vibronic progression (discrete) + polaron-renormalized collective coupling Ω_R^eff(N)</div>
                 <canvas ref={vibCompareCanvas} className="cv" />
               </div>
-              <div className="pane">
+              <div className="pane grow">
                 <div className="pane-head">Panel W · disorder averaging — inhomogeneous broadening · Γ_LP motional-narrowed <i style={{ color: CYAN, fontStyle: "normal" }}>━</i> vs bare γ+σ <i style={{ color: "#8b949e", fontStyle: "normal" }}>┄</i></div>
                 <PlotWrap cw={DI_CW} ch={DI_CH} area={{ ml: DI_ML, mt: DI_MT, pw: DI_PW, ph: DI_PH }} inv={(px, py) => { const OmR = 2 * htc.g * Math.sqrt(htc.N), g2 = (s: number) => htc.gamma + s * s / (2 * Math.max(1e-6, OmR)), b2 = (s: number) => htc.gamma + s; let ym = 1e-6; for (let i = 0; i <= 100; i++) { const s = 0.5 * i / 100; ym = Math.max(ym, g2(s), b2(s)); } ym *= 1.08; return [(((px - DI_ML) / DI_PW) * 0.5).toFixed(3), ((1 - (py - DI_MT) / DI_PH) * ym).toFixed(3)]; }}>
                   <canvas ref={disorderCanvas} className="cv" />
@@ -1734,7 +1716,8 @@ export function App() {
                   <Row label={<Tex t="S\;(\text{Huang-Rhys})" />} k="htS" r={read} />
                   <Row label={<Tex t="E_r = S\omega_v" />} k="htEr" r={read} unit="meV" />
                   <Row label={<Tex t="S_{\mathrm{bright}} = S/N" />} k="htSbright" r={read} />
-                  <Row label={<Tex t="\Omega_R = 2g\sqrt{N}" />} k="htRabi" r={read} unit="meV" />
+                  <Row label={<Tex t="\Omega_R^{\mathrm{bare}} = 2g\sqrt{N}" />} k="htRabi" r={read} unit="meV" />
+                  <Row label={<Tex t="\Omega_R^{\mathrm{eff}} = 2g\sqrt{N}\,e^{-S/2}" />} k="htRabiEff" r={read} unit="meV" />
                   <Row label={<Tex t="n_{\mathrm{vib}}" />} k="htNvib" r={read} />
                 </tbody></table>
               </div>
