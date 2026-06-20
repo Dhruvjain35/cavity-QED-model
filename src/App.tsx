@@ -1206,7 +1206,7 @@ export function App() {
     for (let i = 0; i < GRID; i++) { const x = lx + lw * i / (GRID - 1), y = yL(inCav[i]! / cmax); i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); }
     ctx.stroke();
     ctx.strokeStyle = AXIS; ctx.lineWidth = 0.75; ctx.strokeRect(lx, ly, lw, lh);
-    ctx.fillStyle = DIM; ctx.font = "600 9px " + F; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText("ω/ω_c", lx + lw / 2, ly + lh + 6);
+    ctx.fillStyle = DIM; ctx.font = "600 9px " + F; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText("frequency  ω/ω_c", lx + lw / 2, ly + lh + 6);
     // legend (top-right, inside panel)
     ctx.font = "600 8px " + F; const lg0 = "bare FC  |⟨n|0⟩|² = e⁻ˢSⁿ/n!", lg1 = "in-cavity polariton absorption";
     const legW = Math.max(ctx.measureText(lg0).width, ctx.measureText(lg1).width) + 24, legX = lx + lw - legW - 5, legY = ly + 5;
@@ -1267,7 +1267,7 @@ export function App() {
     ctx.fillStyle = DIM; ctx.font = "500 9px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "center"; ctx.textBaseline = "top";
     for (let s = 0; s <= 0.5001; s += 0.1) { seg(ctx, xOf(s), DI_MT + DI_PH, xOf(s), DI_MT + DI_PH + 3); ctx.fillText(s.toFixed(1), xOf(s), DI_MT + DI_PH + 6); }
     ctx.fillStyle = INK; ctx.font = "600 11px 'JetBrains Mono','SF Mono',monospace"; ctx.textBaseline = "alphabetic"; ctx.fillText("inhomogeneous disorder  σ / ω_c", DI_ML + DI_PW / 2, DI_CH - 6);
-    ctx.save(); ctx.translate(13, DI_MT + DI_PH / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top"; ctx.fillText("Γ_LP  (linewidth)", 0, 0); ctx.restore();
+    ctx.save(); ctx.translate(13, DI_MT + DI_PH / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top"; ctx.fillText("Γ_LP / ω_c  (polariton linewidth, dimensionless)", 0, 0); ctx.restore();
     ctx.font = "600 8.5px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "left"; ctx.textBaseline = "top";
     ctx.fillStyle = CYAN; ctx.fillText("Γ_LP = γ + σ²/2Ω_R   (κ≈γ here)", DI_ML + 6, DI_MT + 4);
     ctx.fillStyle = "#8b949e"; ctx.fillText("bare  γ + σ", DI_ML + 6, DI_MT + 16);
@@ -1512,14 +1512,14 @@ export function App() {
             </Group>
           ) : (
             <Group title="VIBRONIC · HOLSTEIN-TC" k="htc" c={collapsed} t={toggle}>
-              <Field sym="ω" texSym="\omega_v/\omega_c" label="Vibrational mode" value={htc.wv} min={0.04} max={0.4} step={0.005} unit="" onChange={(wv) => setHtc((s) => ({ ...s, wv }))} />
-              <Field sym="S" texSym="S=\lambda^2" label="Huang-Rhys factor" value={htc.S} min={0} max={3} step={0.05} unit="" onChange={(S) => setHtc((s) => ({ ...s, S }))} />
-              <Field sym="g" texSym="g/\omega_c" label="Cavity coupling" value={htc.g} min={0} max={0.25} step={0.005} unit="" onChange={(g) => setHtc((s) => ({ ...s, g }))} />
-              <Field sym="N" texSym="N" label="Ensemble size" value={htc.N} min={1} max={400} step={1} unit="" int onChange={(N) => setHtc((s) => ({ ...s, N: Math.round(N) }))} />
-              <Field sym="γ" texSym="\gamma/\omega_c" label="Linewidth (HWHM)" value={htc.gamma} min={0.004} max={0.04} step={0.002} unit="" onChange={(gamma) => setHtc((s) => ({ ...s, gamma }))} />
+              <Field sym="ω" texSym="\omega_v/\omega_c" label="vibrational mode" value={htc.wv} min={0.04} max={0.4} step={0.005} unit="" tip="vibrational (phonon) frequency ω_v in units of ω_c (dimensionless); sets the spacing of the Franck–Condon replicas" onChange={(wv) => setHtc((s) => ({ ...s, wv }))} />
+              <Field sym="S" texSym="S=\lambda^2" label="Huang-Rhys factor" value={htc.S} min={0} max={3} step={0.05} unit="" tip="exciton–phonon coupling strength S=λ² (dimensionless); higher S = more/brighter vibrational sidebands and a larger Stokes shift" onChange={(S) => setHtc((s) => ({ ...s, S }))} />
+              <Field sym="g" texSym="g/\omega_c" label="cavity coupling" value={htc.g} min={0} max={0.25} step={0.005} unit="" tip="single-molecule light–matter coupling g in units of ω_c (dimensionless); collective splitting = 2g√N" onChange={(g) => setHtc((s) => ({ ...s, g }))} />
+              <Field sym="N" texSym="N" label="ensemble size" value={htc.N} min={1} max={400} step={1} unit="" int tip="number of molecules N (count). Exact diagonalization for N≤3; asymptotic large-N approximation above." onChange={(N) => setHtc((s) => ({ ...s, N: Math.round(N) }))} />
+              <Field sym="γ" texSym="\gamma/\omega_c" label="linewidth (HWHM)" value={htc.gamma} min={0.004} max={0.04} step={0.002} unit="" tip="bare emitter linewidth (half width at half max) in units of ω_c (dimensionless)" onChange={(gamma) => setHtc((s) => ({ ...s, gamma }))} />
               <div className="btn-row">
                 <button className={htc.N <= 1 ? "on" : ""} onClick={() => setHtc((s) => ({ ...s, N: 1 }))}>N = 1</button>
-                <button className={htc.N >= 100 ? "on" : ""} onClick={() => setHtc((s) => ({ ...s, N: 200 }))}>N = 200 · decouple</button>
+                <button className={htc.N >= 100 ? "on" : ""} title="jump to N=200 to demonstrate polaron decoupling (λ→λ/√N); switches from exact to the large-N asymptotic solver" onClick={() => setHtc((s) => ({ ...s, N: 200 }))}>N = 200 · large-N</button>
               </div>
             </Group>
           )}
@@ -1625,18 +1625,21 @@ export function App() {
             </>
           ) : regime === "vibronic" ? (
             <>
-              <div className="pane grow">
-                <div className="pane-head">Holstein-TC absorption · bare molecule <i style={{ color: "#8b949e", fontStyle: "normal" }}>━</i> in-cavity / collective <i style={{ color: CYAN, fontStyle: "normal" }}>━</i> · solver: <i style={{ color: htc.N <= HTC_EXPLICIT_CAP ? GREEN : AMBER, fontStyle: "normal" }}>{htc.N <= HTC_EXPLICIT_CAP ? `exact ${htc.N}-body diagonalization` : "asymptotic 1/N"}</i></div>
+              <div className="pane">
+                <div className="pane-head">Holstein-TC absorption · bare molecule <i style={{ color: "#8b949e", fontStyle: "normal" }}>━</i> in-cavity / collective <i style={{ color: CYAN, fontStyle: "normal" }}>━</i> · solver: <i style={{ color: htc.N <= HTC_EXPLICIT_CAP ? GREEN : AMBER, fontStyle: "normal" }} title={htc.N <= HTC_EXPLICIT_CAP ? "exact diagonalization of the full N-molecule vibronic Hamiltonian" : "N>3: asymptotic large-N polaron decoupling (λ→λ/√N) — an approximation, exact only as N→∞"}>{htc.N <= HTC_EXPLICIT_CAP ? `exact ${htc.N}-body diagonalization` : "asymptotic 1/N (approx)"}</i></div>
+                <div className="pane-sub"><b>What:</b> a molecule's vibrational fingerprint outside vs inside the cavity. <b>Grey</b> = molecule alone (the Franck–Condon comb of vibronic replicas 0–0, 0–1, …); <b>cyan</b> = same molecule in the cavity — collective coupling collapses the comb into LP/UP polariton peaks. <b>Approx:</b> single-excitation · RWA · no κ (ideal absorption).</div>
                 <PlotWrap cw={HT_CW} ch={HT_CH} area={{ ml: HT_ML, mt: HT_MT, pw: HT_PW, ph: HT_PH }} inv={(px, py) => { const N = htc.N, split = 2 * htc.g * Math.sqrt(N), wlo = WA - htc.S * htc.wv - split * 0.7 - 0.12, whi = WA + 7 * htc.wv + 0.12; return [(wlo + ((px - HT_ML) / HT_PW) * (whi - wlo)).toFixed(3), (1 - (py - HT_MT) / HT_PH).toFixed(2)]; }}>
                   <canvas ref={htcCanvas} className="cv" />
                 </PlotWrap>
               </div>
-              <div className="pane grow">
+              <div className="pane">
                 <div className="pane-head">Panel V · vibronic progression (discrete) + polaron-renormalized collective coupling Ω_R^eff(N)</div>
+                <div className="pane-sub"><b>What:</b> <b>left</b> — how the cavity reshapes the vibrational fingerprint; <b>right</b> — how the light–matter coupling Ω_R^eff = 2g√N·e^(−S/2) grows with ensemble size N (the e^(−S/2) is the polaron/vibronic dressing).</div>
                 <canvas ref={vibCompareCanvas} className="cv" />
               </div>
-              <div className="pane grow">
+              <div className="pane">
                 <div className="pane-head">Panel W · disorder averaging — inhomogeneous broadening · Γ_LP motional-narrowed <i style={{ color: CYAN, fontStyle: "normal" }}>━</i> vs bare γ+σ <i style={{ color: "#8b949e", fontStyle: "normal" }}>┄</i></div>
+                <div className="pane-sub"><b>What:</b> adding molecular energy disorder σ broadens a bare line one-for-one (grey), but the cavity polariton (cyan) stays sharp far longer because it averages over the disordered ensemble — "motional/exchange narrowing". They cross at σ=Ω_R.</div>
                 <PlotWrap cw={DI_CW} ch={DI_CH} area={{ ml: DI_ML, mt: DI_MT, pw: DI_PW, ph: DI_PH }} inv={(px, py) => { const OmR = 2 * htc.g * Math.sqrt(htc.N), g2 = (s: number) => htc.gamma + s * s / (2 * Math.max(1e-6, OmR)), b2 = (s: number) => htc.gamma + s; let ym = 1e-6; for (let i = 0; i <= 100; i++) { const s = 0.5 * i / 100; ym = Math.max(ym, g2(s), b2(s)); } ym *= 1.08; return [(((px - DI_ML) / DI_PW) * 0.5).toFixed(3), ((1 - (py - DI_MT) / DI_PH) * ym).toFixed(3)]; }}>
                   <canvas ref={disorderCanvas} className="cv" />
                 </PlotWrap>
@@ -1785,15 +1788,17 @@ export function App() {
             </>
           ) : (
             <>
+              <RegimeBadge gEff={htc.g * Math.sqrt(htc.N)} wc={1} loss={htc.gamma} lossSym="γ" splitSym="2g√N" />
               <div className="pane">
-                <div className="pane-head">Vibronic observables</div>
+                <div className="pane-head">Vibronic observables · Holstein–Tavis–Cummings</div>
+                <div className="pane-sub">molecules with a vibration, coupled to one cavity mode. Ω_R is the same 2g√N as the COLLECTIVE/DYNAMICS tabs (in meV here).</div>
                 <table className="metrics"><tbody>
-                  <Row label={<Tex t="S\;(\text{Huang-Rhys})" />} k="htS" r={read} />
-                  <Row label={<Tex t="E_r = S\omega_v" />} k="htEr" r={read} unit="meV" />
-                  <Row label={<Tex t="S_{\mathrm{bright}} = S/N" />} k="htSbright" r={read} />
-                  <Row label={<Tex t="\Omega_R^{\mathrm{bare}} = 2g\sqrt{N}" />} k="htRabi" r={read} unit="meV" />
-                  <Row label={<Tex t="\Omega_R^{\mathrm{eff}} = 2g\sqrt{N}\,e^{-S/2}" />} k="htRabiEff" r={read} unit="meV" />
-                  <Row label={<Tex t="n_{\mathrm{vib}}" />} k="htNvib" r={read} />
+                  <Row label={<Tex t="S\;(\text{Huang-Rhys})" />} k="htS" r={read} tip="Huang–Rhys factor S = λ² — the exciton–phonon (vibronic) coupling strength (dimensionless); larger S = more vibrational replicas" />
+                  <Row label={<Tex t="E_r = S\omega_v" />} k="htEr" r={read} unit="meV" tip="reorganization energy E_r = S·ω_v (= Stokes shift / 2) — energy released as the molecule relaxes its geometry after excitation" />
+                  <Row label={<Tex t="S_{\mathrm{bright}} = S/N" />} k="htSbright" r={read} tip="per-molecule vibronic coupling after collective dilution by the ensemble (dimensionless); shrinks as 1/N" />
+                  <Row label={<Tex t="\Omega_R^{\mathrm{bare}} = 2g\sqrt{N}" />} k="htRabi" r={read} unit="meV" tip="collective vacuum-Rabi splitting 2g√N (same as the COLLECTIVE/DYNAMICS Ω_R), BEFORE the e^{-S/2} vibronic dressing" />
+                  <Row label={<Tex t="\Omega_R^{\mathrm{eff}} = 2g\sqrt{N}\,e^{-S/2}" />} k="htRabiEff" r={read} unit="meV" tip="vibronically-dressed Rabi splitting — the actual cyan polariton-doublet width you see in the spectrum" />
+                  <Row label={<Tex t="n_{\mathrm{vib}}" />} k="htNvib" r={read} unit="levels" tip="number of vibrational Fock levels kept per molecule (basis truncation / convergence parameter, not a physical quantum number)" />
                 </tbody></table>
               </div>
               <div className="pane">
