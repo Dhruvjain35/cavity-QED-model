@@ -79,7 +79,7 @@ function SimSampler({ stateRef, tRef, inspectRef, liveRef, fieldAmpRef, m }: { s
 // |ψ_i(t)|²·gain, plus an additive halo that grows/brightens with the same excitation so it reads without
 // bloom. NO motion/vibration/rotation (a 2-level Tavis–Cummings emitter has no nuclear coordinate); the only
 // dynamic channel is excitation glow. Decoupled emitters (|b_i|<0.1, glow gated to 0) sit dim purple.
-function Molecules({ liveRef, film, scale }: { liveRef: MutableRefObject<Live>; film: Film; scale: number }) {
+function Molecules({ liveRef, film, scale, glow = 1 }: { liveRef: MutableRefObject<Live>; film: Film; scale: number; glow?: number }) {
   const mats = useRef<(THREE.MeshStandardMaterial | null)[]>([]);
   const halos = useRef<(THREE.Mesh | null)[]>([]);
   const gain = film.gain;
@@ -87,8 +87,9 @@ function Molecules({ liveRef, film, scale }: { liveRef: MutableRefObject<Live>; 
     const mg = liveRef.current.molGlow;
     for (let i = 0; i < film.mols.length; i++) {
       const g = Math.min(1.2, (mg[i] || 0) * gain);
-      const mt = mats.current[i]; if (mt) mt.emissiveIntensity = Math.min(2.2, g * 1.9);
-      const h = halos.current[i]; if (h) { h.scale.setScalar(1 + 1.3 * g); (h.material as THREE.MeshBasicMaterial).opacity = Math.min(0.5, 0.05 + 0.45 * g); }
+      // small always-on floor so the "molecule glow" knob is visible even on a dim frame, then scaled live
+      const mt = mats.current[i]; if (mt) mt.emissiveIntensity = Math.min(3, (g * 1.9 + 0.05) * glow);
+      const h = halos.current[i]; if (h) { h.scale.setScalar(1 + 1.3 * g); (h.material as THREE.MeshBasicMaterial).opacity = Math.min(0.75, (0.05 + 0.45 * g) * glow); }
     }
   });
   return (
@@ -205,9 +206,9 @@ const makeFieldMaterial = () => new THREE.ShaderMaterial({
 // tracks P_photon, so the cavity visibly "fills with light" as the excitation enters the field and goes dark
 // as it drains into the molecules — the energy sloshing made visceral while staying honest (intensity only,
 // mode volume fixed, the single delocalized photon occupies the whole standing wave at once).
-function ModeGlow({ ampRef, visible = true }: { ampRef: MutableRefObject<number>; visible?: boolean }) {
+function ModeGlow({ ampRef, visible = true, intensity = 1 }: { ampRef: MutableRefObject<number>; visible?: boolean; intensity?: number }) {
   const ref = useRef<THREE.Mesh>(null);
-  useFrame(() => { const m = ref.current; if (m) (m.material as THREE.MeshBasicMaterial).opacity = 0.015 + 0.13 * Math.min(1, Math.max(0, ampRef.current)); });
+  useFrame(() => { const m = ref.current; if (m) (m.material as THREE.MeshBasicMaterial).opacity = Math.min(1, (0.015 + 0.13 * Math.min(1, Math.max(0, ampRef.current))) * intensity); });
   if (!visible) return null;
   return (
     <mesh ref={ref} scale={[W0 * 1.7, W0 * 1.7, HALF * 0.92]}>
@@ -217,13 +218,13 @@ function ModeGlow({ ampRef, visible = true }: { ampRef: MutableRefObject<number>
   );
 }
 
-function FieldDiscsShader({ ampRef, visible = true }: { ampRef: MutableRefObject<number>; visible?: boolean }) {
+function FieldDiscsShader({ ampRef, visible = true, intensity = 1 }: { ampRef: MutableRefObject<number>; visible?: boolean; intensity?: number }) {
   const discs = useMemo(() => antinodes().map((z) => ({ z, r: beamRadius(z) * 2.2 })), []);
   const mats = useMemo(() => discs.map(() => makeFieldMaterial()), [discs]);
   const meshes = useRef<(THREE.Mesh | null)[]>([]);
   useFrame(() => {
     const amp = Math.max(0, Math.min(1, ampRef.current));
-    const op = Math.min(0.97, 0.05 + 0.92 * Math.pow(amp, 0.85)); // widened anti-phase swing; radius fixed
+    const op = Math.min(1, (0.05 + 0.92 * Math.pow(amp, 0.85)) * intensity); // widened anti-phase swing; radius fixed
     for (let i = 0; i < mats.length; i++) mats[i]!.uniforms.uOpacity!.value = op;
   });
   if (!visible) return null;
@@ -311,8 +312,8 @@ function drawSpark(cv: HTMLCanvasElement | null, ring: { t: Float32Array; p: Flo
   ctx.strokeStyle = "rgba(255,255,255,0.4)"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(W - 1, 0); ctx.lineTo(W - 1, H); ctx.stroke();
 }
 
-export interface SceneControls { fieldOpacity: number; moleculeScale: number; bloomIntensity: number; showFieldDiscs: boolean; showDipoleArrows: boolean }
-const DEFAULT_CTRL: SceneControls = { fieldOpacity: 0.15, moleculeScale: 1.0, bloomIntensity: 0.6, showFieldDiscs: true, showDipoleArrows: true };
+export interface SceneControls { autoRotate: boolean; fieldGlow: number; moleculeScale: number; moleculeGlow: number; showFieldDiscs: boolean; showDipoleArrows: boolean }
+const DEFAULT_CTRL: SceneControls = { autoRotate: false, fieldGlow: 1.0, moleculeScale: 1.0, moleculeGlow: 1.0, showFieldDiscs: true, showDipoleArrows: true };
 
 export function LiveCavityScene({ stateRef, tRef, inspectRef, m, ensemble, polTheta, controls = DEFAULT_CTRL }: { stateRef: MutableRefObject<Dyn>; tRef: MutableRefObject<number>; inspectRef: MutableRefObject<number | null>; m: number; ensemble: Ens; waist?: number; polTheta: number; controls?: SceneControls }) {
   const film = useMemo(() => buildFilm(ensemble), [ensemble]);
@@ -332,14 +333,14 @@ export function LiveCavityScene({ stateRef, tRef, inspectRef, m, ensemble, polTh
         <group rotation={LIVE_TILT} scale={STAGE_SCALE} position={STAGE_OFFSET}>
           <DBRMirror side={-1} />
           <DBRMirror side={1} />
-          <ModeGlow ampRef={fieldAmpRef} visible={controls.showFieldDiscs} />
+          <ModeGlow ampRef={fieldAmpRef} visible={controls.showFieldDiscs} intensity={controls.fieldGlow} />
           <NodalRings />
-          <FieldDiscsShader ampRef={fieldAmpRef} visible={controls.showFieldDiscs} />
-          <Molecules liveRef={liveRef} film={film} scale={controls.moleculeScale} />
+          <FieldDiscsShader ampRef={fieldAmpRef} visible={controls.showFieldDiscs} intensity={controls.fieldGlow} />
+          <Molecules liveRef={liveRef} film={film} scale={controls.moleculeScale} glow={controls.moleculeGlow} />
           {controls.showDipoleArrows ? <Dipoles film={film} scale={controls.moleculeScale} /> : null}
           <PolarizationAxis theta={polTheta} />
         </group>
-        <OrbitControls makeDefault enablePan={false} autoRotate={false} enableDamping dampingFactor={0.05} minDistance={150} maxDistance={600} minPolarAngle={Math.PI / 2 - 0.55} maxPolarAngle={Math.PI / 2 + 0.55} target={[0, 0, 0]} />
+        <OrbitControls makeDefault enablePan={false} autoRotate={controls.autoRotate} autoRotateSpeed={1.4} enableDamping dampingFactor={0.05} minDistance={150} maxDistance={600} minPolarAngle={Math.PI / 2 - 0.55} maxPolarAngle={Math.PI / 2 + 0.55} target={[0, 0, 0]} />
       </Canvas>
     </div>
   );

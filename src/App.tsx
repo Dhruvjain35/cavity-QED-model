@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { LevaPanel, useControls, useCreateStore } from "leva";
 import katex from "katex";
+import type { SceneControls } from "./cavity/LiveCavityScene";
 import "katex/dist/katex.min.css";
 import { loadWasm, Quantum, solveSpectrum, arrowheadModesGi, arrowheadMatrixGi, cavityPowerSpectrumGi, couplingSweepGi, htcSpectrum, htcSpectrumMulti, htcMatrixView, htcFranckCondon, wignerRawOfRho, cavityLayers, cavityField, cavityReflectance, type SimParams } from "./quantum/engine";
 
@@ -192,15 +192,10 @@ export function App() {
   // the shared molecular ensemble (positions, dipoles, coupling factors) — feeds BOTH the WASM
   // arrowhead and the 3D view, so orientation/position physics and visuals never diverge.
   const ensemble = useMemo(() => buildEnsemble(dyn.m, dyn.seed, dyn.order, MODE_WAIST, dyn.theta * Math.PI / 180), [dyn.m, dyn.seed, dyn.order, dyn.theta]);
-  // 3.B · live 3D-scene controls (Leva), wired straight into the cavity render
-  const sceneStore = useCreateStore();
-  const scene3d = useControls({
-    fieldOpacity: { value: 0.15, min: 0.05, max: 0.8, step: 0.01, label: "field opacity" },
-    moleculeScale: { value: 1.0, min: 0.5, max: 2.0, step: 0.05, label: "molecule scale" },
-    bloomIntensity: { value: 0.6, min: 0, max: 2, step: 0.05, label: "bloom" },
-    showFieldDiscs: { value: true, label: "field discs" },
-    showDipoleArrows: { value: true, label: "dipole arrows" },
-  }, { store: sceneStore });
+  // live 3D-scene controls — a plain, reliably-clickable instrument panel (replaced Leva, whose embedded
+  // panel sat under the WebGL canvas and would not expand on click). State here → controls prop → render.
+  const [scene3d, setScene3d] = useState<SceneControls>({ autoRotate: false, fieldGlow: 1.0, moleculeScale: 1.0, moleculeGlow: 1.0, showFieldDiscs: true, showDipoleArrows: true });
+  const setScene = (patch: Partial<SceneControls>) => setScene3d((s) => ({ ...s, ...patch }));
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [playing, setPlaying] = useState(true);
   const [simSpeed, setSimSpeed] = useState(1); // DYNAMICS transport playback rate (×)
@@ -209,7 +204,7 @@ export function App() {
   const [copied, setCopied] = useState(false); // 3.F · COPY LINK flash
   const [about, setAbout] = useState(false);   // 3.G · about overlay
   const [gallery, setGallery] = useState(false); // examples / preset gallery overlay
-  const [levaCollapsed, setLevaCollapsed] = useState(true); // FIX 1.6 · Leva starts collapsed
+  const [scenePanelOpen, setScenePanelOpen] = useState(false); // 3D-scene controls start collapsed
 
   const wigCanvas = useRef<HTMLCanvasElement>(null), husimiCanvas = useRef<HTMLCanvasElement>(null), seriesCanvas = useRef<HTMLCanvasElement>(null), decohereCanvas = useRef<HTMLCanvasElement>(null);
   const blochCanvas = useRef<HTMLCanvasElement>(null); // 4.A Bloch trajectory
@@ -1750,7 +1745,7 @@ export function App() {
                 <PanelEqn t={"|\\psi(t)\\rangle=\\textstyle\\sum_k c_k\\,e^{-iE_k t}\\,|\\phi_k\\rangle,\\qquad \\hat H|\\phi_k\\rangle=E_k|\\phi_k\\rangle"} where="closed unitary single-excitation Tavis–Cummings" />
                 <div className="pane-sub"><b>What:</b> one quantum sloshing photon↔molecules in real time — the cavity fills with cyan light when it holds the energy, the molecules glow red when they do. <b>Approx:</b> single-excitation subspace (1 photon total) · RWA · ideal mirrors (κ=0 — the live evolution is lossless).</div>
                 <div className="live3d"><Suspense fallback={<div className="cv-loading">loading 3D…</div>}><LiveCavityScene stateRef={dynState} tRef={simT} m={dyn.m} inspectRef={inspectRef} ensemble={ensemble} waist={MODE_WAIST} polTheta={dyn.theta * Math.PI / 180} controls={scene3d} /></Suspense>
-                  <div className="leva-host"><LevaPanel store={sceneStore} fill flat collapsed={{ collapsed: levaCollapsed, onChange: setLevaCollapsed }} titleBar={{ title: "3D SCENE CONTROLS", drag: false, filter: false }} /></div>
+                  <ScenePanel open={scenePanelOpen} onToggle={() => setScenePanelOpen((o) => !o)} v={scene3d} set={setScene} />
                 </div>
                 <div className="transport">
                   <button className="tp-btn" title={playing ? "Pause" : "Play"} onClick={() => setPlaying((p) => !p)}>{playing ? "❚❚" : "▶"}</button>
@@ -1916,6 +1911,33 @@ export function App() {
 // 3.C · hover crosshair + live physics-coordinate readout for any plot canvas. Wraps the plot, paints a
 // 1px vertical guide + the [x,y] value (mapped back through the plot's own axes) on a non-interactive
 // overlay so the underlying canvas keeps its click handlers. inv() returns null when off the data.
+// custom 3D-scene control panel — plain DOM (native checkbox/range), docked over the viewport top-right,
+// z-indexed above the WebGL canvas so every control is actually clickable. Replaces the embedded Leva panel.
+function ScenePanel({ open, onToggle, v, set }: { open: boolean; onToggle: () => void; v: SceneControls; set: (p: Partial<SceneControls>) => void }) {
+  const Slider = ({ label, k, min, max }: { label: string; k: "fieldGlow" | "moleculeScale" | "moleculeGlow"; min: number; max: number }) => (
+    <label className="sc-row"><span>{label}</span>
+      <span className="sc-slide"><input type="range" min={min} max={max} step={0.05} value={v[k]} onChange={(e) => set({ [k]: Number(e.target.value) } as Partial<SceneControls>)} /><b>{v[k].toFixed(2)}</b></span>
+    </label>
+  );
+  return (
+    <div className={"scene-ctrl" + (open ? " open" : "")}>
+      <button className="sc-head" onClick={onToggle} title="show/hide 3D scene controls" aria-expanded={open}>
+        <span className="sc-caret">{open ? "▾" : "▸"}</span>3D SCENE
+      </button>
+      {open ? (
+        <div className="sc-body">
+          <label className="sc-row sc-check"><input type="checkbox" checked={v.autoRotate} onChange={(e) => set({ autoRotate: e.target.checked })} /> auto-rotate</label>
+          <label className="sc-row sc-check"><input type="checkbox" checked={v.showFieldDiscs} onChange={(e) => set({ showFieldDiscs: e.target.checked })} /> cavity field</label>
+          <label className="sc-row sc-check"><input type="checkbox" checked={v.showDipoleArrows} onChange={(e) => set({ showDipoleArrows: e.target.checked })} /> dipole arrows</label>
+          <Slider label="field glow" k="fieldGlow" min={0.2} max={2.5} />
+          <Slider label="molecule size" k="moleculeScale" min={0.5} max={2.0} />
+          <Slider label="molecule glow" k="moleculeGlow" min={0.2} max={2.5} />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function PlotWrap({ cw, ch, area, inv, fit, children }: { cw: number; ch: number; area: { ml: number; mt: number; pw: number; ph: number }; inv: (px: number, py: number) => [string, string] | null; fit?: boolean; children: React.ReactNode }) {
   const ov = useRef<HTMLCanvasElement>(null);
   const onMove = (e: React.MouseEvent<HTMLDivElement>) => {

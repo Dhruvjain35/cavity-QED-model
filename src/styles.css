@@ -173,11 +173,23 @@ tr[title] { cursor: help; }
 .transport .tp-scrub::-moz-range-thumb { width: 9px; height: 15px; border: none; border-radius: 0; background: var(--cyan); cursor: pointer; }
 .transport .tp-time { font-family: var(--sans); font-size: 9px; letter-spacing: 0.03em; color: var(--cyan); min-width: 58px; text-align: right; }
 .transport .tp-speed { font-family: var(--sans); font-size: 9px; padding: 3px 4px; border: 1px solid var(--rule); border-radius: 0; background: var(--panel); color: var(--dim); cursor: pointer; }
-/* 3.B · Leva 3D-scene controls — docked top-right of the 3D viewport */
-/* 3D-scene controls — docked INSIDE the 3D viewport's top-right corner so it only ever overlays the
-   scene (its own controls), never the panel headers, equation strip, or plain-language caption. */
-.leva-host { position: absolute; top: 6px; right: 6px; width: min(210px, 52%); z-index: 40; font-size: 10px; }
-.leva-host .leva-c-kWgxhW, .leva-host > div { width: 100%; }
+/* 3D-scene controls — a plain instrument panel docked in the 3D viewport's top-right corner. Absolute +
+   z-index:50 so it paints ABOVE the WebGL canvas and every control is genuinely clickable (the old Leva
+   panel sat under the canvas and swallowed clicks). Collapsed = just the header button; open = controls. */
+.scene-ctrl { position: absolute; top: 6px; right: 6px; z-index: 50; width: max-content; background: rgba(8, 11, 17, 0.92); border: 1px solid var(--rule-2); font-family: var(--sans); }
+.scene-ctrl.open { width: min(186px, 64%); }
+.sc-head { display: flex; align-items: center; gap: 6px; width: 100%; background: transparent; border: none; color: var(--cyan); font-family: var(--sans); font-size: 8.5px; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; padding: 5px 8px; cursor: pointer; text-align: left; }
+.scene-ctrl.open .sc-head { border-bottom: 1px solid var(--rule); }
+.sc-head:hover { color: #66ffff; }
+.sc-caret { font-size: 9px; line-height: 1; }
+.sc-body { padding: 6px 8px 7px; display: flex; flex-direction: column; gap: 6px; }
+.sc-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 9px; color: var(--dim); cursor: pointer; }
+.sc-row.sc-check { justify-content: flex-start; gap: 6px; }
+.sc-row > span:first-child { white-space: nowrap; }
+.sc-slide { display: inline-flex; align-items: center; gap: 6px; }
+.sc-slide input[type="range"] { width: 76px; }
+.sc-slide b { font-family: var(--mono); font-size: 8.5px; font-weight: 700; color: var(--cyan); font-variant-numeric: tabular-nums; min-width: 26px; text-align: right; }
+.sc-check input[type="checkbox"] { accent-color: var(--cyan); width: 12px; height: 12px; cursor: pointer; }
 .cav-tag { position: absolute; font-family: var(--sans); font-size: 9px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--dim); pointer-events: none; text-shadow: 1px 1px 0 #000; }
 .cav-tag sub { font-size: 0.74em; }
 .cav-tag-l { top: 10px; left: 10px; }
@@ -331,7 +343,7 @@ table.metrics { width: 100%; border-collapse: collapse; }
   .dyn-bento .pw-fit > .cv { width: 100% !important; height: auto !important; max-width: 100%; max-height: none; margin: 4px auto; }
   .dyn-bento .pw-fit > .plot-ov { top: 0; left: 0; transform: none; width: 100% !important; height: 100% !important; max-width: none; max-height: none; }
   .dyn-bento .live3d { flex: none; height: clamp(240px, 52vw, 360px); }
-  .leva-host { width: min(210px, 46vw); }
+  .scene-ctrl.open { width: min(186px, 56vw); }
 }
 @media (max-width: 640px) {
   .topbar { height: auto; flex-wrap: wrap; padding: 3px 8px; row-gap: 2px; }
