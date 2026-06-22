@@ -261,6 +261,8 @@ export function App() {
     window.addEventListener("resize", onResize);
     const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(onResize) : null;
     const center = document.querySelector(".center"); if (ro && center) ro.observe(center);
+    // redraw once the web fonts (IBM Plex) finish loading so canvas axis labels aren't stuck on a fallback
+    document.fonts?.ready?.then(() => redrawCurrent.current()).catch(() => { });
     return () => { window.removeEventListener("resize", onResize); ro?.disconnect(); cancelAnimationFrame(raf); };
   }, []);
 
@@ -414,9 +416,9 @@ export function App() {
   function colorbar(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, ramp: (t: number) => [number, number, number], ticks: { f: number; label: string }[], caption: string) {
     for (let py = 0; py < h; py++) { const [r, g, b] = ramp(1 - py / (h - 1)); ctx.fillStyle = `rgb(${r},${g},${b})`; ctx.fillRect(x, y + py, w, 1); }
     ctx.strokeStyle = AXIS; ctx.lineWidth = 0.75; ctx.strokeRect(x, y, w, h);
-    ctx.fillStyle = DIM; ctx.font = "500 8px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+    ctx.fillStyle = DIM; ctx.font = "500 8px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
     for (const tk of ticks) { const py = y + (1 - tk.f) * h; seg(ctx, x + w, py, x + w + 3, py); ctx.fillText(tk.label, x + w + 5, py); }
-    ctx.fillStyle = INK; ctx.font = "600 10px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = INK; ctx.font = "600 10px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
     ctx.fillText(caption, x + w / 2, y - 3);
   }
 
@@ -440,11 +442,11 @@ export function App() {
     ctx.save(); ctx.setLineDash([3, 3]); ctx.lineWidth = 0.75; ctx.strokeStyle = CROSS;
     seg(ctx, xPx(0), W_MT, xPx(0), W_MT + W_S); seg(ctx, W_ML, pPx(0), W_ML + W_S, pPx(0)); ctx.restore();
     ctx.lineWidth = 0.75; ctx.strokeStyle = AXIS; ctx.strokeRect(W_ML, W_MT, W_S, W_S);
-    ctx.fillStyle = DIM; ctx.font = "500 10px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "center"; ctx.textBaseline = "top";
+    ctx.fillStyle = DIM; ctx.font = "500 10px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top";
     for (const t of W_TICKS) { seg(ctx, xPx(t), W_MT + W_S, xPx(t), W_MT + W_S + 3); ctx.fillText(minus(`${t}`), xPx(t), W_MT + W_S + 6); }
     ctx.textAlign = "right"; ctx.textBaseline = "middle";
     for (const t of W_TICKS) { seg(ctx, W_ML, pPx(t), W_ML - 3, pPx(t)); ctx.fillText(minus(`${t}`), W_ML - 6, pPx(t)); }
-    ctx.fillStyle = INK; ctx.font = "600 14px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = INK; ctx.font = "600 14px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
     ctx.fillText("x", W_ML + W_S / 2, W_CH - 6);
     ctx.save(); ctx.translate(12, W_MT + W_S / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top"; ctx.fillText("p", 0, 0); ctx.restore();
   }
@@ -467,11 +469,11 @@ export function App() {
     ctx.save(); ctx.setLineDash([3, 3]); ctx.lineWidth = 0.75; ctx.strokeStyle = CROSS;
     seg(ctx, xPx(0), W_MT, xPx(0), W_MT + W_S); seg(ctx, W_ML, pPx(0), W_ML + W_S, pPx(0)); ctx.restore();
     ctx.lineWidth = 0.75; ctx.strokeStyle = AXIS; ctx.strokeRect(W_ML, W_MT, W_S, W_S);
-    ctx.fillStyle = DIM; ctx.font = "500 10px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "center"; ctx.textBaseline = "top";
+    ctx.fillStyle = DIM; ctx.font = "500 10px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top";
     for (const t of W_TICKS) { seg(ctx, xPx(t), W_MT + W_S, xPx(t), W_MT + W_S + 3); ctx.fillText(minus(`${t}`), xPx(t), W_MT + W_S + 6); }
     ctx.textAlign = "right"; ctx.textBaseline = "middle";
     for (const t of W_TICKS) { seg(ctx, W_ML, pPx(t), W_ML - 3, pPx(t)); ctx.fillText(minus(`${t}`), W_ML - 6, pPx(t)); }
-    ctx.fillStyle = INK; ctx.font = "600 14px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = INK; ctx.font = "600 14px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
     ctx.fillText("x", W_ML + W_S / 2, W_CH - 6);
     ctx.save(); ctx.translate(12, W_MT + W_S / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top"; ctx.fillText("p", 0, 0); ctx.restore();
   }
@@ -482,7 +484,7 @@ export function App() {
     ctx.fillStyle = PANEL; ctx.fillRect(0, 0, S_CW, S_CH);
     const ps = popSeries.current, T = ps ? ps.T : T_LOOP;
     const yOf = (v: number) => S_MT + (1 - v) * S_PH, xOf = (t: number) => S_ML + (t / T) * S_PW;
-    ctx.font = "500 9px 'JetBrains Mono','SF Mono',monospace"; ctx.fillStyle = DIM;
+    ctx.font = "500 9px 'IBM Plex Sans',system-ui,sans-serif"; ctx.fillStyle = DIM;
     for (const v of [0, 0.5, 1]) {
       ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5;
       seg(ctx, S_ML, yOf(v), S_ML + S_PW, yOf(v)); seg(ctx, S_ML - 3, yOf(v), S_ML, yOf(v));
@@ -505,9 +507,9 @@ export function App() {
       for (const t of [0, T / 3, (2 * T) / 3, T]) ctx.fillText(t.toFixed(0), xOf(t), S_MT + S_PH + 5);
     }
     ctx.lineWidth = 0.75; ctx.strokeStyle = AXIS; ctx.strokeRect(S_ML, S_MT, S_PW, S_PH);
-    ctx.fillStyle = INK; ctx.font = "600 12px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = INK; ctx.font = "600 12px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
     ctx.fillText("time  t   (units of ω_c⁻¹, dimensionless)", S_ML + S_PW / 2, S_CH - 4);
-    ctx.save(); ctx.translate(12, S_MT + S_PH / 2); ctx.rotate(-Math.PI / 2); ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.font = "600 11px 'JetBrains Mono','SF Mono',monospace"; ctx.fillText("population / probability  (dimensionless)", 0, 0); ctx.restore();
+    ctx.save(); ctx.translate(12, S_MT + S_PH / 2); ctx.rotate(-Math.PI / 2); ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.font = "600 11px 'IBM Plex Sans',system-ui,sans-serif"; ctx.fillText("population / probability  (dimensionless)", 0, 0); ctx.restore();
   }
 
   // FIX 4 (SINGLE) · decoherence panel: purity Tr(ρ²) and von Neumann entropy S(t) together — the
@@ -518,7 +520,7 @@ export function App() {
     ctx.fillStyle = PANEL; ctx.fillRect(0, 0, DC_CW, DC_CH);
     const ps = popSeries.current, T = ps ? ps.T : T_LOOP;
     const yOf = (v: number) => DC_MT + (1 - v) * DC_PH, xOf = (t: number) => DC_ML + (t / T) * DC_PW;
-    ctx.font = "500 9px 'JetBrains Mono','SF Mono',monospace";
+    ctx.font = "500 9px 'IBM Plex Sans',system-ui,sans-serif";
     for (const v of [0, 0.5, 1]) { ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5; seg(ctx, DC_ML, yOf(v), DC_ML + DC_PW, yOf(v)); ctx.fillStyle = DIM; ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(v.toFixed(1), DC_ML - 6, yOf(v)); }
     if (ps) {
       let smax = 0.1; for (let i = 0; i < ps.n; i++) if (ps.data[i * 4 + 3]! > smax) smax = ps.data[i * 4 + 3]!;
@@ -533,7 +535,7 @@ export function App() {
       ctx.fillStyle = AMBER; ctx.textAlign = "left"; ctx.textBaseline = "top"; ctx.fillText(`S (nats, ÷${smax.toFixed(2)} max=ln2)   ·   purity ∈ [0,1]`, DC_ML + 5, DC_MT + 4);
     }
     ctx.strokeStyle = AXIS; ctx.lineWidth = 0.75; ctx.strokeRect(DC_ML, DC_MT, DC_PW, DC_PH);
-    ctx.fillStyle = INK; ctx.font = "600 11px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic"; ctx.fillText("time  t  (ω_c⁻¹)", DC_ML + DC_PW / 2, DC_CH - 5);
+    ctx.fillStyle = INK; ctx.font = "600 11px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic"; ctx.fillText("time  t  (ω_c⁻¹)", DC_ML + DC_PW / 2, DC_CH - 5);
   }
 
   // 4.A (SINGLE) · Bloch-vector projection of the single-excitation effective qubit {|0,e⟩,|1,g⟩}.
@@ -549,7 +551,7 @@ export function App() {
     ctx.strokeStyle = "#21262d"; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(cx, cy, R, 0, 2 * Math.PI); ctx.stroke(); // unit circle
     ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5; ctx.beginPath(); ctx.arc(cx, cy, R * 0.5, 0, 2 * Math.PI); ctx.stroke();
     ctx.strokeStyle = "#21262d"; ctx.lineWidth = 0.6; seg(ctx, xPx(-1.12), cy, xPx(1.12), cy); seg(ctx, cx, yPx(-1.12), cx, yPx(1.12));
-    ctx.fillStyle = DIM; ctx.font = "500 8px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "center"; ctx.textBaseline = "top";
+    ctx.fillStyle = DIM; ctx.font = "500 8px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top";
     for (const t of [-1, 1]) ctx.fillText(minus(`${t}`), xPx(t), cy + 4);
     ctx.textAlign = "right"; ctx.textBaseline = "middle";
     for (const t of [-1, 1]) ctx.fillText(minus(`${t}`), cx - 5, yPx(t));
@@ -563,7 +565,7 @@ export function App() {
     const q = quantum.current; // live cursor — where the running open system currently sits on the spiral
     if (q) { const b = q.emitterBloch(); ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(xPx(b[1]!), yPx(b[2]!), 3.5, 0, 2 * Math.PI); ctx.fill(); }
     ctx.strokeStyle = AXIS; ctx.lineWidth = 0.75; ctx.strokeRect(BL_ML, BL_MT, BL_S, BL_S);
-    ctx.fillStyle = INK; ctx.font = "600 11px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = INK; ctx.font = "600 11px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
     ctx.fillText("2 Im ρ₀₁  (coherence)", BL_ML + BL_S / 2, BL_CH - 6);
     ctx.save(); ctx.translate(12, BL_MT + BL_S / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top"; ctx.fillText("ρ₀₀ − ρ₁₁  (inversion)", 0, 0); ctx.restore();
   }
@@ -598,9 +600,9 @@ export function App() {
     ctx.strokeStyle = "#000"; ctx.lineWidth = 1; // explicit 1px matrix grid
     for (let k = 0; k <= B; k++) { const p = k * cell; seg(ctx, R_ML + p, R_MT, R_ML + p, R_MT + R_S); seg(ctx, R_ML, R_MT + p, R_ML + R_S, R_MT + p); }
     ctx.strokeStyle = AXIS; ctx.lineWidth = 0.75; ctx.strokeRect(R_ML, R_MT, R_S, R_S);
-    ctx.fillStyle = DIM; ctx.font = "500 8px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "center"; ctx.textBaseline = "top";
+    ctx.fillStyle = DIM; ctx.font = "500 8px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top";
     ctx.fillText("0", R_ML + cell / 2, R_MT + R_S + 4); ctx.fillText(String(B - 1), R_ML + R_S - cell / 2, R_MT + R_S + 4);
-    ctx.fillStyle = INK; ctx.font = "600 10px 'JetBrains Mono','SF Mono',monospace";
+    ctx.fillStyle = INK; ctx.font = "600 10px 'IBM Plex Sans',system-ui,sans-serif";
     ctx.fillText("|j⟩  (Fock n⊗{g,e})", R_ML + R_S / 2, R_CH - 4);
     ctx.save(); ctx.translate(9, R_MT + R_S / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top"; ctx.fillText("⟨i|", 0, 0); ctx.restore();
   }
@@ -625,23 +627,23 @@ export function App() {
     const col = sweep.current[v.j]!, phot = col.photon, n = phot.length, pk = Math.min(v.k, n - 1), pf = phot[pk]!, mf = Math.max(0, 1 - pf);
     // LEFT — selected eigenstate composition (two horizontal bars)
     const lx = HB_ML + 6, lw = HB_PW * 0.30, by = HB_MT + 12, bh = 28, gap = 18;
-    ctx.fillStyle = INK; ctx.font = "600 10px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "left"; ctx.textBaseline = "bottom";
+    ctx.fillStyle = INK; ctx.font = "600 10px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "bottom";
     ctx.fillText(`SELECTED |ψ_k⟩  k=${pk}`, lx, by - 6);
     const hbar = (y: number, frac: number, c2: string, lab: string) => {
       ctx.fillStyle = "#0c0f12"; ctx.fillRect(lx, y, lw, bh);
       ctx.fillStyle = c2; ctx.fillRect(lx, y, lw * Math.max(0, Math.min(1, frac)), bh);
       ctx.strokeStyle = AXIS; ctx.lineWidth = 0.75; ctx.strokeRect(lx, y, lw, bh);
-      ctx.fillStyle = "#fff"; ctx.font = "600 10px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.fillText(lab, lx + 5, y + bh / 2);
+      ctx.fillStyle = "#fff"; ctx.font = "600 10px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.fillText(lab, lx + 5, y + bh / 2);
       ctx.textAlign = "right"; ctx.fillText(frac.toFixed(3), lx + lw - 5, y + bh / 2);
     };
     hbar(by, pf, CYAN, "photon  |⟨a|ψ⟩|²");
     hbar(by + bh + gap, mf, RED, "matter  |⟨σ|ψ⟩|²");
     // RIGHT — photon-weight distribution across all eigenstates
     const rx = HB_ML + HB_PW * 0.40, rw = HB_PW * 0.60, ry = HB_MT, rh = HB_PH, bw = rw / n;
-    ctx.fillStyle = INK; ctx.textAlign = "left"; ctx.textBaseline = "bottom"; ctx.font = "600 9.5px 'JetBrains Mono','SF Mono',monospace";
+    ctx.fillStyle = INK; ctx.textAlign = "left"; ctx.textBaseline = "bottom"; ctx.font = "600 9.5px 'IBM Plex Sans',system-ui,sans-serif";
     ctx.fillText("PHOTON WEIGHT |⟨a|ψ_k⟩|² PER EIGENSTATE  ·  2 bright polaritons + N−1 dark", rx, ry - 6);
     const yb = (p: number) => ry + rh - p * rh;
-    for (const p of [0, 0.5, 1]) { ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5; seg(ctx, rx, yb(p), rx + rw, yb(p)); ctx.fillStyle = DIM; ctx.font = "500 8px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(p.toFixed(1), rx - 4, yb(p)); }
+    for (const p of [0, 0.5, 1]) { ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5; seg(ctx, rx, yb(p), rx + rw, yb(p)); ctx.fillStyle = DIM; ctx.font = "500 8px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(p.toFixed(1), rx - 4, yb(p)); }
     for (let k = 0; k < n; k++) {
       const p = phot[k]!, x = rx + k * bw, dark = p < 0.05, bwid = Math.max(1, bw - 2);
       ctx.fillStyle = dark ? PURPLE : CYAN; // photon-bright polaritons cyan, dark/subradiant states purple (no amber)
@@ -650,7 +652,7 @@ export function App() {
       if (k === pk) { ctx.strokeStyle = "#fff"; ctx.lineWidth = 1; ctx.strokeRect(x + 0.5, by2 - 1, bwid + 1, bh2 + 1); } // selected eigenstate → white outline
     }
     ctx.strokeStyle = AXIS; ctx.lineWidth = 0.75; ctx.strokeRect(rx, ry, rw, rh);
-    ctx.fillStyle = DIM; ctx.font = "600 9px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText("eigenstate index k", rx + rw / 2, ry + rh + 5);
+    ctx.fillStyle = DIM; ctx.font = "600 9px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText("eigenstate index k", rx + rw / 2, ry + rh + 5);
   }
 
   function drawSpectrum() {
@@ -694,15 +696,15 @@ export function App() {
       const rc = sweep.current[sweep.current.length - 1]!;
       let lo = Infinity, hi = -Infinity;
       for (let k = 0; k < rc.eigs.length; k++) { if (rc.photon[k]! < 0.02) continue; const e = rc.eigs[k]!; if (e < lo) lo = e; if (e > hi) hi = e; }
-      ctx.font = "700 11px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "right"; ctx.textBaseline = "middle";
+      ctx.font = "700 11px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "right"; ctx.textBaseline = "middle";
       ctx.fillStyle = CYAN; ctx.fillText("UP", xOf(R) - 5, yOf(hi) - 9);
       ctx.fillStyle = "#ff7a5c"; ctx.fillText("LP", xOf(R) - 5, yOf(lo) + 9);
-      ctx.font = "500 8px 'JetBrains Mono','SF Mono',monospace"; ctx.fillStyle = "rgba(148,163,184,0.75)"; ctx.textAlign = "left"; ctx.textBaseline = "bottom";
+      ctx.font = "500 8px 'IBM Plex Sans',system-ui,sans-serif"; ctx.fillStyle = "rgba(148,163,184,0.75)"; ctx.textAlign = "left"; ctx.textBaseline = "bottom";
       ctx.fillText("bare cavity ω_c", xOf(R * 0.55) + 2, yOf(WA + R * 0.55 * sp.g) - 2);
     }
     if (ndark > 0) {
       const txt = `${ndark} dark / subradiant reservoir`, yLab = yOf(WA) - 3;
-      ctx.font = "600 8.5px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "right"; ctx.textBaseline = "bottom";
+      ctx.font = "600 8.5px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "right"; ctx.textBaseline = "bottom";
       const tw = ctx.measureText(txt).width;
       ctx.fillStyle = PANEL; ctx.fillRect(P_ML + P_W - 4 - tw - 3, yLab - 10, tw + 6, 12);
       ctx.fillStyle = PURPLE; ctx.fillText(txt, P_ML + P_W - 4, yLab);
@@ -714,16 +716,16 @@ export function App() {
       ctx.beginPath(); ctx.arc(xOf(col.x), yOf(col.eigs[k]!), 5.5, 0, 2 * Math.PI); ctx.stroke();
     }
     ctx.lineWidth = 0.75; ctx.strokeStyle = AXIS; ctx.strokeRect(P_ML, P_MT, P_W, P_H);
-    ctx.fillStyle = DIM; ctx.font = "500 10px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "center"; ctx.textBaseline = "top";
+    ctx.fillStyle = DIM; ctx.font = "500 10px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top";
     for (const t of xticks) { seg(ctx, xOf(t), P_MT + P_H, xOf(t), P_MT + P_H + 3); ctx.fillText(minus(`${Math.round(t)}`), xOf(t), P_MT + P_H + 6); }
     ctx.textAlign = "right"; ctx.textBaseline = "middle";
     for (const e of yticks) { seg(ctx, P_ML, yOf(e), P_ML - 3, yOf(e)); ctx.fillText(fmt(e, 2), P_ML - 6, yOf(e)); }
     ctx.fillStyle = INK; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
-    ctx.font = "13px 'JetBrains Mono','SF Mono',monospace"; ctx.fillText("cavity–emitter detuning  (ω_c − ω_a) / g   (dimensionless)", P_ML + P_W / 2, P_CH - 7);
+    ctx.font = "13px 'IBM Plex Sans',system-ui,sans-serif"; ctx.fillText("cavity–emitter detuning  (ω_c − ω_a) / g   (dimensionless)", P_ML + P_W / 2, P_CH - 7);
     ctx.save(); ctx.translate(15, P_MT + P_H / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top"; ctx.textAlign = "center";
-    ctx.font = "600 13px 'JetBrains Mono','SF Mono',monospace"; ctx.fillText("energy  E / ω_a   (dimensionless)", 0, 0); ctx.restore();
+    ctx.font = "600 13px 'IBM Plex Sans',system-ui,sans-serif"; ctx.fillText("energy  E / ω_a   (dimensionless)", 0, 0); ctx.restore();
     // approximations footnote
-    ctx.fillStyle = DIM; ctx.font = "500 8px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = DIM; ctx.font = "500 8px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
     ctx.fillText("single-excitation Tavis–Cummings · RWA · ideal degenerate dark states", P_ML + 2, P_CH - 7);
   }
 
@@ -742,7 +744,7 @@ export function App() {
     ctx.save(); ctx.setLineDash([3, 3]); ctx.lineWidth = 0.6; ctx.strokeStyle = CROSS;
     seg(ctx, cx, B_MT, cx, B_MT + B_S); seg(ctx, B_ML, cy, B_ML + B_S, cy); ctx.restore();
     ctx.lineWidth = 0.75; ctx.strokeStyle = AXIS; ctx.strokeRect(B_ML, B_MT, B_S, B_S);
-    ctx.fillStyle = INK; ctx.font = "600 11px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = INK; ctx.font = "600 11px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
     ctx.fillText("x", B_ML + B_S / 2, B_CH - 6);
     ctx.save(); ctx.translate(10, B_MT + B_S / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top"; ctx.fillText("p", 0, 0); ctx.restore();
     const set = (key: string, t: string) => { const el = read.current[key]; if (el) el.textContent = t; };
@@ -824,7 +826,7 @@ export function App() {
     let started = false;
     for (const bnd of bands) { const x0 = xOf(bnd.z0), x1 = xOf(bnd.z0 + bnd.d), yn = ynOf(bnd.n); if (!started) { ctx.moveTo(x0, yn); started = true; } else ctx.lineTo(x0, yn); ctx.lineTo(x1, yn); }
     ctx.stroke();
-    ctx.fillStyle = "rgba(140,160,190,0.8)"; ctx.font = "500 8.5px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+    ctx.fillStyle = "rgba(140,160,190,0.8)"; ctx.font = "500 8.5px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
     for (const n of [cav.nLo, cav.nCav, cav.nHi]) { const yn = ynOf(n); seg(ctx, CV_ML + CV_W, yn, CV_ML + CV_W + 3, yn); ctx.fillText(n.toFixed(2), CV_ML + CV_W + 5, yn); }
     // ── |E(z)|² standing wave (left axis), antinode pinned in the spacer, exponential tails INTO the mirrors ──
     const fieldPath = () => { ctx.beginPath(); for (let k = 0; k < z.length; k++) { const x = xOf(z[k]!), y = yOf(intensity[k]!); k === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); } };
@@ -835,11 +837,11 @@ export function App() {
     const zAnti = z[iAt]!, xAnti = xOf(zAnti);
     ctx.strokeStyle = "rgba(226,232,240,0.5)"; ctx.setLineDash([2, 3]); ctx.lineWidth = 1; seg(ctx, xAnti, CV_MT, xAnti, CV_MT + CV_H); ctx.setLineDash([]);
     ctx.fillStyle = "#e2e8f0"; ctx.beginPath(); ctx.arc(xAnti, yOf(imax), 3.2, 0, 2 * Math.PI); ctx.fill();
-    ctx.fillStyle = "#e2e8f0"; ctx.font = "600 8.5px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+    ctx.fillStyle = "#e2e8f0"; ctx.font = "600 8.5px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "bottom";
     ctx.fillText("emitter @ antinode ⇒ g max", xAnti, CV_MT + 10);
     // ── penetration L_DBR over each mirror tail + L_eff bracket across the field region ─────────────────────
     const innerHalf = (ph.LcavNm) / 2, zL = cs.z0 + cs.d / 2 - innerHalf - ph.LdbrNm, zR = cs.z0 + cs.d / 2 + innerHalf + ph.LdbrNm;
-    ctx.strokeStyle = CYAN; ctx.fillStyle = CYAN; ctx.lineWidth = 1; ctx.font = "500 8px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "center"; ctx.textBaseline = "top";
+    ctx.strokeStyle = CYAN; ctx.fillStyle = CYAN; ctx.lineWidth = 1; ctx.font = "500 8px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top";
     const yb = CV_MT + CV_H - 8;
     seg(ctx, xOf(Math.max(0, zL)), yb, xOf(cs.z0), yb); ctx.fillText(`L_DBR ${ph.LdbrNm.toFixed(0)}nm`, xOf((Math.max(0, zL) + cs.z0) / 2), yb + 2);
     ctx.strokeStyle = "rgba(0,229,255,0.5)"; ctx.setLineDash([3, 2]);
@@ -847,11 +849,11 @@ export function App() {
     ctx.fillStyle = CYAN; ctx.textBaseline = "top"; ctx.fillText(`L_eff = ${ph.LeffNm.toFixed(0)} nm`, (xOf(Math.max(0, zL)) + xOf(Math.min(total, zR))) / 2, CV_MT + 16);
     // axes
     ctx.lineWidth = 0.75; ctx.strokeStyle = AXIS; ctx.strokeRect(CV_ML, CV_MT, CV_W, CV_H);
-    ctx.fillStyle = DIM; ctx.font = "500 10px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "center"; ctx.textBaseline = "top";
+    ctx.fillStyle = DIM; ctx.font = "500 10px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top";
     for (const t of niceTicks(0, total, 6)) { const x = xOf(t); seg(ctx, x, CV_MT + CV_H, x, CV_MT + CV_H + 3); ctx.fillText(`${Math.round(t)}`, x, CV_MT + CV_H + 6); }
-    ctx.fillStyle = AMBER; ctx.font = "600 9px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "right"; ctx.textBaseline = "top";
+    ctx.fillStyle = AMBER; ctx.font = "600 9px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "right"; ctx.textBaseline = "top";
     ctx.fillText(`peak |E|²/inc = ${imax.toFixed(2)}×`, CV_ML + CV_W - 4, CV_MT + 3); // field enhancement
-    ctx.fillStyle = INK; ctx.font = "600 13px 'JetBrains Mono','SF Mono',monospace"; ctx.textBaseline = "alphabetic"; ctx.textAlign = "center";
+    ctx.fillStyle = INK; ctx.font = "600 13px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textBaseline = "alphabetic"; ctx.textAlign = "center";
     ctx.fillText("z  (nm)", CV_ML + CV_W / 2, CV_CH - 7);
     ctx.save(); ctx.translate(14, CV_MT + CV_H / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top"; ctx.fillStyle = AMBER; ctx.fillText("|E(z)|²  (E₀⁺=1)", 0, 0); ctx.restore();
     ctx.save(); ctx.translate(CV_CW - 2, CV_MT + CV_H / 2); ctx.rotate(Math.PI / 2); ctx.fillStyle = "rgba(140,160,190,0.8)"; ctx.textBaseline = "top"; ctx.fillText("refractive index n", 0, 0); ctx.restore();
@@ -895,19 +897,19 @@ export function App() {
     const yOf = (R: number) => RB_MT + (1 - R) * RB_PH;
     const flat = cavityLayers(cav.lambda, cav.nHi, cav.nLo, cav.pairs, cav.nCav); // FIXED stack designed at λ₀
     const Rs: number[] = []; for (let s = 0; s <= M; s++) { const l = lmin + (lmax - lmin) * s / M; Rs.push(tmmReflectance(flat, l, N0, NS)); }
-    ctx.font = "500 9px 'JetBrains Mono','SF Mono',monospace";
+    ctx.font = "500 9px 'IBM Plex Sans',system-ui,sans-serif";
     for (const v of [0, 0.5, 1]) { ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5; seg(ctx, RB_ML, yOf(v), RB_ML + RB_PW, yOf(v)); ctx.fillStyle = DIM; ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(v.toFixed(1), RB_ML - 5, yOf(v)); }
     ctx.fillStyle = "rgba(56,84,150,0.18)"; for (let s = 0; s < M; s++) { if (Rs[s]! > 0.5) { const l = lmin + (lmax - lmin) * s / M; ctx.fillRect(xOf(l), RB_MT, Math.max(0.6, RB_PW / M + 0.6), RB_PH); } } // stopband shading
     ctx.strokeStyle = CYAN; ctx.lineWidth = 1.7; ctx.beginPath();
     for (let s = 0; s <= M; s++) { const l = lmin + (lmax - lmin) * s / M; const x = xOf(l), y = yOf(Rs[s]!); s === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); } ctx.stroke();
     ctx.save(); ctx.setLineDash([2, 3]); ctx.strokeStyle = AMBER; ctx.lineWidth = 1; seg(ctx, xOf(lam0), RB_MT, xOf(lam0), RB_MT + RB_PH); ctx.restore();
     const ph = cavPhys();
-    ctx.fillStyle = AMBER; ctx.font = "600 8.5px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText("resonance dip λ₀", xOf(lam0), RB_MT + 2);
+    ctx.fillStyle = AMBER; ctx.font = "600 8.5px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText("resonance dip λ₀", xOf(lam0), RB_MT + 2);
     ctx.fillStyle = "rgba(120,150,210,0.95)"; ctx.textBaseline = "bottom"; ctx.fillText(`stopband Δf/f₀ = ${ph.dffPct.toFixed(0)}% (${ph.dLamNm.toFixed(0)}nm) · contrast-set`, RB_ML + RB_PW / 2, RB_MT + RB_PH - 3);
     ctx.lineWidth = 0.75; ctx.strokeStyle = AXIS; ctx.strokeRect(RB_ML, RB_MT, RB_PW, RB_PH);
-    ctx.fillStyle = DIM; ctx.font = "500 9px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "center"; ctx.textBaseline = "top";
+    ctx.fillStyle = DIM; ctx.font = "500 9px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top";
     for (const l of [lmin, lam0, lmax]) { const x = xOf(l); seg(ctx, x, RB_MT + RB_PH, x, RB_MT + RB_PH + 3); ctx.fillText(`${Math.round(l)}`, x, RB_MT + RB_PH + 6); }
-    ctx.fillStyle = INK; ctx.font = "600 12px 'JetBrains Mono','SF Mono',monospace"; ctx.textBaseline = "alphabetic"; ctx.fillText("wavelength λ (nm)", RB_ML + RB_PW / 2, RB_CH - 6);
+    ctx.fillStyle = INK; ctx.font = "600 12px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textBaseline = "alphabetic"; ctx.fillText("wavelength λ (nm)", RB_ML + RB_PW / 2, RB_CH - 6);
     ctx.save(); ctx.translate(11, RB_MT + RB_PH / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top"; ctx.fillText("Reflectance R", 0, 0); ctx.restore();
   }
 
@@ -927,7 +929,7 @@ export function App() {
     const Nstar = ph.Nstar, logNstar = Math.log10(Math.max(1, Nstar));
     // strong-coupling region shading (N > N*)
     ctx.fillStyle = "rgba(0,229,255,0.07)"; ctx.fillRect(xOf(Math.min(Nx, logNstar)), RB_MT, RB_PW - (xOf(Math.min(Nx, logNstar)) - RB_ML), RB_PH);
-    ctx.font = "500 8px 'JetBrains Mono','SF Mono',monospace"; ctx.fillStyle = DIM; ctx.textAlign = "right"; ctx.textBaseline = "middle";
+    ctx.font = "500 8px 'IBM Plex Sans',system-ui,sans-serif"; ctx.fillStyle = DIM; ctx.textAlign = "right"; ctx.textBaseline = "middle";
     for (const e of [1, 10, 100, 1000]) { const le = Math.log10(e); if (le < ymin || le > ymax) continue; ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5; seg(ctx, RB_ML, yOf(le), RB_ML + RB_PW, yOf(le)); ctx.fillText(`${e}`, RB_ML - 4, yOf(le)); }
     // κ horizontal line
     ctx.strokeStyle = "#ff7080"; ctx.setLineDash([4, 3]); ctx.lineWidth = 1.4; seg(ctx, RB_ML, yOf(Math.log10(kap)), RB_ML + RB_PW, yOf(Math.log10(kap))); ctx.setLineDash([]);
@@ -936,17 +938,17 @@ export function App() {
     ctx.strokeStyle = CYAN; ctx.lineWidth = 1.8; ctx.beginPath();
     for (let s = 0; s <= 120; s++) { const logN = Nx * s / 120, E = g2 * Math.pow(10, logN / 2); ctx.lineTo(xOf(logN), yOf(Math.log10(E))); } ctx.stroke();
     // crossover marker
-    if (logNstar >= 0 && logNstar <= Nx) { ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(xOf(logNstar), yOf(Math.log10(kap)), 2.6, 0, 2 * Math.PI); ctx.fill(); ctx.fillStyle = DIM; ctx.font = "600 8px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText(`N* ≈ ${Nstar < 1e4 ? Math.round(Nstar) : Nstar.toExponential(0)}`, xOf(logNstar), yOf(Math.log10(kap)) + 4); }
+    if (logNstar >= 0 && logNstar <= Nx) { ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(xOf(logNstar), yOf(Math.log10(kap)), 2.6, 0, 2 * Math.PI); ctx.fill(); ctx.fillStyle = DIM; ctx.font = "600 8px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText(`N* ≈ ${Nstar < 1e4 ? Math.round(Nstar) : Nstar.toExponential(0)}`, xOf(logNstar), yOf(Math.log10(kap)) + 4); }
     // current N marker + regime
     const logNcur = Math.log10(Math.max(1, cavN)), Ecur = g2 * Math.sqrt(Math.max(1, cavN)), strong = Ecur > kap;
     ctx.strokeStyle = AMBER; ctx.setLineDash([1, 2]); ctx.lineWidth = 1; seg(ctx, xOf(Math.min(Nx, logNcur)), RB_MT, xOf(Math.min(Nx, logNcur)), RB_MT + RB_PH); ctx.setLineDash([]);
     ctx.fillStyle = strong ? CYAN : "#ff9b50"; ctx.beginPath(); ctx.arc(xOf(Math.min(Nx, logNcur)), yOf(Math.log10(Math.max(Math.pow(10, ymin), Ecur))), 3, 0, 2 * Math.PI); ctx.fill();
-    ctx.font = "600 9px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "center"; ctx.textBaseline = "top";
+    ctx.font = "600 9px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top";
     ctx.fillText(`N=${cavN < 1e4 ? cavN : cavN.toExponential(0)} · 2g√N=${Ecur < 1 ? Ecur.toFixed(2) : Ecur.toFixed(0)} meV · ${strong ? "STRONG" : "weak"}`, RB_ML + RB_PW / 2, RB_MT + 2);
     ctx.lineWidth = 0.75; ctx.strokeStyle = AXIS; ctx.strokeRect(RB_ML, RB_MT, RB_PW, RB_PH);
-    ctx.fillStyle = DIM; ctx.font = "500 9px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "center"; ctx.textBaseline = "top";
+    ctx.fillStyle = DIM; ctx.font = "500 9px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top";
     for (const p of [0, 2, 4, 6, 8]) { const x = xOf(p); seg(ctx, x, RB_MT + RB_PH, x, RB_MT + RB_PH + 3); ctx.fillText(`10${p === 0 ? "⁰" : p === 2 ? "²" : p === 4 ? "⁴" : p === 6 ? "⁶" : "⁸"}`, x, RB_MT + RB_PH + 6); }
-    ctx.fillStyle = INK; ctx.font = "600 12px 'JetBrains Mono','SF Mono',monospace"; ctx.textBaseline = "alphabetic"; ctx.fillText("emitter number N", RB_ML + RB_PW / 2, RB_CH - 6);
+    ctx.fillStyle = INK; ctx.font = "600 12px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textBaseline = "alphabetic"; ctx.fillText("emitter number N", RB_ML + RB_PW / 2, RB_CH - 6);
     ctx.save(); ctx.translate(11, RB_MT + RB_PH / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top"; ctx.fillText("Ω_R = 2g√N (meV)", 0, 0); ctx.restore();
   }
 
@@ -994,7 +996,7 @@ export function App() {
     const { eigs, vecs, n, c } = ds;
     const emin = eigs[0]!, emax = eigs[n - 1]!, pad = (emax - emin) * 0.14 + 1e-4, elo = emin - pad, ehi = emax + pad;
     const xOf = (f: number) => HP_ML + f * HP_PW, yOf = (e: number) => HP_MT + (1 - (e - elo) / (ehi - elo)) * HP_PH;
-    ctx.font = "500 8.5px 'JetBrains Mono','SF Mono',monospace";
+    ctx.font = "500 8.5px 'IBM Plex Sans',system-ui,sans-serif";
     for (const f of [0, 0.25, 0.5, 0.75, 1]) {
       ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5; seg(ctx, xOf(f), HP_MT, xOf(f), HP_MT + HP_PH);
       ctx.fillStyle = DIM; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText(f.toFixed(2), xOf(f), HP_MT + HP_PH + 5);
@@ -1008,7 +1010,7 @@ export function App() {
     // E/ω_c = 1.0 calibration line (the uncoupled / bare-exciton energy) — dotted, full width
     const yA = yOf(WA);
     ctx.strokeStyle = "rgba(139,148,158,0.45)"; ctx.setLineDash([1, 3]); ctx.lineWidth = 0.75; seg(ctx, HP_ML, yA, HP_ML + HP_PW, yA); ctx.setLineDash([]);
-    ctx.fillStyle = DIM; ctx.font = "9px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "right"; ctx.textBaseline = "bottom"; ctx.fillText("E/ω_c=1", HP_ML + HP_PW - 3, yA - 2);
+    ctx.fillStyle = DIM; ctx.font = "9px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "right"; ctx.textBaseline = "bottom"; ctx.fillText("E/ω_c=1", HP_ML + HP_PW - 3, yA - 2);
     if (dark.length) {
       let dlo = Infinity, dhi = -Infinity; for (const k of dark) { dlo = Math.min(dlo, eigs[k]!); dhi = Math.max(dhi, eigs[k]!); }
       const yb = yOf(dhi), yt = yOf(dlo), bw = xOf(0.05) - HP_ML, yc = (yb + yt) / 2;
@@ -1017,9 +1019,9 @@ export function App() {
       // label parked in the empty right region with a leader line — never on the data
       const lx = xOf(0.6);
       ctx.strokeStyle = "rgba(158,119,237,0.4)"; ctx.lineWidth = 0.6; seg(ctx, HP_ML + bw, yc, lx - 4, yc);
-      ctx.fillStyle = DARKC; ctx.font = "600 8.5px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+      ctx.fillStyle = DARKC; ctx.font = "600 8.5px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
       ctx.fillText(`${dark.length} DARK / SUBRADIANT`, lx, yc - 5);
-      ctx.fillStyle = DIM; ctx.font = "500 8px 'JetBrains Mono','SF Mono',monospace"; ctx.fillText("reservoir · zero photon wt.", lx, yc + 5);
+      ctx.fillStyle = DIM; ctx.font = "500 8px 'IBM Plex Sans',system-ui,sans-serif"; ctx.fillText("reservoir · zero photon wt.", lx, yc + 5);
     }
     // marker radius ∝ spatial mode-weight Σ|v_ik|²f(r_i) (Upgrade I): states on center molecules read
     // large, edge-localized states small — so shrinking the waist visibly shrinks edge dark states.
@@ -1035,11 +1037,11 @@ export function App() {
       if (k === inspK) { ctx.strokeStyle = "#fff"; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.arc(x, y, rad + 3.5, 0, 2 * Math.PI); ctx.stroke(); }
     }
     hopMarks.current = marks;
-    ctx.fillStyle = INK; ctx.font = "600 9px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+    ctx.fillStyle = INK; ctx.font = "600 9px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "bottom";
     ctx.fillText("LP", xOf(vecs[0]! * vecs[0]!), yOf(eigs[0]!) - 9);
     ctx.fillText("UP", xOf(vecs[n - 1]! * vecs[n - 1]!), yOf(eigs[n - 1]!) - 9);
     ctx.strokeStyle = AXIS; ctx.lineWidth = 0.75; ctx.strokeRect(HP_ML, HP_MT, HP_PW, HP_PH);
-    ctx.fillStyle = DIM; ctx.font = "600 11px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "center"; ctx.textBaseline = "top";
+    ctx.fillStyle = DIM; ctx.font = "600 11px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top";
     ctx.fillText("photon fraction  |⟨a|ψ_k⟩|²", HP_ML + HP_PW / 2, HP_MT + HP_PH + 16);
     ctx.save(); ctx.translate(15, HP_MT + HP_PH / 2); ctx.rotate(-Math.PI / 2); ctx.fillText("energy  E_k / ω_c", 0, 0); ctx.restore();
   }
@@ -1064,10 +1066,10 @@ export function App() {
       for (let k = 0; k <= n; k++) { const x = ml + k * cell, y = mt + k * cell; seg(ctx, x, mt, x, mt + n * cell); seg(ctx, ml, y, ml + n * cell, y); }
     }
     ctx.strokeStyle = AXIS; ctx.lineWidth = 0.75; ctx.strokeRect(ml, mt, n * cell, n * cell);
-    ctx.fillStyle = DIM; ctx.font = "600 8px 'JetBrains Mono','SF Mono',monospace";
+    ctx.fillStyle = DIM; ctx.font = "600 8px 'IBM Plex Sans',system-ui,sans-serif";
     ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText(`|j⟩  0…${n - 1}`, ml + n * cell / 2, mt + n * cell + 3);
     ctx.save(); ctx.translate(ml - 5, mt + n * cell / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "bottom"; ctx.fillText(`⟨i|  0…${n - 1}`, 0, 0); ctx.restore();
-    ctx.fillStyle = CYAN; ctx.textAlign = "left"; ctx.textBaseline = "bottom"; ctx.font = "600 7.5px 'JetBrains Mono','SF Mono',monospace"; ctx.fillText("⟨0|=photon", ml, mt - 2);
+    ctx.fillStyle = CYAN; ctx.textAlign = "left"; ctx.textBaseline = "bottom"; ctx.font = "600 7.5px 'IBM Plex Sans',system-ui,sans-serif"; ctx.fillText("⟨0|=photon", ml, mt - 2);
   }
 
   function onHopClick(e: React.MouseEvent<HTMLCanvasElement>) {
@@ -1089,7 +1091,7 @@ export function App() {
     // X-axis SYMMETRIC about the bare cavity resonance ω/ω_c = 1 so the Rabi doublet reads symmetric
     const lo = ds.eigs[0]!, hi = ds.eigs[ds.n - 1]!, hw = Math.max(0.5, (hi - lo) * 0.7 + 0.08), wlo = WA - hw, whi = WA + hw;
     const xOf = (w: number) => FF_ML + (w - wlo) / (whi - wlo) * FF_PW, yOf = (p: number) => FF_MT + (1 - p) * FF_PH;
-    ctx.font = "500 8.5px 'JetBrains Mono','SF Mono',monospace";
+    ctx.font = "500 8.5px 'IBM Plex Sans',system-ui,sans-serif";
     for (const p of [0, 0.5, 1]) { ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5; seg(ctx, FF_ML, yOf(p), FF_ML + FF_PW, yOf(p)); ctx.fillStyle = DIM; ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(p.toFixed(1), FF_ML - 6, yOf(p)); }
     // uniform ω ticks every 0.5 with a fine dashed vertical grid for lineshape tracking
     ctx.textAlign = "center"; ctx.textBaseline = "top";
@@ -1104,7 +1106,7 @@ export function App() {
     path(true); ctx.fillStyle = "rgba(0,255,255,0.12)"; ctx.fill();
     path(false); ctx.strokeStyle = CYAN; ctx.lineWidth = 1.6; ctx.stroke();
     ctx.strokeStyle = AXIS; ctx.lineWidth = 0.75; ctx.strokeRect(FF_ML, FF_MT, FF_PW, FF_PH);
-    ctx.fillStyle = DIM; ctx.font = "10px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText("ω/ω_c", FF_ML + FF_PW / 2, FF_CH - 11);
+    ctx.fillStyle = DIM; ctx.font = "10px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText("ω/ω_c", FF_ML + FF_PW / 2, FF_CH - 11);
     ctx.save(); ctx.translate(13, FF_MT + FF_PH / 2); ctx.rotate(-Math.PI / 2); ctx.fillText("S(ω)", 0, 0); ctx.restore();
   }
 
@@ -1119,7 +1121,7 @@ export function App() {
     for (const e of sw.eigs) for (let i = 0; i < K; i++) { emin = Math.min(emin, e[i]!); emax = Math.max(emax, e[i]!); }
     const pad = (emax - emin) * 0.08 + 1e-3; emin -= pad; emax += pad;
     const xOf = (g: number) => SW_ML + (g / SWEEP_GMAX) * SW_PW, yOf = (e: number) => SW_MT + (1 - (e - emin) / (emax - emin)) * SW_PH;
-    ctx.font = "500 9px 'JetBrains Mono','SF Mono',monospace";
+    ctx.font = "500 9px 'IBM Plex Sans',system-ui,sans-serif";
     for (let t = 0; t <= 4; t++) { const g = SWEEP_GMAX * t / 4; ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5; seg(ctx, xOf(g), SW_MT, xOf(g), SW_MT + SW_PH); ctx.fillStyle = DIM; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText(g.toFixed(2), xOf(g), SW_MT + SW_PH + 6); }
     for (let t = 0; t <= 4; t++) { const e = emin + (emax - emin) * t / 4; ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5; seg(ctx, SW_ML, yOf(e), SW_ML + SW_PW, yOf(e)); ctx.fillStyle = DIM; ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(fmt(e, 2), SW_ML - 7, yOf(e)); }
     for (let i = 0; i < K; i++) {
@@ -1130,11 +1132,11 @@ export function App() {
     }
     const gx = xOf(Math.min(SWEEP_GMAX, dynGRef.current));
     ctx.strokeStyle = "rgba(245,158,11,0.85)"; ctx.lineWidth = 1; ctx.setLineDash([4, 3]); seg(ctx, gx, SW_MT, gx, SW_MT + SW_PH); ctx.setLineDash([]);
-    ctx.fillStyle = AMBER; ctx.font = "600 9px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "center"; ctx.textBaseline = "bottom"; ctx.fillText("g = " + fmt(dynGRef.current, 3), gx, SW_MT - 3);
+    ctx.fillStyle = AMBER; ctx.font = "600 9px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "bottom"; ctx.fillText("g = " + fmt(dynGRef.current, 3), gx, SW_MT - 3);
     ctx.strokeStyle = AXIS; ctx.lineWidth = 0.75; ctx.strokeRect(SW_ML, SW_MT, SW_PW, SW_PH);
-    ctx.fillStyle = INK; ctx.font = "600 12px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText("coupling  g_0 / ω_c", SW_ML + SW_PW / 2, SW_MT + SW_PH + 18);
+    ctx.fillStyle = INK; ctx.font = "600 12px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText("coupling  g_0 / ω_c", SW_ML + SW_PW / 2, SW_MT + SW_PH + 18);
     ctx.save(); ctx.translate(16, SW_MT + SW_PH / 2); ctx.rotate(-Math.PI / 2); ctx.fillText("energy  E / ω_c", 0, 0); ctx.restore();
-    ctx.font = "600 10px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+    ctx.font = "600 10px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
     ctx.fillStyle = COBALT; ctx.fillText("UP", SW_ML + SW_PW + 5, yOf(sw.eigs[steps - 1]![K - 1]!));
     ctx.fillText("LP", SW_ML + SW_PW + 5, yOf(sw.eigs[steps - 1]![0]!));
     ctx.fillStyle = DARKC; ctx.fillText("dark", SW_ML + SW_PW + 5, yOf(sw.eigs[steps - 1]![Math.floor(K / 2)]!));
@@ -1161,7 +1163,7 @@ export function App() {
     };
     const bare = curve(hd.fc.pos, hd.fc.weight), live = curve(hd.live.eigs, hd.live.absorption);
     let norm = 1e-9; for (let i = 0; i < HTC_GRID; i++) { if (bare[i]! > norm) norm = bare[i]!; if (live[i]! > norm) norm = live[i]!; }
-    ctx.font = "500 9px 'JetBrains Mono','SF Mono',monospace";
+    ctx.font = "500 9px 'IBM Plex Sans',system-ui,sans-serif";
     for (const a of [0, 0.5, 1]) { ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5; seg(ctx, HT_ML, yOf(a), HT_ML + HT_PW, yOf(a)); ctx.fillStyle = DIM; ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(a.toFixed(1), HT_ML - 6, yOf(a)); }
     for (let t = 0; t <= 6; t++) { const w = wlo + (whi - wlo) * t / 6; ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5; seg(ctx, xOf(w), HT_MT, xOf(w), HT_MT + HT_PH); ctx.fillStyle = DIM; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText(fmt(w, 2), xOf(w), HT_MT + HT_PH + 5); }
     const drawArea = (ys: Float64Array, line: string, fill: string) => {
@@ -1173,9 +1175,9 @@ export function App() {
     drawArea(live, COBALT, "rgba(59,130,246,0.15)"); // in-cavity / collective
     // bare 0-0 origin marker (polaron-shifted)
     const x00 = xOf(WA - htc.S * htc.wv); ctx.strokeStyle = "rgba(245,158,11,0.5)"; ctx.setLineDash([3, 3]); ctx.lineWidth = 0.75; seg(ctx, x00, HT_MT, x00, HT_MT + HT_PH); ctx.setLineDash([]);
-    ctx.fillStyle = AMBER; ctx.font = "600 9px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "left"; ctx.textBaseline = "top"; ctx.fillText("0–0", x00 + 3, HT_MT + 2);
+    ctx.fillStyle = AMBER; ctx.font = "600 9px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "top"; ctx.fillText("0–0", x00 + 3, HT_MT + 2);
     ctx.strokeStyle = AXIS; ctx.lineWidth = 0.75; ctx.strokeRect(HT_ML, HT_MT, HT_PW, HT_PH);
-    ctx.fillStyle = INK; ctx.font = "600 12px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText("frequency  ω / ω_c", HT_ML + HT_PW / 2, HT_MT + HT_PH + 18);
+    ctx.fillStyle = INK; ctx.font = "600 12px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText("frequency  ω / ω_c", HT_ML + HT_PW / 2, HT_MT + HT_PH + 18);
     ctx.save(); ctx.translate(15, HT_MT + HT_PH / 2); ctx.rotate(-Math.PI / 2); ctx.fillText("absorption  A(ω)", 0, 0); ctx.restore();
   }
 
@@ -1186,7 +1188,7 @@ export function App() {
     const cv = vibCompareCanvas.current, hd = htcData.current; if (!cv || !hd) return;
     const ctx = sized(cv, VB_CW, VB_CH);
     ctx.fillStyle = PANEL; ctx.fillRect(0, 0, VB_CW, VB_CH);
-    const F = "'JetBrains Mono','SF Mono',monospace", S = htc.S, wv = htc.wv;
+    const F = "'IBM Plex Sans',system-ui,sans-serif", S = htc.S, wv = htc.wv;
     // 1.D · LEFT — bare Franck–Condon progression (amber vertical bars, e^{−S}Sⁿ/n!) with the in-cavity
     // polariton absorption as a continuous Lorentzian-broadened cyan curve overlaid for direct comparison.
     const lx = VB_ML + 30, lw = VB_PW * 0.44, ly = VB_MT, lh = VB_PH;
@@ -1245,12 +1247,12 @@ export function App() {
     const bareW = (s: number) => gam + s;
     let ymax = 1e-6; for (let i = 0; i <= 100; i++) { const s = smax * i / 100; ymax = Math.max(ymax, GammaLP(s), bareW(s)); } ymax *= 1.08;
     const xOf = (s: number) => DI_ML + (s / smax) * DI_PW, yOf = (v: number) => DI_MT + (1 - v / ymax) * DI_PH;
-    ctx.font = "500 9px 'JetBrains Mono','SF Mono',monospace";
+    ctx.font = "500 9px 'IBM Plex Sans',system-ui,sans-serif";
     for (let t = 0; t <= 4; t++) { const v = ymax * t / 4; ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5; seg(ctx, DI_ML, yOf(v), DI_ML + DI_PW, yOf(v)); ctx.fillStyle = DIM; ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(v.toFixed(2), DI_ML - 5, yOf(v)); }
     // crossover divider at σ = Ω_R
     if (OmR > 0 && OmR < smax) {
       const xd = xOf(OmR); ctx.strokeStyle = AMBER; ctx.setLineDash([4, 3]); ctx.lineWidth = 1; seg(ctx, xd, DI_MT, xd, DI_MT + DI_PH); ctx.setLineDash([]);
-      ctx.fillStyle = AMBER; ctx.font = "600 8.5px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText("σ = Ω_R", xd, DI_MT + 2);
+      ctx.fillStyle = AMBER; ctx.font = "600 8.5px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText("σ = Ω_R", xd, DI_MT + 2);
     }
     const plot = (fn: (s: number) => number, stroke: string, dash: boolean) => {
       ctx.strokeStyle = stroke; ctx.lineWidth = dash ? 1.3 : 2; ctx.setLineDash(dash ? [4, 3] : []); ctx.beginPath();
@@ -1260,15 +1262,15 @@ export function App() {
     plot(bareW, "rgba(148,163,184,0.7)", true); // bare γ + σ
     plot(GammaLP, CYAN, false);                  // motional-narrowed polariton
     // regime labels
-    ctx.font = "600 8.5px 'JetBrains Mono','SF Mono',monospace"; ctx.textBaseline = "bottom";
+    ctx.font = "600 8.5px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textBaseline = "bottom";
     ctx.fillStyle = CYAN; ctx.textAlign = "left"; ctx.fillText("strong coupling · motional narrowing", DI_ML + 6, DI_MT + DI_PH - 6);
     ctx.fillStyle = "#8b949e"; ctx.textAlign = "right"; ctx.fillText("disorder-dominated", DI_ML + DI_PW - 6, DI_MT + 16);
     ctx.strokeStyle = AXIS; ctx.lineWidth = 0.75; ctx.strokeRect(DI_ML, DI_MT, DI_PW, DI_PH);
-    ctx.fillStyle = DIM; ctx.font = "500 9px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "center"; ctx.textBaseline = "top";
+    ctx.fillStyle = DIM; ctx.font = "500 9px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top";
     for (let s = 0; s <= 0.5001; s += 0.1) { seg(ctx, xOf(s), DI_MT + DI_PH, xOf(s), DI_MT + DI_PH + 3); ctx.fillText(s.toFixed(1), xOf(s), DI_MT + DI_PH + 6); }
-    ctx.fillStyle = INK; ctx.font = "600 11px 'JetBrains Mono','SF Mono',monospace"; ctx.textBaseline = "alphabetic"; ctx.fillText("inhomogeneous disorder  σ / ω_c", DI_ML + DI_PW / 2, DI_CH - 6);
+    ctx.fillStyle = INK; ctx.font = "600 11px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textBaseline = "alphabetic"; ctx.fillText("inhomogeneous disorder  σ / ω_c", DI_ML + DI_PW / 2, DI_CH - 6);
     ctx.save(); ctx.translate(13, DI_MT + DI_PH / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top"; ctx.fillText("Γ_LP / ω_c  (polariton linewidth, dimensionless)", 0, 0); ctx.restore();
-    ctx.font = "600 8.5px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "left"; ctx.textBaseline = "top";
+    ctx.font = "600 8.5px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "top";
     ctx.fillStyle = CYAN; ctx.fillText("Γ_LP = γ + σ²/2Ω_R   (κ≈γ here)", DI_ML + 6, DI_MT + 4);
     ctx.fillStyle = "#8b949e"; ctx.fillText("bare  γ + σ", DI_ML + 6, DI_MT + 16);
   }
@@ -1289,7 +1291,7 @@ export function App() {
     const ctx = sized(cvEl, PP_CW, PP_CH);
     ctx.fillStyle = PANEL; ctx.fillRect(0, 0, PP_CW, PP_CH);
     const yOf = (v: number) => PP_MT + (1 - v) * PP_PH, xOf = (t: number) => PP_ML + (t / pc.T) * PP_PW;
-    ctx.font = "500 9px 'JetBrains Mono','SF Mono',monospace";
+    ctx.font = "500 9px 'IBM Plex Sans',system-ui,sans-serif";
     for (const v of [0, 0.5, 1]) { ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5; seg(ctx, PP_ML, yOf(v), PP_ML + PP_PW, yOf(v)); ctx.fillStyle = DIM; ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(v.toFixed(1), PP_ML - 6, yOf(v)); }
     // one dashed gridline + tick per vacuum-Rabi cycle (0…6)
     const cycT = 2 * Math.PI / pc.split;
@@ -1306,7 +1308,7 @@ export function App() {
     const tnow = ((simT.current % pc.T) + pc.T) % pc.T; // live cursor, wraps every 6 cycles
     ctx.strokeStyle = "rgba(255,204,0,0.7)"; ctx.lineWidth = 1; ctx.setLineDash([3, 3]); seg(ctx, xOf(tnow), PP_MT, xOf(tnow), PP_MT + PP_PH); ctx.setLineDash([]);
     ctx.lineWidth = 0.75; ctx.strokeStyle = AXIS; ctx.strokeRect(PP_ML, PP_MT, PP_PW, PP_PH);
-    ctx.fillStyle = INK; ctx.font = "600 11px 'JetBrains Mono','SF Mono',monospace"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = INK; ctx.font = "600 11px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
     ctx.fillText("time   t Ω_R / 2π   (Rabi cycles)", PP_ML + PP_PW / 2, PP_CH - 8);
     ctx.save(); ctx.translate(13, PP_MT + PP_PH / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top"; ctx.fillText("population  P  (dimensionless, Σ=1)", 0, 0); ctx.restore();
   }
@@ -1829,7 +1831,7 @@ function PlotWrap({ cw, ch, area, inv, children }: { cw: number; ch: number; are
     if (x < area.ml || x > area.ml + area.pw || y < area.mt || y > area.mt + area.ph) return;
     ctx.strokeStyle = "#ffffff44"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(Math.round(x) + 0.5, area.mt); ctx.lineTo(Math.round(x) + 0.5, area.mt + area.ph); ctx.stroke();
     const v = inv(x, y); if (!v) return;
-    ctx.fillStyle = "#00ffff"; ctx.font = "10px 'JetBrains Mono','SF Mono',monospace";
+    ctx.fillStyle = "#00ffff"; ctx.font = "10px 'IBM Plex Sans',system-ui,sans-serif";
     const right = x > area.ml + area.pw * 0.62; ctx.textAlign = right ? "right" : "left"; ctx.textBaseline = "bottom";
     ctx.fillText(`[${v[0]}, ${v[1]}]`, x + (right ? -5 : 5), Math.max(area.mt + 11, y - 5));
   };
