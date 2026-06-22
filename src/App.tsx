@@ -14,6 +14,18 @@ function Tex({ t }: { t: string }) {
   const html = useMemo(() => katex.renderToString(t, { throwOnError: false, displayMode: false }), [t]);
   return <span className="tex" dangerouslySetInnerHTML={{ __html: html }} />;
 }
+// Governing-equation strip under a panel title — the exact math the panel computes, in Computer-Modern
+// (KaTeX). `where` is an optional compact symbol key. Renders as a thin instrument-style band.
+function PanelEqn({ t, where }: { t: string; where?: string }) {
+  const html = useMemo(() => katex.renderToString(t, { throwOnError: false, displayMode: true }), [t]);
+  return (
+    <div className="panel-eqn">
+      <span className="pe-tag">computes</span>
+      <span className="pe-tex" dangerouslySetInnerHTML={{ __html: html }} />
+      {where ? <span className="pe-where">{where}</span> : null}
+    </div>
+  );
+}
 
 // PERF: returns `value` only after it has stopped changing for `delay` ms. The heavy per-tab recomputes key
 // off the debounced inputs, so dragging a slider does NO synchronous physics on the main thread — the
@@ -1540,6 +1552,7 @@ export function App() {
             <>
               <div className="pane">
                 <div className="pane-head">Panel C · observables ⟨a†a⟩ <i style={{ color: COBALT }}>—</i> ⟨P_e⟩ <i style={{ color: CRIMSON }}>—</i> purity <i style={{ color: EMERALD }}>—</i></div>
+                <PanelEqn t={"\\begin{aligned}\\dot{\\rho} &= -i[\\hat H,\\rho] + \\kappa\\,\\mathcal{D}[\\hat a]\\rho + \\gamma\\,\\mathcal{D}[\\hat\\sigma]\\rho \\\\ \\hat H &= \\omega_c \\hat a^\\dagger \\hat a + \\Omega\\,\\hat\\sigma^\\dagger\\hat\\sigma + g(\\hat a^\\dagger\\hat\\sigma + \\hat a\\hat\\sigma^\\dagger)\\end{aligned}"} />
                 <div className="pane-sub"><b>What:</b> one quantum sloshes photon↔atom — the cyan/red anti-phase wiggle is the vacuum-Rabi oscillation at frequency 2g; the envelope decays as κ,γ leak it out. ⟨a†a⟩=mean photon number, ⟨P_e⟩=excited-state prob, all dimensionless ∈[0,1] here.</div>
                 <PlotWrap cw={S_CW} ch={S_CH} area={{ ml: S_ML, mt: S_MT, pw: S_PW, ph: S_PH }} inv={(px, py) => { const T = popSeries.current?.T ?? T_LOOP; return [(((px - S_ML) / S_PW) * T).toFixed(1), (1 - (py - S_MT) / S_PH).toFixed(2)]; }}>
                   <canvas ref={seriesCanvas} className="cv" />
@@ -1547,6 +1560,7 @@ export function App() {
               </div>
               <div className="pane">
                 <div className="pane-head">Panel B · phase space — Wigner <em>W</em> (signed · red = negativity) | Husimi <em>Q</em> (≥ 0)</div>
+                <PanelEqn t={"W(x,p)=\\tfrac{1}{\\pi}\\!\\int\\!\\langle x{-}y|\\hat\\rho|x{+}y\\rangle\\, e^{2ipy}\\,dy,\\qquad Q(\\alpha)=\\tfrac{1}{\\pi}\\langle\\alpha|\\hat\\rho|\\alpha\\rangle"} where="α=(x+ip)/√2" />
                 <div className="pane-sub"><b>What:</b> quasi-probability portrait of the cavity field in the x–p plane. <b>W</b> can go negative (red) — a non-classical signature; <b>Q</b> is a Gaussian-smoothed W that is always ≥0. Both are dimensionless densities.</div>
                 <div className="phase-row">
                   <canvas ref={wigCanvas} className="cv" />
@@ -1555,6 +1569,7 @@ export function App() {
               </div>
               <div className="pane">
                 <div className="pane-head">Panel E · decoherence — purity Tr(ρ²) <i style={{ color: GREEN, fontStyle: "normal" }}>—</i> von Neumann entropy S(t) <i style={{ color: AMBER, fontStyle: "normal" }}>—</i> (open-system mixing under κ,γ)</div>
+                <PanelEqn t={"\\mathcal{P}=\\operatorname{Tr}(\\hat\\rho^2)\\in(0,1],\\qquad S=-\\operatorname{Tr}(\\hat\\rho\\ln\\hat\\rho)"} where="S in nats" />
                 <div className="pane-sub"><b>What:</b> the state starts pure (purity→1, entropy→0) and mixes into the environment over time. <b>Green</b>=purity Tr ρ²∈[0,1] (left axis); <b>amber</b>=entropy S in nats (scaled to its peak ≈ln2). Falling purity = decoherence.</div>
                 <PlotWrap cw={DC_CW} ch={DC_CH} area={{ ml: DC_ML, mt: DC_MT, pw: DC_PW, ph: DC_PH }} inv={(px, py) => { const T = popSeries.current?.T ?? T_LOOP; return [(((px - DC_ML) / DC_PW) * T).toFixed(1), (1 - (py - DC_MT) / DC_PH).toFixed(2)]; }}>
                   <canvas ref={decohereCanvas} className="cv" />
@@ -1562,6 +1577,7 @@ export function App() {
               </div>
               <div className="pane">
                 <div className="pane-head">Panel F · quantum trajectory — Bloch vector projection · single-excitation qubit {"{|0,e⟩,|1,g⟩}"} · spirals inward under κ,γ</div>
+                <PanelEqn t={"\\vec{r}=\\big(\\,2\\,\\operatorname{Im}\\rho_{01},\\ \\ \\rho_{00}-\\rho_{11}\\,\\big)"} where="x = coherence, y = inversion" />
                 <div className="pane-sub"><b>What:</b> the {"{|0,e⟩,|1,g⟩}"} qubit drawn as a Bloch vector. Rabi oscillation = rotation around the circle; the inward spiral toward the centre = decoherence, shown geometrically (a pure state sits on the rim, a fully mixed one at the centre).</div>
                 <div className="bloch-wrap" style={{ textAlign: "center" }}>
                   <PlotWrap cw={BL_CW} ch={BL_CH} area={{ ml: BL_ML, mt: BL_MT, pw: BL_S, ph: BL_S }} inv={(px, py) => { const R = (BL_S / 2) / 1.12, cx = BL_ML + BL_S / 2, cy = BL_MT + BL_S / 2; return [((px - cx) / R).toFixed(3), ((cy - py) / R).toFixed(3)]; }}>
@@ -1574,6 +1590,7 @@ export function App() {
             <>
               <div className="pane">
                 <div className="pane-head">Panel D · polariton spectrum (N = {sp.m}) · click an eigenstate · dot colour = photon fraction <i style={{ color: RED, fontStyle: "normal" }}>matter ▸</i> <i style={{ color: CYAN, fontStyle: "normal" }}>▸ photon</i> · <i style={{ color: PURPLE, fontStyle: "normal" }}>━ N−1 dark</i></div>
+                <PanelEqn t={"\\hat H\\,\\phi_k = E_k\\,\\phi_k,\\qquad \\hat H=\\begin{pmatrix}\\omega_c & g_1 & \\cdots & g_N\\\\ g_1 & \\omega_1 & & \\\\ \\vdots & & \\ddots & \\\\ g_N & & & \\omega_N\\end{pmatrix}"} where="arrowhead → O(N) · Ω_R = 2g√N" />
                 <div className="pane-sub"><b>What:</b> each curve is a polariton energy as the cavity is detuned through the emitters; the two bright bands that repel are the <b>LP/UP</b> polaritons (split by 2g√N), the flat purple line is the <b>N−1 dark states</b> that don't couple to light. <b>Change → watch:</b> raise N → the LP/UP gap Ω_R grows as 2g√N; raise σ → polaritons broaden, the dark band spreads. <b>Approx:</b> single-excitation Tavis–Cummings · RWA · dark states ideal/degenerate.</div>
                 <PlotWrap cw={P_CW} ch={P_CH} area={{ ml: P_ML, mt: P_MT, pw: P_W, ph: P_H }} inv={(px, py) => { const { emin, emax, R } = specMap.current; return [fmt(((px - P_ML) / P_W) * 2 * R - R, 2), fmt(emax - ((py - P_MT) / P_H) * (emax - emin), 3)]; }}>
                   <canvas ref={specCanvas} className="cv click" onClick={onSpecClick} />
@@ -1581,6 +1598,7 @@ export function App() {
               </div>
               <div className="pane">
                 <div className="pane-head">Panel D · Wigner of selected eigenstate</div>
+                <PanelEqn t={"W(0,0)=\\tfrac{1}{\\pi}\\big(1-2|C|^2\\big)"} where="|C|² = photon fraction; W<0 ⇒ non-classical" />
                 <div className="pane-sub"><b>What:</b> phase-space portrait of the polariton you clicked. A red dip at the centre = negative Wigner value = non-classical light; a purely positive blob = classical-like. x,p are dimensionless field quadratures.</div>
                 <div className="bridge">
                   <canvas ref={bridgeCanvas} className="cv" />
@@ -1595,6 +1613,7 @@ export function App() {
               </div>
               <div className="pane">
                 <div className="pane-head">Panel G · Hopfield composition + photon-weight distribution · left bars: photon <i style={{ color: CYAN, fontStyle: "normal" }}>▪</i> / matter <i style={{ color: RED, fontStyle: "normal" }}>▪</i> · right histogram: bright polariton <i style={{ color: CYAN, fontStyle: "normal" }}>▪</i> / dark <i style={{ color: PURPLE, fontStyle: "normal" }}>▪</i></div>
+                <PanelEqn t={"|\\psi_k\\rangle = C_k\\,|1,\\!\\{g\\}\\rangle + \\textstyle\\sum_i X_{k,i}\\,|0,e_i\\rangle,\\quad |C_k|^2+\\sum_i|X_{k,i}|^2=1"} where="photon weight |C|² = |⟨a|ψ⟩|²" />
                 <div className="pane-sub"><b>What:</b> <b>left</b> — is the clicked state more photon or matter (the two add to 1)? <b>right</b> — of all N+1 eigenstates, only 2 carry photon weight (the bright polaritons); the rest are dark and invisible to light.</div>
                 <canvas ref={hopBarsCanvas} className="cv" />
               </div>
@@ -1603,6 +1622,7 @@ export function App() {
             <>
               <div className="pane grow">
                 <div className="pane-head">Panel E · |E(z)|² standing-wave mode over the real DBR stack · refractive-index n(z) staircase (right axis) · emitter pinned to argmax|E|² · L_DBR / L_eff penetration</div>
+                <PanelEqn t={"g=\\frac{\\mu}{\\hbar}\\sqrt{\\frac{\\hbar\\omega_c}{2\\varepsilon_0 V_m}},\\qquad V_m=\\tfrac{\\pi}{2}\\,w_0^2\\,L_{\\mathrm{eff}},\\quad L_{\\mathrm{eff}}=L_{\\mathrm{cav}}+2L_{\\mathrm{DBR}}"} where="smaller mode volume V_m ⇒ larger g" />
                 <div className="pane-sub"><b>What:</b> the optical field piles up into a standing wave between the mirrors and peaks at the centre antinode (dashed line). Put the molecule there — that maximizes the single-emitter coupling g. The mirror stack's index contrast sets the reflectance, mode volume, and thus g.</div>
                 <canvas ref={cavCanvas} className="cv" />
                 <div className="legend">
@@ -1616,10 +1636,12 @@ export function App() {
               <div className="cav-row">
                 <div className="pane">
                   <div className="pane-head">Panel R · cavity reflectance R(λ) · stopband / photonic bandgap <i style={{ color: CYAN, fontStyle: "normal" }}>━</i> · resonance dip at λ₀ <i style={{ color: AMBER, fontStyle: "normal" }}>┆</i> · width set by index contrast, not pairs · <span style={{ color: "#6e7681", fontWeight: 400 }}>lossless mirrors, normal incidence (TMM)</span></div>
+                  <PanelEqn t={"R=|r|^2,\\qquad F=\\frac{\\pi\\sqrt{R}}{1-R},\\qquad Q=\\frac{\\omega_c}{\\kappa}"} where="r from transfer-matrix; F = finesse" />
                   <canvas ref={stopCanvas} className="cv" />
                 </div>
                 <div className="pane">
                   <div className="pane-head">Panel N · collective coupling Ω<sub>R</sub>=2g√N <i style={{ color: CYAN, fontStyle: "normal" }}>━</i> vs cavity loss κ <i style={{ color: "#ff7080", fontStyle: "normal" }}>┄</i> · markers: <i style={{ color: "#fff", fontStyle: "normal" }}>● N* crossover</i> <i style={{ color: "#ff9b50", fontStyle: "normal" }}>● current N (weak)</i> <i style={{ color: CYAN, fontStyle: "normal" }}>● current N (strong)</i></div>
+                  <PanelEqn t={"\\Omega_R=2g\\sqrt{N},\\qquad N^*=\\left(\\frac{\\kappa}{2g}\\right)^2"} where="strong coupling when 2g√N > κ" />
                   <div className="pane-sub"><b>What:</b> one molecule (N=1) is too weakly coupled to beat the cavity loss κ — Purcell/weak regime. Strong coupling (2g√N {">"} κ) is reached only collectively, above the crossover N* where the cyan line crosses κ.</div>
                   <canvas ref={collCanvas} className="cv" />
                 </div>
@@ -1629,6 +1651,7 @@ export function App() {
             <>
               <div className="pane">
                 <div className="pane-head">Holstein-TC absorption · bare molecule <i style={{ color: "#8b949e", fontStyle: "normal" }}>━</i> in-cavity / collective <i style={{ color: CYAN, fontStyle: "normal" }}>━</i> · solver: <i style={{ color: htc.N <= HTC_EXPLICIT_CAP ? GREEN : AMBER, fontStyle: "normal" }} title={htc.N <= HTC_EXPLICIT_CAP ? "exact diagonalization of the full N-molecule vibronic Hamiltonian" : "N>3: asymptotic large-N polaron decoupling (λ→λ/√N) — an approximation, exact only as N→∞"}>{htc.N <= HTC_EXPLICIT_CAP ? `exact ${htc.N}-body diagonalization` : "asymptotic 1/N (approx)"}</i></div>
+                <PanelEqn t={"\\hat H=\\omega_c a^\\dagger a+\\omega_x\\sigma^\\dagger\\sigma+\\omega_v b^\\dagger b+\\lambda\\omega_v\\,\\sigma^\\dagger\\sigma(b{+}b^\\dagger)+g(a^\\dagger\\sigma+a\\sigma^\\dagger)"} where="Holstein–Tavis–Cummings · S=λ²" />
                 <div className="pane-sub"><b>What:</b> a molecule's vibrational fingerprint outside vs inside the cavity. <b>Grey</b> = molecule alone (the Franck–Condon comb of vibronic replicas 0–0, 0–1, …); <b>cyan</b> = same molecule in the cavity — collective coupling collapses the comb into LP/UP polariton peaks. <b>Approx:</b> single-excitation · RWA · no κ (ideal absorption).</div>
                 <PlotWrap cw={HT_CW} ch={HT_CH} area={{ ml: HT_ML, mt: HT_MT, pw: HT_PW, ph: HT_PH }} inv={(px, py) => { const N = htc.N, split = 2 * htc.g * Math.sqrt(N), wlo = WA - htc.S * htc.wv - split * 0.7 - 0.12, whi = WA + 7 * htc.wv + 0.12; return [(wlo + ((px - HT_ML) / HT_PW) * (whi - wlo)).toFixed(3), (1 - (py - HT_MT) / HT_PH).toFixed(2)]; }}>
                   <canvas ref={htcCanvas} className="cv" />
@@ -1636,11 +1659,13 @@ export function App() {
               </div>
               <div className="pane">
                 <div className="pane-head">Panel V · vibronic progression (discrete) + polaron-renormalized collective coupling Ω_R^eff(N)</div>
+                <PanelEqn t={"I_n=e^{-S}\\frac{S^n}{n!},\\qquad \\Omega_R^{\\mathrm{eff}}=2g\\sqrt{N}\\;e^{-S/2}"} where="Franck–Condon comb · polaron-dressed Rabi" />
                 <div className="pane-sub"><b>What:</b> <b>left</b> — how the cavity reshapes the vibrational fingerprint; <b>right</b> — how the light–matter coupling Ω_R^eff = 2g√N·e^(−S/2) grows with ensemble size N (the e^(−S/2) is the polaron/vibronic dressing).</div>
                 <canvas ref={vibCompareCanvas} className="cv" />
               </div>
               <div className="pane">
                 <div className="pane-head">Panel W · disorder averaging — inhomogeneous broadening · Γ_LP motional-narrowed <i style={{ color: CYAN, fontStyle: "normal" }}>━</i> vs bare γ+σ <i style={{ color: "#8b949e", fontStyle: "normal" }}>┄</i></div>
+                <PanelEqn t={"\\Gamma_{\\mathrm{LP}}=\\gamma+\\frac{\\sigma^2}{2\\,\\Omega_R}\\ \\ \\ll\\ \\ \\gamma+\\sigma"} where="motional narrowing for σ < Ω_R" />
                 <div className="pane-sub"><b>What:</b> adding molecular energy disorder σ broadens a bare line one-for-one (grey), but the cavity polariton (cyan) stays sharp far longer because it averages over the disordered ensemble — "motional/exchange narrowing". They cross at σ=Ω_R.</div>
                 <PlotWrap cw={DI_CW} ch={DI_CH} area={{ ml: DI_ML, mt: DI_MT, pw: DI_PW, ph: DI_PH }} inv={(px, py) => { const OmR = 2 * htc.g * Math.sqrt(htc.N), g2 = (s: number) => htc.gamma + s * s / (2 * Math.max(1e-6, OmR)), b2 = (s: number) => htc.gamma + s; let ym = 1e-6; for (let i = 0; i <= 100; i++) { const s = 0.5 * i / 100; ym = Math.max(ym, g2(s), b2(s)); } ym *= 1.08; return [(((px - DI_ML) / DI_PW) * 0.5).toFixed(3), ((1 - (py - DI_MT) / DI_PH) * ym).toFixed(3)]; }}>
                   <canvas ref={disorderCanvas} className="cv" />
@@ -1656,6 +1681,7 @@ export function App() {
             <div className="dyn-bento">
               <div className="pane bento-3d">
                 <div className="pane-head">Live cavity · {dyn.m} two-level emitters + 1 photon · ψ(t)=Σ<sub>k</sub> c<sub>k</sub> e<sup>−iE<sub>k</sub>t</sup>φ<sub>k</sub>{inspect != null ? <> · <i style={{ color: "#fff", fontStyle: "normal" }}>inspecting eigenstate #{inspect}</i></> : <> · field <i style={{ color: CYAN, fontStyle: "normal" }}>cyan</i> · bright <i style={{ color: RED, fontStyle: "normal" }}>red</i> · dark <i style={{ color: PURPLE, fontStyle: "normal" }}>purple</i> · glow ∝ |ψ<sub>i</sub>(t)|²</>}</div>
+                <PanelEqn t={"|\\psi(t)\\rangle=\\textstyle\\sum_k c_k\\,e^{-iE_k t}\\,|\\phi_k\\rangle,\\qquad \\hat H|\\phi_k\\rangle=E_k|\\phi_k\\rangle"} where="closed unitary single-excitation Tavis–Cummings" />
                 <div className="pane-sub"><b>What:</b> one quantum sloshing photon↔molecules in real time — the cavity fills with cyan light when it holds the energy, the molecules glow red when they do. <b>Approx:</b> single-excitation subspace (1 photon total) · RWA · ideal mirrors (κ=0 — the live evolution is lossless).</div>
                 <div className="live3d"><Suspense fallback={<div className="cv-loading">loading 3D…</div>}><LiveCavityScene stateRef={dynState} tRef={simT} m={dyn.m} inspectRef={inspectRef} ensemble={ensemble} waist={MODE_WAIST} polTheta={dyn.theta * Math.PI / 180} controls={scene3d} /></Suspense></div>
                 <div className="transport">
@@ -1674,6 +1700,7 @@ export function App() {
               </div>
               <div className="pane">
                 <div className="pane-head">Populations — photon <i style={{ color: CYAN, fontStyle: "normal" }}>━</i> bright/superradiant <i style={{ color: RED, fontStyle: "normal" }}>━</i> dark/subradiant <i style={{ color: PURPLE, fontStyle: "normal" }}>━</i> · <i style={{ color: "#8b949e", fontStyle: "normal" }}>closed unitary evolution (κ=γ=0 here); Γ enters the transmission spectrum only</i></div>
+                <PanelEqn t={"P_{\\mathrm{photon}}=|\\langle 0|\\psi(t)\\rangle|^2,\\ \\ P_{\\mathrm{bright}}=|\\langle B|\\psi(t)\\rangle|^2,\\qquad \\textstyle\\sum_k P_k = 1"} where="|B⟩ = symmetric bright mode" />
                 <div className="pane-sub"><b>What:</b> where the single excitation lives vs time — it sloshes photon↔bright at the vacuum-Rabi frequency Ω_R; the dark fraction stays flat (it doesn't couple to light). Undamped because the live model is lossless.</div>
                 <PlotWrap cw={PP_CW} ch={PP_CH} area={{ ml: PP_ML, mt: PP_MT, pw: PP_PW, ph: PP_PH }} inv={(px, py) => [(((px - PP_ML) / PP_PW) * 6).toFixed(2), (1 - (py - PP_MT) / PP_PH).toFixed(2)]}>
                   <canvas ref={popCanvas} className="cv" />
@@ -1681,6 +1708,7 @@ export function App() {
               </div>
               <div className="pane">
                 <div className="pane-head">Dressed states · E<sub>k</sub> vs photon fraction · {inspect != null ? <span style={{ color: "#fff" }}>▸ #{inspect} on 3D · click to release</span> : <span>click a state to project onto molecules</span>}</div>
+                <PanelEqn t={"\\hat H|\\phi_k\\rangle=E_k|\\phi_k\\rangle,\\qquad \\text{photon fraction}=|\\langle 0|\\phi_k\\rangle|^2"} where="2 bright polaritons + N−1 dark" />
                 <div className="pane-sub"><b>What:</b> each dot is an eigenstate (polariton). The two at the right edge (photon-like) are the bright LP/UP polaritons; the dense stack pinned at the bare energy is the N−1 dark/invisible states. Click one to highlight it in 3D.</div>
                 <PlotWrap cw={HP_CW} ch={HP_CH} area={{ ml: HP_ML, mt: HP_MT, pw: HP_PW, ph: HP_PH }} inv={(px, py) => { const ds = dynState.current; if (!ds) return null; const emin = ds.eigs[0]!, emax = ds.eigs[ds.n - 1]!, pad = (emax - emin) * 0.14 + 1e-4, elo = emin - pad, ehi = emax + pad; return [((px - HP_ML) / HP_PW).toFixed(2), fmt(elo + (1 - (py - HP_MT) / HP_PH) * (ehi - elo), 3)]; }}>
                   <canvas ref={hopCanvas} className="cv click" onClick={onHopClick} />
@@ -1688,6 +1716,7 @@ export function App() {
               </div>
               <div className="pane">
                 <div className="pane-head">Transmission S(ω) · |FFT of the photon return amplitude ⟨0|ψ(t)⟩, e<sup>−Γt</sup>-windowed|² · Lorentzian vacuum-Rabi doublet weighted by photon fraction</div>
+                <PanelEqn t={"S(\\omega)=\\big|\\,\\mathrm{FFT}\\big[\\langle 0|\\psi(t)\\rangle\\,e^{-\\Gamma t}\\big]\\,\\big|^2"} where="peaks at the polariton energies E_k" />
                 <div className="pane-sub"><b>What:</b> what a transmission/PL spectrometer would measure — two polariton peaks (LP and UP); their separation is the Rabi splitting Ω_R. The width Γ is set by the spectral-linewidth slider (this is the only place loss enters).</div>
                 <PlotWrap cw={FF_CW} ch={FF_CH} area={{ ml: FF_ML, mt: FF_MT, pw: FF_PW, ph: FF_PH }} inv={(px, py) => { const ds = dynState.current; if (!ds) return null; const lo = ds.eigs[0]!, hi = ds.eigs[ds.n - 1]!, hw = Math.max(0.5, (hi - lo) * 0.7 + 0.08), wlo = WA - hw, whi = WA + hw; return [(wlo + ((px - FF_ML) / FF_PW) * (whi - wlo)).toFixed(3), (1 - (py - FF_MT) / FF_PH).toFixed(2)]; }}>
                   <canvas ref={fftCanvas} className="cv" />
@@ -1703,6 +1732,7 @@ export function App() {
             <>
               <div className="pane">
                 <div className="pane-head">Panel A · joint density matrix ρ · |ρ_ij| brightness · sign <i style={{ color: "#00ffff", fontStyle: "normal" }}>+ ▪</i> <i style={{ color: "#ff3333", fontStyle: "normal" }}>− ▪</i> · coherence = cyan/red pair</div>
+                <PanelEqn t={"\\rho_{ij}=\\langle i|\\hat\\rho|j\\rangle,\\quad |i\\rangle\\in\\{|n,g\\rangle,\\,|n,e\\rangle\\}"} where="cavity Fock n ⊗ atom {g,e}" />
                 <div className="pane-sub"><b>What:</b> each cell is one matrix element of the joint atom⊗cavity state. <b>Diagonal</b>=populations; the off-diagonal <b>cyan/red pair</b> at (|0,e⟩,|1,g⟩) is the vacuum-Rabi coherence, flipping sign as the quantum sloshes. <b>Approx:</b> single-excitation subspace — the full 32×32 ρ is cropped to its populated 8×8 block.</div>
                 <canvas ref={rhoCanvas} className="cv" />
               </div>
