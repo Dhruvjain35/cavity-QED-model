@@ -140,6 +140,33 @@ type SweepCol = { x: number; eigs: Float64Array; photon: Float64Array };
 type Regime = "single" | "collective" | "cavity" | "dynamics" | "vibronic";
 type Pt = { t: number; n: number; pe: number; pur: number; s: number };
 
+// Curated example gallery — each preset loads a configured experiment and jumps to its tab, so a cold
+// user has a one-click entry into each phenomenon (the 'where do I start' onboarding).
+type Preset = {
+  group: string; title: string; blurb: string; regime: Regime;
+  params?: { g: number; kappa: number; gamma: number };
+  sp?: { m: number; g: number; sigma: number };
+  cav?: { lambda: number; nHi: number; nLo: number; pairs: number; nCav: number; g: number };
+  cavN?: number;
+  htc?: { wv: number; S: number; g: number; N: number; gamma: number };
+  dyn?: { m: number; g: number; sigma: number };
+};
+const PRESETS: Preset[] = [
+  { group: "Single emitter · open Jaynes–Cummings", title: "Vacuum-Rabi oscillation", blurb: "One quantum sloshing photon ↔ atom at the rate 2g — the textbook strong-coupling oscillation, lightly damped. Watch Panel C and the Wigner map.", regime: "single", params: { g: 0.3, kappa: 0.01, gamma: 0.01 } },
+  { group: "Single emitter · open Jaynes–Cummings", title: "Weak / Purcell regime", blurb: "Cavity loss beats the coupling (2g < κ): no oscillation — the excitation just leaks away. Contrast with the strong-coupling preset.", regime: "single", params: { g: 0.05, kappa: 0.4, gamma: 0.05 } },
+  { group: "Single emitter · open Jaynes–Cummings", title: "Decoherence in action", blurb: "Turn κ,γ up: watch the purity collapse and the Wigner function lose its non-classical negativity (red core fades).", regime: "single", params: { g: 0.3, kappa: 0.14, gamma: 0.14 } },
+  { group: "Collective · Tavis–Cummings", title: "Polariton avoided crossing", blurb: "Tune the cavity through the emitters: the two bright polaritons (LP/UP) repel and never cross, split by 2g√N.", regime: "collective", sp: { m: 20, g: 0.1, sigma: 0 } },
+  { group: "Collective · Tavis–Cummings", title: "Dark-state reservoir", blurb: "40 emitters → only 2 bright polaritons carry photon weight; the other 39 are dark/subradiant and invisible to light.", regime: "collective", sp: { m: 40, g: 0.08, sigma: 0 } },
+  { group: "Collective · Tavis–Cummings", title: "Disorder washes out polaritons", blurb: "Add static energy disorder (σ ≳ Ω_R): the bright doublet broadens and the dark band spreads — strong coupling degrades.", regime: "collective", sp: { m: 20, g: 0.06, sigma: 0.12 } },
+  { group: "Cavity hardware · DBR Fabry–Pérot", title: "Mirror stack → coupling g", blurb: "See how the DBR design sets the standing-wave field, the mode volume V_m, and therefore the single-emitter coupling g.", regime: "cavity", cav: { lambda: 550, nHi: 2.5, nLo: 1.46, pairs: 4, nCav: 1.6, g: 1.6 }, cavN: 1 },
+  { group: "Cavity hardware · DBR Fabry–Pérot", title: "Collective crossover N*", blurb: "One molecule is too weak to beat the cavity loss; strong coupling (2g√N > κ) is reached only collectively, above N*.", regime: "cavity", cav: { lambda: 550, nHi: 2.5, nLo: 1.46, pairs: 4, nCav: 1.6, g: 1.6 }, cavN: 10000 },
+  { group: "Live dynamics · real-time", title: "Vacuum-Rabi sloshing (3D)", blurb: "Watch one excitation slosh photon ↔ molecules in real time in 3D, alongside the clean transmission doublet.", regime: "dynamics", dyn: { m: 12, g: 0.06, sigma: 0.03 } },
+  { group: "Live dynamics · real-time", title: "Collective enhancement", blurb: "More molecules → a larger Rabi splitting Ω_R = 2g√N and faster sloshing. Compare the populations period.", regime: "dynamics", dyn: { m: 30, g: 0.05, sigma: 0.03 } },
+  { group: "Vibronic · Holstein–Tavis–Cummings", title: "Franck–Condon comb → polaritons", blurb: "A molecule's vibrational fingerprint (grey comb) collapses into LP/UP polaritons inside the cavity (cyan).", regime: "vibronic", htc: { wv: 0.15, S: 1.0, g: 0.05, N: 3, gamma: 0.012 } },
+  { group: "Vibronic · Holstein–Tavis–Cummings", title: "Motional narrowing", blurb: "Under molecular disorder, the cavity polariton stays sharp far longer than a bare line — it averages over the ensemble.", regime: "vibronic", htc: { wv: 0.15, S: 1.0, g: 0.08, N: 3, gamma: 0.012 } },
+];
+const PRESET_GROUPS = [...new Set(PRESETS.map((p) => p.group))];
+
 export function App() {
   const [regime, setRegime] = useState<Regime>("single");
   const [params, setParams] = useState({ g: 0.3, kappa: 0.02, gamma: 0.02 }); // 2.2 · Ω_R=2g≫κ → visible Rabi oscillations on load
@@ -181,6 +208,7 @@ export function App() {
   const [ready, setReady] = useState(false);
   const [copied, setCopied] = useState(false); // 3.F · COPY LINK flash
   const [about, setAbout] = useState(false);   // 3.G · about overlay
+  const [gallery, setGallery] = useState(false); // examples / preset gallery overlay
   const [levaCollapsed, setLevaCollapsed] = useState(true); // FIX 1.6 · Leva starts collapsed
 
   const wigCanvas = useRef<HTMLCanvasElement>(null), husimiCanvas = useRef<HTMLCanvasElement>(null), seriesCanvas = useRef<HTMLCanvasElement>(null), decohereCanvas = useRef<HTMLCanvasElement>(null);
@@ -409,6 +437,17 @@ export function App() {
   function copyLink() {
     setCopied(true); setTimeout(() => setCopied(false), 1500); // flash regardless — clipboard is best-effort
     navigator.clipboard?.writeText(window.location.href).catch(() => { });
+  }
+  function applyPreset(p: Preset) {
+    setRegime(p.regime);
+    if (p.params) setParams(p.params);
+    if (p.sp) setSp((s) => ({ ...s, ...p.sp }));
+    if (p.cav) setCav(p.cav);
+    if (p.cavN != null) setCavN(p.cavN);
+    if (p.htc) setHtc(p.htc);
+    if (p.dyn) setDyn((s) => ({ ...s, ...p.dyn }));
+    if (p.regime === "single") singleDirty.current = true;
+    setGallery(false);
   }
 
   // Each plot is drawn at a FIXED logical size w×h; the backing store is w×h×dpr (so it is crisp at 1:1 on a
@@ -1429,10 +1468,31 @@ export function App() {
         <span className="brand">POLARITON CAVITY-QED LAB</span>
         <span className="topbar-right">
           <span className="status"><span className="live">●</span> {ready ? "WASM CORE LIVE" : "LOADING…"} · QuTiP-GOLDEN CORE + ANALYTIC-VALIDATED OPTICS/VIBRONICS</span>
+          <button className="examples-btn" onClick={() => setGallery(true)} title="load a configured example experiment to get started">▸ EXAMPLES</button>
           <button className="copy-link" onClick={copyLink} title="copy a shareable link to this exact configuration">{copied ? "COPIED" : "COPY LINK"}</button>
           <button className="about-btn" onClick={() => setAbout(true)} title="about">?</button>
         </span>
       </div>
+      {gallery ? (
+        <div className="gallery-overlay" onClick={(e) => { if (e.target === e.currentTarget) setGallery(false); }}>
+          <div className="gallery-panel">
+            <button className="about-x" onClick={() => setGallery(false)} aria-label="close">×</button>
+            <div className="gallery-head">Examples — pick a phenomenon to load</div>
+            <div className="gallery-sub">Each one loads a configured experiment and jumps to the right tab. New here? Start with <b>Vacuum-Rabi oscillation</b>, then read the equation and the “What / Watch” line on each panel.</div>
+            {PRESET_GROUPS.map((g) => (
+              <div className="gallery-group" key={g}>
+                <div className="gg-head">{g}</div>
+                {PRESETS.filter((p) => p.group === g).map((p) => (
+                  <button className="gg-item" key={p.title} onClick={() => applyPreset(p)}>
+                    <span className="gg-title">{p.title}</span>
+                    <span className="gg-blurb">{p.blurb}</span>
+                  </button>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
       {about ? (
         <div className="about-overlay">
           <button className="about-x" onClick={() => setAbout(false)} aria-label="close">×</button>

@@ -34,6 +34,22 @@ body { background: var(--bg); color: var(--ink); font-family: var(--sans); font-
 .topbar-right { display: flex; align-items: center; gap: 10px; }
 .copy-link { font-family: var(--sans); font-size: 12px; background: #444; color: #00ff66; border: none; padding: 2px 8px; cursor: pointer; letter-spacing: 0.04em; text-transform: none; }
 .copy-link:hover { background: #555; }
+.examples-btn { font-family: var(--sans); font-size: 11px; font-weight: 700; letter-spacing: 0.04em; background: var(--cyan); color: #001014; border: none; padding: 3px 11px; cursor: pointer; text-transform: none; }
+.examples-btn:hover { background: #66ffff; }
+/* examples / preset gallery overlay */
+.gallery-overlay { position: fixed; inset: 0; background: rgba(3, 5, 8, 0.74); z-index: 1000; display: flex; align-items: center; justify-content: center; }
+.gallery-panel { position: relative; width: min(660px, calc(100vw - 32px)); max-height: 88vh; overflow-y: auto; background: #0c0f12; border: 1px solid var(--rule-2); padding: 16px 18px 14px; font-family: var(--sans); }
+.gallery-head { font-size: 13px; font-weight: 700; letter-spacing: 0.05em; color: var(--cyan); margin-bottom: 5px; }
+.gallery-sub { font-size: 10px; color: var(--dim); margin-bottom: 14px; line-height: 1.55; }
+.gallery-sub b { color: var(--ink); }
+.gallery-group { margin-bottom: 13px; }
+.gg-head { font-size: 9px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint); padding-bottom: 4px; border-bottom: 1px solid var(--rule); margin-bottom: 3px; }
+.gg-item { display: block; width: 100%; text-align: left; background: transparent; border: 1px solid transparent; border-bottom: 1px solid var(--rule-soft); padding: 7px 9px; cursor: pointer; transition: background 0.08s; }
+.gg-item:last-child { border-bottom: none; }
+.gg-item:hover { background: #11161d; border-color: var(--rule-2); }
+.gg-title { display: block; font-size: 11.5px; font-weight: 600; color: var(--ink); margin-bottom: 2px; }
+.gg-item:hover .gg-title { color: var(--cyan); }
+.gg-blurb { display: block; font-size: 9.5px; color: var(--dim); line-height: 1.45; max-width: 60ch; }
 .about-btn { width: 18px; height: 18px; background: #21262d; color: #888; border: 1px solid #30363d; cursor: pointer; font-size: 11px; line-height: 1; display: inline-flex; align-items: center; justify-content: center; padding: 0; }
 .about-btn:hover { color: #fff; }
 .about-overlay { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(440px, calc(100vw - 24px)); max-height: 90vh; overflow-y: auto; background: #0c0f12; border: 1px solid #30363d; padding: 16px; z-index: 1000; font-family: var(--sans); text-transform: none; }
