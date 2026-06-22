@@ -779,13 +779,19 @@ export function App() {
   function onSpecClick(e: React.MouseEvent<HTMLCanvasElement>) {
     const cv = specCanvas.current; if (!cv || sweep.current.length === 0) return;
     const rect = cv.getBoundingClientRect();
-    const frac = clamp((e.clientX - rect.left - P_ML) / P_W, 0, 1), py = e.clientY - rect.top;
-    const j = Math.round(frac * (N_DELTA - 1)), col = sweep.current[j]; if (!col) return;
-    const { emin, emax } = specMap.current;
+    // displayed CSS px → logical plot coords (canvas may be CSS-scaled below its native size)
+    const lx = (e.clientX - rect.left) * (P_CW / rect.width), ly = (e.clientY - rect.top) * (P_CH / rect.height);
+    // pick the nearest dot in PIXEL space using the exact xOf/yOf the drawing uses — guaranteed to match
+    // what's on screen (no column-index/N_DELTA round-trip drift).
+    const { emin, emax, R } = specMap.current;
+    const xOf = (x: number) => P_ML + ((x + R) / (2 * R)) * P_W;
     const yOf = (en: number) => P_MT + ((emax - en) / (emax - emin)) * P_H;
-    let bestK = 0, bestD = Infinity;
-    for (let k = 0; k < col.eigs.length; k++) { const d = Math.abs(yOf(col.eigs[k]!) - py); if (d < bestD) { bestD = d; bestK = k; } }
-    sel.current = { j, k: bestK }; renderSpectrum();
+    let bestJ = 0, bestK = 0, bestD = Infinity;
+    for (let j = 0; j < sweep.current.length; j++) {
+      const col = sweep.current[j]!; const x = xOf(col.x);
+      for (let k = 0; k < col.eigs.length; k++) { const dx = x - lx, dy = yOf(col.eigs[k]!) - ly, d = dx * dx + dy * dy; if (d < bestD) { bestD = d; bestJ = j; bestK = k; } }
+    }
+    sel.current = { j: bestJ, k: bestK }; renderSpectrum();
   }
 
   // The full hardware → coupling chain, SI, from the cavity geometry. Every number is derived (no fit); the
