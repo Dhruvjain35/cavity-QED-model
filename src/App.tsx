@@ -1749,7 +1749,9 @@ export function App() {
                 <div className="pane-head">Live cavity · {dyn.m} two-level emitters + 1 photon · ψ(t)=Σ<sub>k</sub> c<sub>k</sub> e<sup>−iE<sub>k</sub>t</sup>φ<sub>k</sub>{inspect != null ? <> · <i style={{ color: "#fff", fontStyle: "normal" }}>inspecting eigenstate #{inspect}</i></> : <> · field <i style={{ color: CYAN, fontStyle: "normal" }}>cyan</i> · bright <i style={{ color: RED, fontStyle: "normal" }}>red</i> · dark <i style={{ color: PURPLE, fontStyle: "normal" }}>purple</i> · glow ∝ |ψ<sub>i</sub>(t)|²</>}</div>
                 <PanelEqn t={"|\\psi(t)\\rangle=\\textstyle\\sum_k c_k\\,e^{-iE_k t}\\,|\\phi_k\\rangle,\\qquad \\hat H|\\phi_k\\rangle=E_k|\\phi_k\\rangle"} where="closed unitary single-excitation Tavis–Cummings" />
                 <div className="pane-sub"><b>What:</b> one quantum sloshing photon↔molecules in real time — the cavity fills with cyan light when it holds the energy, the molecules glow red when they do. <b>Approx:</b> single-excitation subspace (1 photon total) · RWA · ideal mirrors (κ=0 — the live evolution is lossless).</div>
-                <div className="live3d"><Suspense fallback={<div className="cv-loading">loading 3D…</div>}><LiveCavityScene stateRef={dynState} tRef={simT} m={dyn.m} inspectRef={inspectRef} ensemble={ensemble} waist={MODE_WAIST} polTheta={dyn.theta * Math.PI / 180} controls={scene3d} /></Suspense></div>
+                <div className="live3d"><Suspense fallback={<div className="cv-loading">loading 3D…</div>}><LiveCavityScene stateRef={dynState} tRef={simT} m={dyn.m} inspectRef={inspectRef} ensemble={ensemble} waist={MODE_WAIST} polTheta={dyn.theta * Math.PI / 180} controls={scene3d} /></Suspense>
+                  <div className="leva-host"><LevaPanel store={sceneStore} fill flat collapsed={{ collapsed: levaCollapsed, onChange: setLevaCollapsed }} titleBar={{ title: "3D SCENE CONTROLS", drag: false, filter: false }} /></div>
+                </div>
                 <div className="transport">
                   <button className="tp-btn" title={playing ? "Pause" : "Play"} onClick={() => setPlaying((p) => !p)}>{playing ? "❚❚" : "▶"}</button>
                   <button className="tp-btn" title="Step +0.1 ω_c⁻¹ (while paused)" onClick={() => { simT.current += 0.1; }}>▶❘</button>
@@ -1762,7 +1764,6 @@ export function App() {
                     {[0.25, 0.5, 1, 2, 4].map((s) => <option key={s} value={s}>{s}×</option>)}
                   </select>
                 </div>
-                <div className="leva-host"><LevaPanel store={sceneStore} fill flat collapsed={{ collapsed: levaCollapsed, onChange: setLevaCollapsed }} titleBar={{ title: "3D SCENE CONTROLS", drag: false, filter: false }} /></div>
               </div>
               <div className="pane">
                 <div className="pane-head">Populations — photon <i style={{ color: CYAN, fontStyle: "normal" }}>━</i> bright/superradiant <i style={{ color: RED, fontStyle: "normal" }}>━</i> dark/subradiant <i style={{ color: PURPLE, fontStyle: "normal" }}>━</i> · <i style={{ color: "#8b949e", fontStyle: "normal" }}>closed unitary evolution (κ=γ=0 here); Γ enters the transmission spectrum only</i></div>
