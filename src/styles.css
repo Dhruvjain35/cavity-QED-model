@@ -183,11 +183,12 @@ tr[title] { cursor: help; }
 .sc-head:hover { color: #66ffff; }
 .sc-caret { font-size: 9px; line-height: 1; }
 .sc-body { padding: 6px 8px 7px; display: flex; flex-direction: column; gap: 6px; }
+.sc-note { font-size: 8px; line-height: 1.35; color: var(--faint); padding-bottom: 4px; margin-bottom: 1px; border-bottom: 1px solid var(--rule-soft); }
 .sc-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 9px; color: var(--dim); cursor: pointer; }
 .sc-row.sc-check { justify-content: flex-start; gap: 6px; }
 .sc-row > span:first-child { white-space: nowrap; }
-.sc-slide { display: inline-flex; align-items: center; gap: 6px; }
-.sc-slide input[type="range"] { width: 76px; }
+.sc-slide { display: inline-flex; align-items: center; gap: 7px; }
+.sc-slide input[type="range"] { width: 88px; }
 .sc-slide b { font-family: var(--mono); font-size: 8.5px; font-weight: 700; color: var(--cyan); font-variant-numeric: tabular-nums; min-width: 26px; text-align: right; }
 .sc-check input[type="checkbox"] { accent-color: var(--cyan); width: 12px; height: 12px; cursor: pointer; }
 .cav-tag { position: absolute; font-family: var(--sans); font-size: 9px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--dim); pointer-events: none; text-shadow: 1px 1px 0 #000; }

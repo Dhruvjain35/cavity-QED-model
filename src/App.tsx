@@ -1916,7 +1916,7 @@ export function App() {
 function ScenePanel({ open, onToggle, v, set }: { open: boolean; onToggle: () => void; v: SceneControls; set: (p: Partial<SceneControls>) => void }) {
   const Slider = ({ label, k, min, max }: { label: string; k: "fieldGlow" | "moleculeScale" | "moleculeGlow"; min: number; max: number }) => (
     <label className="sc-row"><span>{label}</span>
-      <span className="sc-slide"><input type="range" min={min} max={max} step={0.05} value={v[k]} onChange={(e) => set({ [k]: Number(e.target.value) } as Partial<SceneControls>)} /><b>{v[k].toFixed(2)}</b></span>
+      <span className="sc-slide"><input type="range" min={min} max={max} step={0.01} value={v[k]} onChange={(e) => set({ [k]: Number(e.target.value) } as Partial<SceneControls>)} /><b>{v[k].toFixed(2)}</b></span>
     </label>
   );
   return (
@@ -1926,6 +1926,7 @@ function ScenePanel({ open, onToggle, v, set }: { open: boolean; onToggle: () =>
       </button>
       {open ? (
         <div className="sc-body">
+          <div className="sc-note">view only · the physics (N, g, σ, polarization, order) is in the left rail</div>
           <label className="sc-row sc-check"><input type="checkbox" checked={v.autoRotate} onChange={(e) => set({ autoRotate: e.target.checked })} /> auto-rotate</label>
           <label className="sc-row sc-check"><input type="checkbox" checked={v.showFieldDiscs} onChange={(e) => set({ showFieldDiscs: e.target.checked })} /> cavity field</label>
           <label className="sc-row sc-check"><input type="checkbox" checked={v.showDipoleArrows} onChange={(e) => set({ showDipoleArrows: e.target.checked })} /> dipole arrows</label>
