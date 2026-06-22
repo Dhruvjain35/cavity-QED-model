@@ -1769,7 +1769,7 @@ export function App() {
                 <div className="pane-head">Populations — photon <i style={{ color: CYAN, fontStyle: "normal" }}>━</i> bright/superradiant <i style={{ color: RED, fontStyle: "normal" }}>━</i> dark/subradiant <i style={{ color: PURPLE, fontStyle: "normal" }}>━</i> · <i style={{ color: "#8b949e", fontStyle: "normal" }}>closed unitary evolution (κ=γ=0 here); Γ enters the transmission spectrum only</i></div>
                 <PanelEqn t={"P_{\\mathrm{photon}}=|\\langle 0|\\psi(t)\\rangle|^2,\\ \\ P_{\\mathrm{bright}}=|\\langle B|\\psi(t)\\rangle|^2,\\qquad \\textstyle\\sum_k P_k = 1"} where="|B⟩ = symmetric bright mode" />
                 <div className="pane-sub"><b>What:</b> where the single excitation lives vs time — it sloshes photon↔bright at the vacuum-Rabi frequency Ω_R; the dark fraction stays flat (it doesn't couple to light). Undamped because the live model is lossless.</div>
-                <PlotWrap cw={PP_CW} ch={PP_CH} area={{ ml: PP_ML, mt: PP_MT, pw: PP_PW, ph: PP_PH }} inv={(px, py) => [(((px - PP_ML) / PP_PW) * 6).toFixed(2), (1 - (py - PP_MT) / PP_PH).toFixed(2)]}>
+                <PlotWrap fit cw={PP_CW} ch={PP_CH} area={{ ml: PP_ML, mt: PP_MT, pw: PP_PW, ph: PP_PH }} inv={(px, py) => [(((px - PP_ML) / PP_PW) * 6).toFixed(2), (1 - (py - PP_MT) / PP_PH).toFixed(2)]}>
                   <canvas ref={popCanvas} className="cv" />
                 </PlotWrap>
               </div>
@@ -1777,7 +1777,7 @@ export function App() {
                 <div className="pane-head">Dressed states · E<sub>k</sub> vs photon fraction · {inspect != null ? <span style={{ color: "#fff" }}>▸ #{inspect} on 3D · click to release</span> : <span>click a state to project onto molecules</span>}</div>
                 <PanelEqn t={"\\hat H|\\phi_k\\rangle=E_k|\\phi_k\\rangle,\\qquad \\text{photon fraction}=|\\langle 0|\\phi_k\\rangle|^2"} where="2 bright polaritons + N−1 dark" />
                 <div className="pane-sub"><b>What:</b> each dot is an eigenstate (polariton). The two at the right edge (photon-like) are the bright LP/UP polaritons; the dense stack pinned at the bare energy is the N−1 dark/invisible states. Click one to highlight it in 3D.</div>
-                <PlotWrap cw={HP_CW} ch={HP_CH} area={{ ml: HP_ML, mt: HP_MT, pw: HP_PW, ph: HP_PH }} inv={(px, py) => { const ds = dynState.current; if (!ds) return null; const emin = ds.eigs[0]!, emax = ds.eigs[ds.n - 1]!, pad = (emax - emin) * 0.14 + 1e-4, elo = emin - pad, ehi = emax + pad; return [((px - HP_ML) / HP_PW).toFixed(2), fmt(elo + (1 - (py - HP_MT) / HP_PH) * (ehi - elo), 3)]; }}>
+                <PlotWrap fit cw={HP_CW} ch={HP_CH} area={{ ml: HP_ML, mt: HP_MT, pw: HP_PW, ph: HP_PH }} inv={(px, py) => { const ds = dynState.current; if (!ds) return null; const emin = ds.eigs[0]!, emax = ds.eigs[ds.n - 1]!, pad = (emax - emin) * 0.14 + 1e-4, elo = emin - pad, ehi = emax + pad; return [((px - HP_ML) / HP_PW).toFixed(2), fmt(elo + (1 - (py - HP_MT) / HP_PH) * (ehi - elo), 3)]; }}>
                   <canvas ref={hopCanvas} className="cv click" onClick={onHopClick} />
                 </PlotWrap>
               </div>
@@ -1785,7 +1785,7 @@ export function App() {
                 <div className="pane-head">Transmission S(ω) · |FFT of the photon return amplitude ⟨0|ψ(t)⟩, e<sup>−Γt</sup>-windowed|² · Lorentzian vacuum-Rabi doublet weighted by photon fraction</div>
                 <PanelEqn t={"S(\\omega)=\\big|\\,\\mathrm{FFT}\\big[\\langle 0|\\psi(t)\\rangle\\,e^{-\\Gamma t}\\big]\\,\\big|^2"} where="peaks at the polariton energies E_k" />
                 <div className="pane-sub"><b>What:</b> what a transmission/PL spectrometer would measure — two polariton peaks (LP and UP); their separation is the Rabi splitting Ω_R. The width Γ is set by the spectral-linewidth slider (this is the only place loss enters).</div>
-                <PlotWrap cw={FF_CW} ch={FF_CH} area={{ ml: FF_ML, mt: FF_MT, pw: FF_PW, ph: FF_PH }} inv={(px, py) => { const ds = dynState.current; if (!ds) return null; const lo = ds.eigs[0]!, hi = ds.eigs[ds.n - 1]!, hw = Math.max(0.5, (hi - lo) * 0.7 + 0.08), wlo = WA - hw, whi = WA + hw; return [(wlo + ((px - FF_ML) / FF_PW) * (whi - wlo)).toFixed(3), (1 - (py - FF_MT) / FF_PH).toFixed(2)]; }}>
+                <PlotWrap fit cw={FF_CW} ch={FF_CH} area={{ ml: FF_ML, mt: FF_MT, pw: FF_PW, ph: FF_PH }} inv={(px, py) => { const ds = dynState.current; if (!ds) return null; const lo = ds.eigs[0]!, hi = ds.eigs[ds.n - 1]!, hw = Math.max(0.5, (hi - lo) * 0.7 + 0.08), wlo = WA - hw, whi = WA + hw; return [(wlo + ((px - FF_ML) / FF_PW) * (whi - wlo)).toFixed(3), (1 - (py - FF_MT) / FF_PH).toFixed(2)]; }}>
                   <canvas ref={fftCanvas} className="cv" />
                 </PlotWrap>
               </div>
@@ -1916,10 +1916,15 @@ export function App() {
 // 3.C · hover crosshair + live physics-coordinate readout for any plot canvas. Wraps the plot, paints a
 // 1px vertical guide + the [x,y] value (mapped back through the plot's own axes) on a non-interactive
 // overlay so the underlying canvas keeps its click handlers. inv() returns null when off the data.
-function PlotWrap({ cw, ch, area, inv, children }: { cw: number; ch: number; area: { ml: number; mt: number; pw: number; ph: number }; inv: (px: number, py: number) => [string, string] | null; children: React.ReactNode }) {
+function PlotWrap({ cw, ch, area, inv, fit, children }: { cw: number; ch: number; area: { ml: number; mt: number; pw: number; ph: number }; inv: (px: number, py: number) => [string, string] | null; fit?: boolean; children: React.ReactNode }) {
   const ov = useRef<HTMLCanvasElement>(null);
   const onMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    const host = e.currentTarget, r = host.getBoundingClientRect(), cv = ov.current; if (!cv) return;
+    const cv = ov.current; if (!cv) return;
+    // measure the PLOT canvas itself (the overlay's previous sibling), not the wrapper — in fit mode the
+    // wrapper centres a scaled-down canvas, so the wrapper box is larger than the plot. Mapping mouse→data
+    // by the canvas rect (cw/r.width, ch/r.height) stays correct at any display scale.
+    const main = (cv.previousElementSibling as HTMLElement | null) ?? e.currentTarget;
+    const r = main.getBoundingClientRect();
     const d = Math.min(window.devicePixelRatio || 1, 2);
     if (cv.width !== Math.round(cw * d)) { cv.width = Math.round(cw * d); cv.height = Math.round(ch * d); }
     const ctx = cv.getContext("2d"); if (!ctx) return;
@@ -1933,7 +1938,7 @@ function PlotWrap({ cw, ch, area, inv, children }: { cw: number; ch: number; are
     ctx.fillText(`[${v[0]}, ${v[1]}]`, x + (right ? -5 : 5), Math.max(area.mt + 11, y - 5));
   };
   const clear = () => { const cv = ov.current; if (!cv) return; const ctx = cv.getContext("2d"); if (ctx) ctx.clearRect(0, 0, cv.width, cv.height); };
-  return (<div className="plotwrap" onMouseMove={onMove} onMouseLeave={clear}>{children}<canvas ref={ov} className="plot-ov" /></div>);
+  return (<div className={fit ? "plotwrap pw-fit" : "plotwrap"} onMouseMove={onMove} onMouseLeave={clear}>{children}<canvas ref={ov} className="plot-ov" /></div>);
 }
 function mkCanvas(n: number): HTMLCanvasElement { const c = document.createElement("canvas"); c.width = n; c.height = n; return c; }
 function seg(ctx: CanvasRenderingContext2D, x0: number, y0: number, x1: number, y1: number) { ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); }

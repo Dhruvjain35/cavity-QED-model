@@ -148,20 +148,22 @@ tr[title] { cursor: help; }
 .phase-row { display: flex; gap: 8px; flex-wrap: wrap; }
 
 /* live dynamics: bento grid — 3D viewport + diagnostic cells, single-pixel metallic dividers.
-   2×2 when the center is wide; it FILLS the column when the window is tall and SCROLLS (never clips a
-   plot or an equation) when the window is short. flex:1 0 auto grows the grid to fill the remaining
-   height yet refuses to shrink below its content; the implicit auto rows + default align-content:stretch
-   share any extra height evenly. This is the same scroll-don't-clip behaviour the other tabs already use. */
-.dyn-bento { flex: 1 0 auto; display: grid; grid-template-columns: minmax(0, 1.18fr) minmax(300px, 0.82fr); }
-.dyn-bento > .pane { min-width: 0; display: flex; flex-direction: column; overflow: hidden; border-bottom: 1px solid var(--rule-2); border-right: 1px solid var(--rule-2); }
+   FIT-TO-VIEWPORT: all four panes are visible at once, never clipped, never scrolled. Each plot scales
+   DOWN to fill whatever height is left in its quadrant after the header / equation / caption, so the
+   dashboard reflows to any window height instead of cutting the bottom row off. */
+.dyn-bento { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1.18fr) minmax(300px, 0.82fr); grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); }
+.dyn-bento > .pane { min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; border-bottom: 1px solid var(--rule-2); border-right: 1px solid var(--rule-2); }
 .dyn-bento > .pane:nth-child(2n) { border-right: none; }
 .dyn-bento > .pane:nth-last-child(-n+2) { border-bottom: none; }
-/* plots render at native resolution but scale DOWN to fit a tight pane WITHOUT distortion (height tracks
-   the constrained width), then center in whatever space the stretched row gives them. */
-.dyn-bento .cv { max-width: 100%; height: auto !important; margin: auto; }
-.dyn-bento .plotwrap { max-width: 100%; margin: auto; }
+/* the fit wrapper: takes all remaining pane height and centres a plot that scales to fit BOTH the
+   leftover width and height, aspect preserved (the canvas is a replaced element, so max-width +
+   max-height + auto sizing scales it down uniformly). The hover overlay is absolutely centred with the
+   identical constraints, so it lands exactly on the scaled plot. */
+.pw-fit { flex: 1 1 0; min-height: 0; min-width: 0; display: flex; align-items: center; justify-content: center; position: relative; }
+.pw-fit > .cv { display: block; max-width: 100%; max-height: 100%; width: auto !important; height: auto !important; margin: 0; }
+.pw-fit > .plot-ov { position: absolute; inset: auto; top: 50%; left: 50%; transform: translate(-50%, -50%); width: auto !important; height: auto !important; max-width: 100%; max-height: 100%; }
 .bento-3d { padding-bottom: 0; position: relative; }
-.live3d { position: relative; flex: 1; width: 100%; min-height: clamp(240px, 32vh, 380px); overflow: hidden; background: #050708; }
+.live3d { position: relative; flex: 1 1 0; width: 100%; min-height: 150px; overflow: hidden; background: #050708; }
 /* DYNAMICS transport bar — thin industrial controls, zero radius, cyan accents */
 .transport { flex-shrink: 0; display: flex; align-items: center; gap: 6px; padding: 5px 8px; border-top: 1px solid var(--rule-2); background: var(--panel); }
 .transport .tp-btn { font-family: var(--sans); font-size: 10px; line-height: 1; width: 26px; height: 22px; padding: 0; border: 1px solid var(--rule); border-radius: 0; background: transparent; color: var(--dim); cursor: pointer; display: flex; align-items: center; justify-content: center; }
@@ -204,9 +206,25 @@ tr[title] { cursor: help; }
 .cr-legend .sw-d { background: var(--purple); }
 .cr-spark { display: block; width: 100%; height: 46px; border: 1px solid var(--rule); }
 /* the bento adapts to the CENTER column's own width (container query), not the viewport — so it stacks
-   exactly when its own space gets tight, regardless of rail/dock widths. */
-@container center (max-width: 700px) { .dyn-bento { grid-template-columns: 1fr; grid-template-rows: auto auto auto auto; } .dyn-bento > .pane { border-right: none; } }
-@supports not (container-type: inline-size) { @media (max-width: 1180px) { .dyn-bento { grid-template-columns: 1fr; grid-template-rows: auto auto auto auto; } .dyn-bento > .pane { border-right: none; } } }
+   exactly when its own space gets tight, regardless of rail/dock widths. Once stacked, a single column
+   can't fit four fit-to-viewport panes, so the panes become content-height and the plots size by WIDTH
+   (the column scrolls) — the fit wrapper falls back to ordinary block flow. */
+@container center (max-width: 700px) {
+  .dyn-bento { grid-template-columns: 1fr; grid-template-rows: none; grid-auto-rows: auto; }
+  .dyn-bento > .pane { border-right: none; }
+  .dyn-bento .pw-fit { display: block; flex: none; }
+  .dyn-bento .pw-fit > .cv { max-height: none; height: auto !important; margin: 0 auto; }
+  .dyn-bento .pw-fit > .plot-ov { top: 0; left: 0; transform: none; width: 100% !important; height: 100% !important; max-width: none; max-height: none; }
+  .dyn-bento .live3d { flex: none; height: clamp(240px, 52vw, 360px); }
+}
+@supports not (container-type: inline-size) { @media (max-width: 1180px) {
+  .dyn-bento { grid-template-columns: 1fr; grid-template-rows: none; grid-auto-rows: auto; }
+  .dyn-bento > .pane { border-right: none; }
+  .dyn-bento .pw-fit { display: block; flex: none; }
+  .dyn-bento .pw-fit > .cv { max-height: none; height: auto !important; margin: 0 auto; }
+  .dyn-bento .pw-fit > .plot-ov { top: 0; left: 0; transform: none; width: 100% !important; height: 100% !important; max-width: none; max-height: none; }
+  .dyn-bento .live3d { flex: none; height: clamp(240px, 52vw, 360px); }
+} }
 
 /* legends */
 .legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 6px; font-family: var(--sans); font-size: 9px; color: var(--dim); }
@@ -305,8 +323,15 @@ table.metrics { width: 100%; border-collapse: collapse; }
   .center > .pane.grow > .phase-row > .cv { max-width: 100%; }
   .phase-row { flex-direction: column; }
   .bridge { flex-direction: column; }
-  .dyn-bento .cv, .dyn-bento .plotwrap { margin: 4px auto; }
-  .leva-host { width: min(214px, 46vw); }
+  /* the stacked workstation has no definite center height, so the fit dashboard reverts to block flow:
+     one column of content-height panes that size their plots by width and scroll vertically. */
+  .dyn-bento { grid-template-columns: 1fr; grid-template-rows: none; grid-auto-rows: auto; }
+  .dyn-bento > .pane { border-right: none; }
+  .dyn-bento .pw-fit { display: block; flex: none; }
+  .dyn-bento .pw-fit > .cv { width: 100% !important; height: auto !important; max-width: 100%; max-height: none; margin: 4px auto; }
+  .dyn-bento .pw-fit > .plot-ov { top: 0; left: 0; transform: none; width: 100% !important; height: 100% !important; max-width: none; max-height: none; }
+  .dyn-bento .live3d { flex: none; height: clamp(240px, 52vw, 360px); }
+  .leva-host { width: min(210px, 46vw); }
 }
 @media (max-width: 640px) {
   .topbar { height: auto; flex-wrap: wrap; padding: 3px 8px; row-gap: 2px; }
