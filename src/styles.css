@@ -71,12 +71,15 @@ body { background: var(--bg); color: var(--ink); font-family: var(--sans); font-
 .about-x:hover { color: #fff; }
 
 /* 3-column console grid */
-.workstation { flex: 1; min-height: 0; display: grid; grid-template-columns: 214px minmax(0, 1fr) 318px; overflow: hidden; }
+/* fluid 3-pane grid: rail + dock shrink with the window so the center keeps usable room; collapse to a
+   single scrolling column on tablets/phones. */
+.workstation { flex: 1; min-height: 0; display: grid; grid-template-columns: clamp(184px, 14.5vw, 220px) minmax(0, 1fr) clamp(248px, 20vw, 320px); overflow: hidden; }
+@media (max-width: 1240px) { .workstation { grid-template-columns: 184px minmax(0, 1fr) 248px; } }
 @media (max-width: 1040px) { .workstation { grid-template-columns: 1fr; overflow-y: auto; } .ws-root { overflow: auto; } }
 .rail { border-right: 1px solid var(--rule-2); }
 .dock { border-left: 1px solid var(--rule-2); }
 .rail, .dock { overflow-y: auto; min-height: 0; }
-.center { display: flex; flex-direction: column; min-height: 0; overflow-y: auto; }
+.center { display: flex; flex-direction: column; min-height: 0; overflow-y: auto; container-type: inline-size; container-name: center; }
 
 /* panes — zero radius, 1px rules, 4-6px padding */
 .pane { border-bottom: 1px solid var(--rule); padding: 4px 6px; }
@@ -190,7 +193,10 @@ tr[title] { cursor: help; }
 .cr-legend .sw-b { background: var(--red); }
 .cr-legend .sw-d { background: var(--purple); }
 .cr-spark { display: block; width: 100%; height: 46px; border: 1px solid var(--rule); }
-@media (max-width: 1180px) { .dyn-bento { grid-template-columns: 1fr; grid-template-rows: auto auto auto auto; } .dyn-bento > .pane { border-right: none; } }
+/* the bento adapts to the CENTER column's own width (container query), not the viewport — so it stacks
+   exactly when its own space gets tight, regardless of rail/dock widths. */
+@container center (max-width: 700px) { .dyn-bento { grid-template-columns: 1fr; grid-template-rows: auto auto auto auto; } .dyn-bento > .pane { border-right: none; } }
+@supports not (container-type: inline-size) { @media (max-width: 1180px) { .dyn-bento { grid-template-columns: 1fr; grid-template-rows: auto auto auto auto; } .dyn-bento > .pane { border-right: none; } } }
 
 /* legends */
 .legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 6px; font-family: var(--sans); font-size: 9px; color: var(--dim); }
