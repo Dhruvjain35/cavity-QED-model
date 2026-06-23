@@ -8,6 +8,7 @@
 // live Canvas has NO bloom, so glow must carry itself).
 import { OrbitControls, PerspectiveCamera } from "@react-three/drei";
 import { Canvas, useFrame } from "@react-three/fiber";
+import { Bloom, EffectComposer, Vignette } from "@react-three/postprocessing";
 import { MutableRefObject, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { antinodes, beamRadius, DBRMirror, HALF, LightRig, STAGE_OFFSET, STAGE_SCALE, W0 } from "./cavityKit";
@@ -17,9 +18,10 @@ type Dyn = { eigs: Float64Array; vecs: Float64Array; n: number; c: Float64Array;
 type Ens = { m: number; centers: [number, number, number][]; dipoles: [number, number, number][]; factors: Float64Array };
 type Live = { pPhoton: number; pBright: number; pDark: number; molGlow: Float64Array };
 
-const MOL_R = 5.5;
-const C_BRIGHT = new THREE.Color("#ff2a2a"), C_DARK = new THREE.Color("#9e77ed");
+const MOL_R = 7.0;
+const C_BRIGHT = new THREE.Color("#ff5a1e"), C_DARK = new THREE.Color("#9e77ed");
 const DIP_OFF = new THREE.Color("#3a4046"), DIP_ON = new THREE.Color("#cfe8ff");
+const C_PHOTON = new THREE.Color("#22e8ff"), C_MATTER = new THREE.Color("#ff5a1e");
 // the cavity is shown in profile but tilted enough that the TEM₀₀ field discs read as ellipses (not pure
 // edge-on slivers) so the standing wave is actually visible; small polar clamp keeps it from tumbling.
 const LIVE_TILT: [number, number, number] = [0.30, 1.36, 0];
@@ -87,9 +89,10 @@ function Molecules({ liveRef, film, scale, glow = 1 }: { liveRef: MutableRefObje
     const mg = liveRef.current.molGlow;
     for (let i = 0; i < film.mols.length; i++) {
       const g = Math.min(1.2, (mg[i] || 0) * gain);
-      // small always-on floor so the "molecule glow" knob is visible even on a dim frame, then scaled live
-      const mt = mats.current[i]; if (mt) mt.emissiveIntensity = Math.min(3, (g * 1.9 + 0.05) * glow);
-      const h = halos.current[i]; if (h) { h.scale.setScalar(1 + 1.3 * g); (h.material as THREE.MeshBasicMaterial).opacity = Math.min(0.75, (0.05 + 0.45 * g) * glow); }
+      // small always-on floor so the "molecule glow" knob is visible even on a dim frame, then scaled live.
+      // High live excitation drives the emissive well past 1 so bloom blows the active emitters to a hot core.
+      const mt = mats.current[i]; if (mt) mt.emissiveIntensity = Math.min(4.5, (g * 3.0 + 0.06) * glow);
+      const h = halos.current[i]; if (h) { h.scale.setScalar(1 + 2.1 * g); (h.material as THREE.MeshBasicMaterial).opacity = Math.min(0.9, (0.06 + 0.6 * g) * glow); }
     }
   });
   return (
@@ -103,7 +106,7 @@ function Molecules({ liveRef, film, scale, glow = 1 }: { liveRef: MutableRefObje
               <meshStandardMaterial ref={(el) => { mats.current[i] = el; }} color="#241326" emissive={emis} emissiveIntensity={0} roughness={0.45} metalness={0.1} toneMapped={false} transparent depthTest={false} depthWrite={false} />
             </mesh>
             <mesh ref={(el) => { halos.current[i] = el; }} renderOrder={9}>
-              <sphereGeometry args={[MOL_R * 1.7, 16, 16]} />
+              <sphereGeometry args={[MOL_R * 2.2, 20, 20]} />
               <meshBasicMaterial color={emis} transparent opacity={0.05} blending={THREE.AdditiveBlending} depthWrite={false} depthTest={false} toneMapped={false} />
             </mesh>
           </group>
@@ -275,25 +278,18 @@ function CavReadout({ liveRef, stateRef, tRef }: { liveRef: MutableRefObject<Liv
   const R = (k: string) => (n: HTMLElement | null) => { el.current[k] = n; };
   return (
     <div className="cav-readout">
-      <div className="cr-title" title="live energy exchange between the cavity photon and the molecules at the vacuum-Rabi frequency Ω_R">VACUUM-RABI EXCHANGE</div>
-      <div className="cr-nums">
-        <span title="vacuum-Rabi splitting Ω_R = LP→UP gap = 2g√N, in units of ω_c">Ω<sub>R</sub> <b ref={R("omR")}>—</b> ω<sub>c</sub></span>
-        <span title="Rabi period T = 2π/Ω_R, in units of 1/ω_c">T <b ref={R("per")}>—</b> ω<sub>c</sub>⁻¹</span>
-        <span title="fraction through the current Rabi cycle (0–1)">φ <b ref={R("phi")}>—</b> cyc</span>
-        <span className="cr-flow" ref={R("flow")}>—</span>
-      </div>
-      <div className="cr-bar">
+      <span className="cr-title" title="live energy exchange between the cavity photon and the molecules at the vacuum-Rabi frequency Ω_R">VACUUM-RABI EXCHANGE</span>
+      <span className="cr-k" title="vacuum-Rabi splitting Ω_R = 2g√N, in units of ω_c">Ω<sub>R</sub> <b ref={R("omR")}>—</b></span>
+      <div className="cr-bar" title="where the one quantum lives right now: cyan = in the photon field, orange = in the molecules (bright mode), purple = dark states">
         <div className="cr-seg cr-p" ref={R("barP")} />
         <div className="cr-seg cr-b" ref={R("barB")} />
         <div className="cr-seg cr-d" ref={R("barD")} />
       </div>
-      <div className="cr-legend">
-        <span><i className="sw-p" />photon <b ref={R("vP")}>0.00</b></span>
-        <span><i className="sw-b" />bright <b ref={R("vB")}>0.00</b></span>
-        <span><i className="sw-d" />dark <b ref={R("vD")}>0.00</b></span>
-        <span>Σ <b ref={R("vSum")}>1.00</b></span>
-      </div>
-      <canvas className="cr-spark" ref={spark} width={196} height={46} />
+      <span className="cr-leg"><i className="sw-p" />photon <b ref={R("vP")}>0.00</b></span>
+      <span className="cr-leg"><i className="sw-b" />matter <b ref={R("vB")}>0.00</b></span>
+      <span className="cr-leg"><i className="sw-d" />dark <b ref={R("vD")}>0.00</b></span>
+      <span className="cr-flow" ref={R("flow")}>—</span>
+      <canvas className="cr-spark" ref={spark} width={1} height={1} style={{ display: "none" }} />
     </div>
   );
 }
@@ -312,6 +308,77 @@ function drawSpark(cv: HTMLCanvasElement | null, ring: { t: Float32Array; p: Flo
   ctx.strokeStyle = "rgba(255,255,255,0.4)"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(W - 1, 0); ctx.lineTo(W - 1, H); ctx.stroke();
 }
 
+// ── THE PHOTON, made visceral: a cyan core that fills the inter-mirror volume and BLAZES when the excitation
+// is in the field, dying away as it drains into the molecules — the "light" half of every vacuum-Rabi swing.
+// Driven past 1 so bloom turns a full photon into a hot white-cyan core. Intensity only; mode volume is fixed.
+function PhotonCore({ ampRef, intensity = 1, visible = true }: { ampRef: MutableRefObject<number>; intensity?: number; visible?: boolean }) {
+  const core = useRef<THREE.Mesh>(null), halo = useRef<THREE.Mesh>(null);
+  useFrame(() => {
+    const a = Math.max(0, Math.min(1, ampRef.current)), e = Math.pow(a, 0.7) * intensity;
+    const c = core.current, h = halo.current;
+    if (c) (c.material as THREE.MeshBasicMaterial).opacity = Math.min(1, 0.025 + 1.15 * e);
+    if (h) { (h.material as THREE.MeshBasicMaterial).opacity = Math.min(0.85, 0.02 + 0.62 * e); h.scale.set(W0 * 2.7, W0 * 2.7, HALF * (0.92 + 0.12 * a)); }
+  });
+  if (!visible) return null;
+  return (
+    <group>
+      <mesh ref={core} scale={[W0 * 1.45, W0 * 1.45, HALF * 0.96]}>
+        <sphereGeometry args={[1, 32, 24]} />
+        <meshBasicMaterial color="#3df2ff" transparent opacity={0} blending={THREE.AdditiveBlending} depthWrite={false} depthTest={false} toneMapped={false} />
+      </mesh>
+      <mesh ref={halo} scale={[W0 * 2.7, W0 * 2.7, HALF]}>
+        <sphereGeometry args={[1, 24, 18]} />
+        <meshBasicMaterial color="#12a8ff" transparent opacity={0} blending={THREE.AdditiveBlending} depthWrite={false} depthTest={false} toneMapped={false} />
+      </mesh>
+    </group>
+  );
+}
+
+// ── THE INTERACTION, made literal: energy quanta shuttling between the photon field (cavity centre) and the
+// molecules. Direction = sign of dP_photon/dt — photon draining ⇒ quanta fly OUT to the emitters (cyan→orange
+// as light becomes matter); photon refilling ⇒ they fly back IN (orange→cyan). Size/brightness track the
+// transfer RATE, so the stream is most alive mid-swing — exactly when the state is a 50/50 light–matter
+// polariton. A faint floor keeps the coupling channel visible at the turning points. Pure readout of P_photon(t).
+function EnergyStreamers({ liveRef, film, count = 36 }: { liveRef: MutableRefObject<Live>; film: Film; count?: number }) {
+  const inst = useRef<THREE.InstancedMesh>(null);
+  const prev = useRef(0), act = useRef(0), dir = useRef(1);
+  // each quantum runs from a point in the DELOCALIZED field (spread along the cavity axis z, within the
+  // Gaussian beam) to a molecule at the centre — so the flow travels ALONG the axis and reads against the
+  // darker mid-cavity, instead of vanishing into the central blaze where field and molecules overlap.
+  const parts = useMemo(() => Array.from({ length: count }, (_, i) => {
+    const m = film.mols[i % Math.max(1, film.mols.length)]!;
+    const z = (Math.random() * 2 - 1) * HALF * 0.82, ang = Math.random() * Math.PI * 2, rr = beamRadius(z) * (0.22 + Math.random() * 0.8);
+    const src = new THREE.Vector3(Math.cos(ang) * rr, Math.sin(ang) * rr * 0.7, z);
+    return { src, tgt: m.pos.clone(), s: i / count, sw: 0.6 + Math.random() * 0.9, off: new THREE.Vector3((Math.random() - 0.5) * 11, (Math.random() - 0.5) * 11, 0) };
+  }), [film, count]);
+  const dummy = useMemo(() => new THREE.Object3D(), []);
+  const col = useMemo(() => new THREE.Color(), []);
+  const ease = (s: number) => s * s * (3 - 2 * s);
+  useFrame((_, dt) => {
+    const im = inst.current; if (!im) return;
+    const ph = liveRef.current.pPhoton, dP = ph - prev.current; prev.current = ph;
+    if (Math.abs(dP) > 1e-5) dir.current = dP < 0 ? 1 : -1;              // photon dropping → flow OUT to matter (+1)
+    act.current = act.current * 0.86 + Math.min(1, Math.abs(dP) * 55) * 0.14;
+    const a = act.current, spd = (0.18 + 1.7 * a) * dir.current, dts = Math.min(0.05, dt);
+    for (let i = 0; i < parts.length; i++) {
+      const p = parts[i]!;
+      p.s = ((p.s + spd * dts * p.sw) % 1 + 1) % 1;
+      const u = ease(p.s), bow = Math.sin(Math.PI * p.s);
+      dummy.position.set(p.src.x + (p.tgt.x - p.src.x) * u + p.off.x * bow, p.src.y + (p.tgt.y - p.src.y) * u + p.off.y * bow, p.src.z + (p.tgt.z - p.src.z) * u);
+      dummy.scale.setScalar(Math.max(0.02, (0.4 + 1.0 * a) * (0.25 + 0.75 * bow)));
+      dummy.updateMatrix(); im.setMatrixAt(i, dummy.matrix);
+      im.setColorAt(i, col.copy(C_PHOTON).lerp(C_MATTER, u));
+    }
+    im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true;
+  });
+  return (
+    <instancedMesh ref={inst} args={[undefined, undefined, count]} renderOrder={12} frustumCulled={false}>
+      <sphereGeometry args={[3.0, 12, 12]} />
+      <meshBasicMaterial transparent opacity={0.95} blending={THREE.AdditiveBlending} depthWrite={false} depthTest={false} toneMapped={false} />
+    </instancedMesh>
+  );
+}
+
 export interface SceneControls { autoRotate: boolean; fieldGlow: number; moleculeScale: number; moleculeGlow: number; showFieldDiscs: boolean; showDipoleArrows: boolean }
 const DEFAULT_CTRL: SceneControls = { autoRotate: false, fieldGlow: 1.0, moleculeScale: 1.0, moleculeGlow: 1.0, showFieldDiscs: true, showDipoleArrows: true };
 
@@ -323,24 +390,30 @@ export function LiveCavityScene({ stateRef, tRef, inspectRef, m, ensemble, polTh
     <div className="cav-stage">
       <div className="cav-tag cav-tag-l">DBR mirror</div>
       <div className="cav-tag cav-tag-r">DBR mirror</div>
-      <div className="cav-tag cav-tag-mode">ω<sub>c</sub> TEM₀₀ field · <span style={{ color: "#ffcc00" }}>ε̂</span> polariz. · cyan = photon</div>
+      <div className="cav-tag cav-tag-mode"><span style={{ color: "#3df2ff" }}>photon (light)</span> ⇄ <span style={{ color: "#ff7a3c" }}>molecules (matter)</span> = polariton</div>
       <CavReadout liveRef={liveRef} stateRef={stateRef} tRef={tRef} />
       <Canvas dpr={[1, 2]} gl={{ antialias: true, alpha: true }} camera={{ position: [0, 60, 330], fov: 50 }}>
-        <color attach="background" args={["#05070e"]} />
+        <color attach="background" args={["#04060c"]} />
         <PerspectiveCamera makeDefault fov={50} position={[0, 60, 330]} />
         <LightRig />
         <SimSampler stateRef={stateRef} tRef={tRef} inspectRef={inspectRef} liveRef={liveRef} fieldAmpRef={fieldAmpRef} m={m} />
         <group rotation={LIVE_TILT} scale={STAGE_SCALE} position={STAGE_OFFSET}>
           <DBRMirror side={-1} />
           <DBRMirror side={1} />
+          <PhotonCore ampRef={fieldAmpRef} visible={controls.showFieldDiscs} intensity={controls.fieldGlow} />
           <ModeGlow ampRef={fieldAmpRef} visible={controls.showFieldDiscs} intensity={controls.fieldGlow} />
           <NodalRings />
           <FieldDiscsShader ampRef={fieldAmpRef} visible={controls.showFieldDiscs} intensity={controls.fieldGlow} />
+          <EnergyStreamers liveRef={liveRef} film={film} />
           <Molecules liveRef={liveRef} film={film} scale={controls.moleculeScale} glow={controls.moleculeGlow} />
           {controls.showDipoleArrows ? <Dipoles film={film} scale={controls.moleculeScale} /> : null}
           <PolarizationAxis theta={polTheta} />
         </group>
         <OrbitControls makeDefault enablePan={false} autoRotate={controls.autoRotate} autoRotateSpeed={1.4} enableDamping dampingFactor={0.05} minDistance={150} maxDistance={600} minPolarAngle={Math.PI / 2 - 0.55} maxPolarAngle={Math.PI / 2 + 0.55} target={[0, 0, 0]} />
+        <EffectComposer>
+          <Bloom luminanceThreshold={0.2} luminanceSmoothing={0.5} intensity={1.15} radius={0.72} mipmapBlur />
+          <Vignette eskil={false} offset={0.32} darkness={0.55} />
+        </EffectComposer>
       </Canvas>
     </div>
   );
