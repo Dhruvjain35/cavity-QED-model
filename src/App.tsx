@@ -6,6 +6,7 @@ import { loadWasm, Quantum, solveSpectrum, arrowheadModesGi, arrowheadMatrixGi, 
 
 const HTC_EXPLICIT_CAP = 3; // N ≤ this → exact (N+1)·nv^N diagonalization; above → asymptotic 1/N decoupling
 import { buildEnsemble, brightWeights } from "./cavity/ensemble";
+import { PolaritonFormation } from "./PolaritonFormation";
 
 const MODE_WAIST = 2.4; // TEM00 Gaussian mode waist w (length units of the molecular layout)
 
@@ -177,6 +178,8 @@ export function App() {
   const [htc, setHtc] = useState({ wv: 0.15, S: 1.0, g: 0.05, N: 3, gamma: 0.012 }); // HTC: ω_v, Huang-Rhys S, cavity g, collective N, broadening γ (units of ω_c). N=3 (the explicit-diagonalization cap) so the disorder panel opens in the collective regime where motional narrowing actually dominates (Ω_R=0.17 ⇒ crossover σ=Ω_R sits mid-plot), not the N=1 sliver where σ²/2Ω_R blows up.
   const [dyn, setDyn] = useState({ m: 12, g: 0.06, sigma: 0.03, seed: 1, init: 0, order: 1.0, gamma: 0.022, theta: 0 }); // CANONICAL DEFAULT — σ=0.03 locks the clean strong-coupling regime; τ resets to 0; populations show 0–6 Rabi cycles
   const [inspect, setInspect] = useState<number | null>(null); // clicked dressed eigenstate (UI badge)
+  const [dynView, setDynView] = useState<"formation" | "dynamics">("formation"); // DYNAMICS lead view
+  const [pfSel, setPfSel] = useState<"LP" | "UP" | null>(null); // formation: selected polariton branch
   const [dynSweep, setDynSweep] = useState(false); // coupling-sweep dispersion mode (replaces the 3D)
   const [wcEv, setWcEv] = useState(2.0); // physical cavity-photon energy ℏω_c in eV (display scale only)
   // PERF: the heavy per-tab recomputes (ODE integration, arrowhead diagonalization, TMM sweeps) key off the
@@ -1738,7 +1741,20 @@ export function App() {
                 </PlotWrap>
               </div>
             </>
-          ) : dynSweep ? (
+          ) : (
+            <>
+              <div className="dyn-viewtabs">
+                <button className={dynView === "formation" ? "on" : ""} onClick={() => setDynView("formation")}>⚛ Polariton formation</button>
+                <button className={dynView === "dynamics" ? "on" : ""} onClick={() => setDynView("dynamics")}>▶ Live dynamics</button>
+              </div>
+              {dynView === "formation" ? (
+                <div className="pf-pane">
+                  <div className="pane-head">Polariton formation · the cavity photon + the molecules hybridize into the LP/UP polaritons · turn up the coupling to watch them split</div>
+                  <PanelEqn t={"\\hat H=\\begin{pmatrix}\\omega_c & G\\\\ G & \\omega_a\\end{pmatrix},\\ G=g\\sqrt N,\\quad E_\\pm=\\tfrac{\\omega_c+\\omega_a}{2}\\pm\\tfrac12\\sqrt{\\Delta^2+4G^2}"} where="Δ=ω_c−ω_a · the 2 bright modes of the Tavis–Cummings arrowhead" />
+                  <div className="pane-sub"><b>What:</b> the photon and the bright molecular mode are two coupled oscillators. With no coupling they just cross; turn up <b>g√N</b> and they repel into two <b>polaritons</b> (LP/UP) split by Ω_R. Each is a light–matter blend — at resonance both are <b>50/50</b>, the maximal hybrid. <b>Drag</b> the plot to detune; <b>click</b> a branch.</div>
+                  <PolaritonFormation g={dyn.g} n={dyn.m} selected={pfSel} onSelect={setPfSel} />
+                </div>
+              ) : dynSweep ? (
             <div className="pane grow">
               <div className="pane-head">Coupling sweep · polariton dispersion E(g) · {SWEEP_STEPS} diagonalizations · bright split as 2g√N, dark flat at ω_a · amber = live g</div>
               <canvas ref={sweepCanvas} className="cv" />
@@ -1790,6 +1806,8 @@ export function App() {
                 </PlotWrap>
               </div>
             </div>
+              )}
+            </>
           )}
         </main>
 
