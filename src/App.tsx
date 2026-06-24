@@ -99,6 +99,14 @@ const MX_S = 196; // live Hamiltonian heatmap size (px)
 const PANEL = "#0c0f12", INK = "#ffffff", DIM = "#8b949e", AXIS = "#484f58";
 const CYAN = "#00ffff", RED = "#ff3333", AMBER = "#ffcc00", PURPLE = "#9e77ed", GREEN = "#00ff66";
 const COBALT = CYAN, CRIMSON = RED, EMERALD = GREEN, SLATE = "#484f58"; // legacy aliases → new palette
+// the two bright polaritons = the eigenstates of largest PHOTON weight |⟨0|φ_k⟩|² = vecs[k]² (row 0);
+// lower energy = LP, higher = UP. Robust under disorder (which spreads the dark band past the extremes).
+function brightPolaritonIdx(vecs: Float64Array, eigs: Float64Array, n: number) {
+  let pa = 0, pb = 1, wpa = -1, wpb = -1;
+  for (let k = 0; k < n; k++) { const w = vecs[k]! * vecs[k]!; if (w > wpa) { wpb = wpa; pb = pa; wpa = w; pa = k; } else if (w > wpb) { wpb = w; pb = k; } }
+  const kLP = eigs[pa]! <= eigs[pb]! ? pa : pb, kUP = kLP === pa ? pb : pa;
+  return { kLP, kUP };
+}
 const GRIDLINE = "#1b2026", DASH = "#1f242c", CROSS = "rgba(120,130,145,0.4)";
 
 const minus = (s: string) => s.replace("-", "−");
@@ -150,7 +158,7 @@ type Preset = {
   cav?: { lambda: number; nHi: number; nLo: number; pairs: number; nCav: number; g: number };
   cavN?: number;
   htc?: { wv: number; S: number; g: number; N: number; gamma: number };
-  dyn?: { m: number; g: number; sigma: number };
+  dyn?: { m: number; g: number; sigma: number; detuning?: number };
 };
 const PRESETS: Preset[] = [
   { group: "Single emitter · open Jaynes–Cummings", title: "Vacuum-Rabi oscillation", blurb: "One quantum sloshing photon ↔ atom at the rate 2g — the textbook strong-coupling oscillation, lightly damped. Watch Panel C and the Wigner map.", regime: "single", params: { g: 0.3, kappa: 0.01, gamma: 0.01 } },
@@ -161,8 +169,8 @@ const PRESETS: Preset[] = [
   { group: "Collective · Tavis–Cummings", title: "Disorder washes out polaritons", blurb: "Add static energy disorder (σ ≳ Ω_R): the bright doublet broadens and the dark band spreads — strong coupling degrades.", regime: "collective", sp: { m: 20, g: 0.06, sigma: 0.12 } },
   { group: "Cavity hardware · DBR Fabry–Pérot", title: "Mirror stack → coupling g", blurb: "See how the DBR design sets the standing-wave field, the mode volume V_m, and therefore the single-emitter coupling g.", regime: "cavity", cav: { lambda: 550, nHi: 2.5, nLo: 1.46, pairs: 4, nCav: 1.6, g: 1.6 }, cavN: 1 },
   { group: "Cavity hardware · DBR Fabry–Pérot", title: "Collective crossover N*", blurb: "One molecule is too weak to beat the cavity loss; strong coupling (2g√N > κ) is reached only collectively, above N*.", regime: "cavity", cav: { lambda: 550, nHi: 2.5, nLo: 1.46, pairs: 4, nCav: 1.6, g: 1.6 }, cavN: 10000 },
-  { group: "Live dynamics · real-time", title: "Vacuum-Rabi sloshing (3D)", blurb: "Watch one excitation slosh photon ↔ molecules in real time in 3D, alongside the clean transmission doublet.", regime: "dynamics", dyn: { m: 12, g: 0.06, sigma: 0.03 } },
-  { group: "Live dynamics · real-time", title: "Collective enhancement", blurb: "More molecules → a larger Rabi splitting Ω_R = 2g√N and faster sloshing. Compare the populations period.", regime: "dynamics", dyn: { m: 30, g: 0.05, sigma: 0.03 } },
+  { group: "Live dynamics · real-time", title: "Vacuum-Rabi sloshing (3D)", blurb: "Watch one excitation slosh photon ↔ molecules in real time in 3D, alongside the clean transmission doublet.", regime: "dynamics", dyn: { m: 12, g: 0.06, sigma: 0.03, detuning: 0 } },
+  { group: "Live dynamics · real-time", title: "Collective enhancement", blurb: "More molecules → a larger Rabi splitting Ω_R = 2g√N and faster sloshing. Compare the populations period.", regime: "dynamics", dyn: { m: 30, g: 0.05, sigma: 0.03, detuning: 0 } },
   { group: "Vibronic · Holstein–Tavis–Cummings", title: "Franck–Condon comb → polaritons", blurb: "A molecule's vibrational fingerprint (grey comb) collapses into LP/UP polaritons inside the cavity (cyan).", regime: "vibronic", htc: { wv: 0.15, S: 1.0, g: 0.05, N: 3, gamma: 0.012 } },
   { group: "Vibronic · Holstein–Tavis–Cummings", title: "Motional narrowing", blurb: "Under molecular disorder, the cavity polariton stays sharp far longer than a bare line — it averages over the ensemble.", regime: "vibronic", htc: { wv: 0.15, S: 1.0, g: 0.08, N: 3, gamma: 0.012 } },
 ];
@@ -176,7 +184,7 @@ export function App() {
   const [cav, setCav] = useState({ lambda: 550, nHi: 2.5, nLo: 1.46, pairs: 4, nCav: 1.6, g: 1.6 });
   const [cavN, setCavN] = useState(1); // CAVITY: emitter ensemble size N for the 2g√N-vs-κ collective-coupling demo
   const [htc, setHtc] = useState({ wv: 0.15, S: 1.0, g: 0.05, N: 3, gamma: 0.012 }); // HTC: ω_v, Huang-Rhys S, cavity g, collective N, broadening γ (units of ω_c). N=3 (the explicit-diagonalization cap) so the disorder panel opens in the collective regime where motional narrowing actually dominates (Ω_R=0.17 ⇒ crossover σ=Ω_R sits mid-plot), not the N=1 sliver where σ²/2Ω_R blows up.
-  const [dyn, setDyn] = useState({ m: 12, g: 0.06, sigma: 0.03, seed: 1, init: 0, order: 1.0, gamma: 0.022, theta: 0 }); // CANONICAL DEFAULT — σ=0.03 locks the clean strong-coupling regime; τ resets to 0; populations show 0–6 Rabi cycles
+  const [dyn, setDyn] = useState({ m: 12, g: 0.06, sigma: 0.03, seed: 1, init: 0, order: 1.0, gamma: 0.022, theta: 0, detuning: 0 }); // CANONICAL DEFAULT — σ=0.03 locks the clean strong-coupling regime; τ resets to 0; populations show 0–6 Rabi cycles; detuning=0 = resonance
   const [inspect, setInspect] = useState<number | null>(null); // clicked dressed eigenstate (UI badge)
   const [dynView, setDynView] = useState<"formation" | "dynamics">("formation"); // DYNAMICS lead view
   const [pfSel, setPfSel] = useState<"LP" | "UP" | null>(null); // formation: selected polariton branch
@@ -332,7 +340,7 @@ export function App() {
     if (regime !== "dynamics") return;
     loadWasm().then(() => {
       const gi = Float64Array.from(ensemble.factors, (f) => f * dyn.g); // g_i = g_0·(μ̂_i·ε̂)·f(r_i)
-      const { eigs, vecs, n } = arrowheadModesGi(WA, WA, dyn.sigma, dyn.seed, gi);
+      const { eigs, vecs, n } = arrowheadModesGi(WA + dyn.detuning, WA, dyn.sigma, dyn.seed, gi);
       const c = new Float64Array(n);
       for (let k = 0; k < n; k++) c[k] = vecs[dyn.init * n + k]!; // ⟨φ_k|ψ0⟩ for the chosen initial site
       const bright = brightWeights(ensemble.factors); // per-molecule b_i = g_i/‖g‖ — drives the live glow
@@ -345,13 +353,27 @@ export function App() {
       popCurve.current = { T: T_POP, split, n: NP, data: pdata };
       simT.current = 0;
       inspectRef.current = null; setInspect(null); // a new ensemble invalidates the inspected state
-      matData.current = arrowheadMatrixGi(WA, WA, dyn.sigma, dyn.seed, gi);
-      fftData.current = cavityPowerSpectrumGi(WA, WA, dyn.sigma, dyn.seed, gi, FFT_N, FFT_DT, dyn.gamma);
-      logDoublet(fftData.current, eigs, n, gi); // 1.A · console check: peaks at ω_c±‖g‖, equal height
-      if (dynSweep) sweepData.current = couplingSweepGi(WA, WA, dyn.sigma, dyn.seed, ensemble.factors, 0, SWEEP_GMAX, SWEEP_STEPS); // 90 diagonalizations — only when displayed
+      matData.current = arrowheadMatrixGi(WA + dyn.detuning, WA, dyn.sigma, dyn.seed, gi);
+      fftData.current = cavityPowerSpectrumGi(WA + dyn.detuning, WA, dyn.sigma, dyn.seed, gi, FFT_N, FFT_DT, dyn.gamma);
+      if (Math.abs(dyn.detuning) < 1e-9) logDoublet(fftData.current, eigs, n, gi); // 1.A · console check (on-resonance only): peaks at ω_c±‖g‖, equal height
+      if (dynSweep) sweepData.current = couplingSweepGi(WA + dyn.detuning, WA, dyn.sigma, dyn.seed, ensemble.factors, 0, SWEEP_GMAX, SWEEP_STEPS); // 90 diagonalizations — only when displayed
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [regime, dDyn, dynSweep]);
+
+  // FORMATION: selecting LP/UP freezes the 3D on that bright polariton (the stable hybrid) via inspectRef;
+  // null releases it back to the live ψ(t) oscillation. Re-pins after a recompute (dDyn) so it tracks the
+  // freshly-diagonalized eigenstates as the coupling / detuning dials change.
+  useEffect(() => {
+    if (regime !== "dynamics") return;
+    const ds = dynState.current;
+    // not actively freezing (live-dynamics view, or no branch picked) → release any stale inspect
+    if (dynView !== "formation" || !pfSel || !ds) { if (inspectRef.current !== null) { inspectRef.current = null; setInspect(null); } return; }
+    const { kLP, kUP } = brightPolaritonIdx(ds.vecs, ds.eigs, ds.n);
+    const target = pfSel === "LP" ? kLP : kUP;
+    inspectRef.current = target; setInspect(target);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pfSel, regime, dynView, dDyn]);
 
   useEffect(() => {
     if (regime !== "vibronic") return;
@@ -1062,10 +1084,11 @@ export function App() {
     // reservoir) clustered near ω_a. Shade and bracket it so the N-body structure is unmistakable.
     const md = ds.modeAmp, dark: number[] = [];
     for (let k = 0; k < n; k++) if (vecs[k]! * vecs[k]! < 0.02) dark.push(k);
-    // E/ω_c = 1.0 calibration line (the uncoupled / bare-exciton energy) — dotted, full width
+    // bare-energy calibration lines: emitter ω_a (where the dark band sits) and, when detuned, the cavity ω_c
     const yA = yOf(WA);
     ctx.strokeStyle = "rgba(139,148,158,0.45)"; ctx.setLineDash([1, 3]); ctx.lineWidth = 0.75; seg(ctx, HP_ML, yA, HP_ML + HP_PW, yA); ctx.setLineDash([]);
-    ctx.fillStyle = DIM; ctx.font = "9px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "right"; ctx.textBaseline = "bottom"; ctx.fillText("E/ω_c=1", HP_ML + HP_PW - 3, yA - 2);
+    ctx.fillStyle = DIM; ctx.font = "9px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "right"; ctx.textBaseline = "bottom"; ctx.fillText("ω_a", HP_ML + HP_PW - 3, yA - 2);
+    if (Math.abs(dyn.detuning) > 1e-9) { const yC = yOf(WA + dyn.detuning); ctx.strokeStyle = "rgba(0,255,255,0.4)"; ctx.setLineDash([1, 3]); ctx.lineWidth = 0.75; seg(ctx, HP_ML, yC, HP_ML + HP_PW, yC); ctx.setLineDash([]); ctx.fillStyle = "rgba(0,255,255,0.7)"; ctx.fillText("ω_c", HP_ML + HP_PW - 3, yC - 2); }
     if (dark.length) {
       let dlo = Infinity, dhi = -Infinity; for (const k of dark) { dlo = Math.min(dlo, eigs[k]!); dhi = Math.max(dhi, eigs[k]!); }
       const yb = yOf(dhi), yt = yOf(dlo), bw = xOf(0.05) - HP_ML, yc = (yb + yt) / 2;
@@ -1093,11 +1116,8 @@ export function App() {
     }
     hopMarks.current = marks;
     ctx.fillStyle = INK; ctx.font = "600 9px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "bottom";
-    // LP/UP = the two largest-PHOTON-WEIGHT eigenstates (robust when disorder spreads the dark band past the
-    // energy extremes — energy rank alone would then mark a dark state); lower energy = LP, higher = UP.
-    let pa = 0, pb = 1, wpa = -1, wpb = -1;
-    for (let k = 0; k < n; k++) { const w = vecs[k]! * vecs[k]!; if (w > wpa) { wpb = wpa; pb = pa; wpa = w; pa = k; } else if (w > wpb) { wpb = w; pb = k; } }
-    const kLP = eigs[pa]! <= eigs[pb]! ? pa : pb, kUP = kLP === pa ? pb : pa;
+    // LP/UP = the two largest-photon-weight eigenstates (see brightPolaritonIdx)
+    const { kLP, kUP } = brightPolaritonIdx(vecs, eigs, n);
     ctx.fillText("LP", xOf(vecs[kLP]! * vecs[kLP]!), yOf(eigs[kLP]!) - 9);
     ctx.fillText("UP", xOf(vecs[kUP]! * vecs[kUP]!), yOf(eigs[kUP]!) - 9);
     ctx.strokeStyle = AXIS; ctx.lineWidth = 0.75; ctx.strokeRect(HP_ML, HP_MT, HP_PW, HP_PH);
@@ -1148,8 +1168,8 @@ export function App() {
     const cvEl = fftCanvas.current, fd = fftData.current, ds = dynState.current; if (!cvEl || !fd || !ds) return;
     const ctx = sized(cvEl, FF_CW, FF_CH);
     ctx.fillStyle = PANEL; ctx.fillRect(0, 0, FF_CW, FF_CH);
-    // X-axis SYMMETRIC about the bare cavity resonance ω/ω_c = 1 so the Rabi doublet reads symmetric
-    const lo = ds.eigs[0]!, hi = ds.eigs[ds.n - 1]!, hw = Math.max(0.5, (hi - lo) * 0.7 + 0.08), wlo = WA - hw, whi = WA + hw;
+    // X-axis centred on the eigenvalue midpoint (= (ω_c+ω_a)/2) so the doublet stays framed at ANY detuning.
+    const lo = ds.eigs[0]!, hi = ds.eigs[ds.n - 1]!, hw = Math.max(0.5, (hi - lo) * 0.7 + 0.08), mid = (lo + hi) / 2, wlo = mid - hw, whi = mid + hw;
     const xOf = (w: number) => FF_ML + (w - wlo) / (whi - wlo) * FF_PW, yOf = (p: number) => FF_MT + (1 - p) * FF_PH;
     ctx.font = "500 8.5px 'IBM Plex Sans',system-ui,sans-serif";
     for (const p of [0, 0.5, 1]) { ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5; seg(ctx, FF_ML, yOf(p), FF_ML + FF_PW, yOf(p)); ctx.fillStyle = DIM; ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(p.toFixed(1), FF_ML - 6, yOf(p)); }
@@ -1159,8 +1179,12 @@ export function App() {
       const x = xOf(w); ctx.strokeStyle = DASH; ctx.setLineDash([1, 3]); ctx.lineWidth = 0.6; seg(ctx, x, FF_MT, x, FF_MT + FF_PH); ctx.setLineDash([]);
       ctx.fillStyle = DIM; ctx.fillText(w.toFixed(1), x, FF_MT + FF_PH + 5);
     }
-    // ω/ω_c = 1 resonance marker
-    ctx.strokeStyle = "rgba(139,148,158,0.5)"; ctx.setLineDash([1, 3]); ctx.lineWidth = 0.75; seg(ctx, xOf(WA), FF_MT, xOf(WA), FF_MT + FF_PH); ctx.setLineDash([]);
+    // bare-mode markers: emitter ω_a (red) fixed at 1, cavity ω_c (cyan) at 1+detuning — they coincide at
+    // resonance; off-resonance the polariton peaks sit asymmetrically between them.
+    ctx.setLineDash([1, 3]); ctx.lineWidth = 0.75;
+    ctx.strokeStyle = "rgba(255,58,58,0.5)"; seg(ctx, xOf(WA), FF_MT, xOf(WA), FF_MT + FF_PH);
+    if (Math.abs(dyn.detuning) > 1e-9) { ctx.strokeStyle = "rgba(0,255,255,0.5)"; seg(ctx, xOf(WA + dyn.detuning), FF_MT, xOf(WA + dyn.detuning), FF_MT + FF_PH); }
+    ctx.setLineDash([]);
     const om = fd.omega, pw = fd.power;
     const path = (close: boolean) => { ctx.beginPath(); let st = false; for (let i = 0; i < om.length; i++) { const w = om[i]!; if (w < wlo) continue; if (w > whi) break; const x = xOf(w), y = yOf(Math.min(1, pw[i]!)); if (!st) { if (close) { ctx.moveTo(x, yOf(0)); ctx.lineTo(x, y); } else ctx.moveTo(x, y); st = true; } else ctx.lineTo(x, y); } if (close && st) { ctx.lineTo(xOf(Math.min(whi, om[om.length - 1]!)), yOf(0)); ctx.closePath(); } };
     path(true); ctx.fillStyle = "rgba(0,255,255,0.12)"; ctx.fill();
@@ -1443,7 +1467,7 @@ export function App() {
 
   function exportHamiltonian() {
     const gi = Float64Array.from(ensemble.factors, (f) => f * dyn.g);
-    const { h, n } = arrowheadMatrixGi(WA, WA, dyn.sigma, dyn.seed, gi);
+    const { h, n } = arrowheadMatrixGi(WA + dyn.detuning, WA, dyn.sigma, dyn.seed, gi);
     downloadNpy(`H_cavityQED_N${dyn.m}.npy`, h, [n, n]); // np.load(...) → (N+1)×(N+1) Hamiltonian in units of ω_c
   }
 
@@ -1748,11 +1772,23 @@ export function App() {
                 <button className={dynView === "dynamics" ? "on" : ""} onClick={() => setDynView("dynamics")}>▶ Live dynamics</button>
               </div>
               {dynView === "formation" ? (
-                <div className="pf-pane">
-                  <div className="pane-head">Polariton formation · the cavity photon + the molecules hybridize into the LP/UP polaritons · turn up the coupling to watch them split</div>
-                  <PanelEqn t={"\\hat H=\\begin{pmatrix}\\omega_c & G\\\\ G & \\omega_a\\end{pmatrix},\\ G=g\\sqrt N,\\quad E_\\pm=\\tfrac{\\omega_c+\\omega_a}{2}\\pm\\tfrac12\\sqrt{\\Delta^2+4G^2}"} where="Δ=ω_c−ω_a · the 2 bright modes of the Tavis–Cummings arrowhead" />
-                  <div className="pane-sub"><b>What:</b> the photon and the bright molecular mode are two coupled oscillators. With no coupling they just cross; turn up <b>g√N</b> and they repel into two <b>polaritons</b> (LP/UP) split by Ω_R. Each is a light–matter blend — at resonance both are <b>50/50</b>, the maximal hybrid. <b>Drag</b> the plot to detune; <b>click</b> a branch.</div>
-                  <PolaritonFormation g={dyn.g} n={dyn.m} selected={pfSel} onSelect={setPfSel} />
+                <div className="pf-grid">
+                  <div className="pf-left">
+                    <div className="pane-head">Polariton formation · cavity photon + molecules → LP/UP · the coupling & detuning dials drive the live simulation</div>
+                    <PanelEqn t={"\\hat H=\\begin{pmatrix}\\omega_c & G\\\\ G & \\omega_a\\end{pmatrix},\\ G=g\\sqrt N,\\quad E_\\pm=\\tfrac{\\omega_c+\\omega_a}{2}\\pm\\tfrac12\\sqrt{\\Delta^2+4G^2}"} where="Δ=ω_c−ω_a · the 2 bright modes of the (N+1)×(N+1) arrowhead" />
+                    <PolaritonFormation g={dyn.g} n={dyn.m} delta={dyn.detuning} onDelta={(d) => setDyn((s) => ({ ...s, detuning: d }))} onG={(Gv) => setDyn((s) => ({ ...s, g: Gv / Math.sqrt(Math.max(1, s.m)) }))} selected={pfSel} onSelect={setPfSel} />
+                  </div>
+                  <div className="pf-right">
+                    <div className="pane-head">{pfSel ? <>▸ <i style={{ color: "#fff", fontStyle: "normal" }}>{pfSel} polariton</i> — the STABLE hybrid: the standing-wave field <b>and</b> the excited molecules are lit at once, and stay that way</> : <>Live oscillation — the Rabi beat between LP &amp; UP. A polariton is the <i style={{ color: "#fff", fontStyle: "normal" }}>stable</i> mix; this sloshing is what happens when you're not sitting in one. Freeze one →</>}</div>
+                    <div className="live3d"><Suspense fallback={<div className="cv-loading">loading 3D…</div>}><LiveCavityScene stateRef={dynState} tRef={simT} m={dyn.m} inspectRef={inspectRef} ensemble={ensemble} waist={MODE_WAIST} polTheta={dyn.theta * Math.PI / 180} controls={scene3d} /></Suspense>
+                      <ScenePanel open={scenePanelOpen} onToggle={() => setScenePanelOpen((o) => !o)} v={scene3d} set={setScene} />
+                    </div>
+                    <div className="pf-3dctrls">
+                      <button className={pfSel === "LP" ? "on" : ""} onClick={() => setPfSel("LP")} title="freeze the 3D on the lower polariton">⏸ LP hybrid</button>
+                      <button className={pfSel === "UP" ? "on" : ""} onClick={() => setPfSel("UP")} title="freeze the 3D on the upper polariton">⏸ UP hybrid</button>
+                      <button className={pfSel === null ? "on" : ""} onClick={() => { setPfSel(null); setPlaying(true); }} title="release and watch the Rabi oscillation">▶ oscillate</button>
+                    </div>
+                  </div>
                 </div>
               ) : dynSweep ? (
             <div className="pane grow">
@@ -1801,7 +1837,7 @@ export function App() {
                 <div className="pane-head">Transmission S(ω) · |FFT of the photon return amplitude ⟨0|ψ(t)⟩, e<sup>−Γt</sup>-windowed|² · Lorentzian vacuum-Rabi doublet weighted by photon fraction</div>
                 <PanelEqn t={"S(\\omega)=\\big|\\,\\mathrm{FFT}\\big[\\langle 0|\\psi(t)\\rangle\\,e^{-\\Gamma t}\\big]\\,\\big|^2"} where="peaks at the polariton energies E_k" />
                 <div className="pane-sub"><b>What:</b> what a transmission/PL spectrometer would measure — two polariton peaks (LP and UP); their separation is the Rabi splitting Ω_R. The width Γ is set by the spectral-linewidth slider (this is the only place loss enters).</div>
-                <PlotWrap fit cw={FF_CW} ch={FF_CH} area={{ ml: FF_ML, mt: FF_MT, pw: FF_PW, ph: FF_PH }} inv={(px, py) => { const ds = dynState.current; if (!ds) return null; const lo = ds.eigs[0]!, hi = ds.eigs[ds.n - 1]!, hw = Math.max(0.5, (hi - lo) * 0.7 + 0.08), wlo = WA - hw, whi = WA + hw; return [(wlo + ((px - FF_ML) / FF_PW) * (whi - wlo)).toFixed(3), (1 - (py - FF_MT) / FF_PH).toFixed(2)]; }}>
+                <PlotWrap fit cw={FF_CW} ch={FF_CH} area={{ ml: FF_ML, mt: FF_MT, pw: FF_PW, ph: FF_PH }} inv={(px, py) => { const ds = dynState.current; if (!ds) return null; const lo = ds.eigs[0]!, hi = ds.eigs[ds.n - 1]!, hw = Math.max(0.5, (hi - lo) * 0.7 + 0.08), mid = (lo + hi) / 2, wlo = mid - hw, whi = mid + hw; return [(wlo + ((px - FF_ML) / FF_PW) * (whi - wlo)).toFixed(3), (1 - (py - FF_MT) / FF_PH).toFixed(2)]; }}>
                   <canvas ref={fftCanvas} className="cv" />
                 </PlotWrap>
               </div>

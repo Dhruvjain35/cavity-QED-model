@@ -152,31 +152,41 @@ tr[title] { cursor: help; }
 .dyn-viewtabs button { font-family: var(--sans); font-size: 10px; font-weight: 600; letter-spacing: 0.03em; padding: 7px 14px; border: none; border-right: 1px solid var(--rule); background: transparent; color: var(--faint); cursor: pointer; }
 .dyn-viewtabs button:hover { color: var(--ink); background: var(--rule-soft); }
 .dyn-viewtabs button.on { color: var(--cyan); border-bottom: 2px solid var(--cyan); background: #0b1016; }
-/* polariton-formation panel */
-.pf-pane { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 10px 12px; }
-.pf-pane .pane-head { margin-bottom: 4px; }
-.pf-root { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start; }
-.pf-plotwrap { flex: 1 1 360px; min-width: 0; line-height: 0; }
-.pf-canvas { display: block; cursor: ew-resize; }
-.pf-side { flex: 1 1 230px; min-width: 200px; display: flex; flex-direction: column; gap: 10px; font-family: var(--sans); }
+/* polariton FORMATION — 2-panel fit-to-screen: avoided crossing (left) + the selected polariton in 3D (right).
+   Fills the center column height with no scroll; stacks to one column when the center gets narrow. */
+.pf-grid { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1.06fr) minmax(272px, 0.94fr); }
+.pf-grid > .pf-left, .pf-grid > .pf-right { min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; padding: 6px 9px 8px; }
+.pf-grid > .pf-left { border-right: 1px solid var(--rule-2); }
+.pf-grid .pane-head { margin-bottom: 3px; }
+/* left: the avoided-crossing diagram (fits) + the dials + composition */
+.pf-root { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; font-family: var(--sans); }
+.pf-plotwrap { flex: 1 1 0; min-height: 0; min-width: 0; display: flex; align-items: center; justify-content: center; }
+.pf-canvas { aspect-ratio: 600 / 360; width: auto; height: auto; max-width: 100%; max-height: 100%; display: block; cursor: ew-resize; }
+.pf-ctrls { flex: 0 0 auto; display: flex; flex-direction: column; gap: 6px; }
 .pf-row { display: flex; align-items: center; gap: 8px; font-size: 10px; color: var(--dim); }
+.pf-row > span:first-child { white-space: nowrap; min-width: 64px; }
 .pf-row i { font-style: normal; color: var(--ink); font-weight: 600; }
-.pf-row input[type="range"] { flex: 1; }
-.pf-row b { font-family: var(--mono); font-size: 11px; font-variant-numeric: tabular-nums; min-width: 42px; text-align: right; }
-.pf-hint { font-size: 9.5px; color: var(--faint); line-height: 1.4; }
-.pf-comps { border: 1px solid var(--rule-2); }
-.pf-comps-head { font-size: 8.5px; color: var(--faint); padding: 5px 7px; border-bottom: 1px solid var(--rule); line-height: 1.4; }
-.pf-comp { display: block; width: 100%; text-align: left; background: transparent; border: none; border-bottom: 1px solid var(--rule-soft); padding: 7px 8px; cursor: pointer; }
-.pf-comp:last-child { border-bottom: none; }
-.pf-comp:hover { background: #11161d; }
-.pf-comp.on { background: #11202a; }
+.pf-row input[type="range"] { flex: 1; min-width: 60px; }
+.pf-row b { font-family: var(--mono); font-size: 11px; font-variant-numeric: tabular-nums; min-width: 44px; text-align: right; }
+.pf-hint { font-size: 9px; color: var(--faint); line-height: 1.4; }
+.pf-comps { display: flex; gap: 8px; }
+.pf-comp { flex: 1; min-width: 0; text-align: left; background: transparent; border: 1px solid var(--rule-2); padding: 6px 8px; cursor: pointer; }
+.pf-comp:hover { background: #11161d; border-color: var(--axis); }
+.pf-comp.on { background: #11202a; border-color: var(--cyan); }
 .pf-comp-name { font-size: 11px; font-weight: 700; color: var(--ink); }
 .pf-comp.on .pf-comp-name { color: var(--cyan); }
 .pf-bar { display: flex; height: 9px; margin: 5px 0 4px; border: 1px solid #000; overflow: hidden; }
 .pf-seg { height: 100%; } .pf-seg.pf-ph { background: var(--cyan); } .pf-seg.pf-mt { background: #ff3a3a; }
-.pf-comp-val { font-size: 9px; color: var(--dim); } .pf-comp-val b { font-family: var(--mono); font-variant-numeric: tabular-nums; }
-.pf-note { font-size: 9px; color: var(--faint); line-height: 1.5; }
-.pf-note b { font-weight: 700; }
+.pf-comp-val { font-size: 8.5px; color: var(--dim); } .pf-comp-val b { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+/* right: the selected polariton as a stable hybrid in 3D + a freeze/oscillate toggle */
+.pf-right .live3d { flex: 1 1 0; position: relative; min-height: 200px; width: 100%; overflow: hidden; background: #050708; }
+.pf-3dctrls { flex: 0 0 auto; display: flex; gap: 0; border: 1px solid var(--rule-2); margin-top: 7px; width: fit-content; }
+.pf-3dctrls button { font-family: var(--sans); font-size: 10px; font-weight: 600; padding: 6px 12px; border: none; border-right: 1px solid var(--rule); background: transparent; color: var(--dim); cursor: pointer; }
+.pf-3dctrls button:last-child { border-right: none; }
+.pf-3dctrls button:hover { background: var(--rule); color: var(--ink); }
+.pf-3dctrls button.on { background: var(--cyan); color: #001014; font-weight: 700; }
+@container center (max-width: 620px) { .pf-grid { grid-template-columns: 1fr; grid-auto-rows: auto; overflow-y: auto; } .pf-grid > .pf-left { border-right: none; border-bottom: 1px solid var(--rule-2); } .pf-right .live3d { min-height: 260px; } }
+@supports not (container-type: inline-size) { @media (max-width: 1180px) { .pf-grid { grid-template-columns: 1fr; overflow-y: auto; } .pf-grid > .pf-left { border-right: none; border-bottom: 1px solid var(--rule-2); } } }
 
 /* live dynamics: bento grid — 3D viewport + diagnostic cells, single-pixel metallic dividers.
    FIT-TO-VIEWPORT: all four panes are visible at once, never clipped, never scrolled. Each plot scales
