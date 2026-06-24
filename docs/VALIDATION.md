@@ -226,15 +226,21 @@ These are identical to the native results in §3.2–3.3.
 
 ## 4. Test inventory
 
-**9 cargo tests** across four files, plus **1 Node boundary validation**.
+**11 cargo tests** across the four golden files below, plus **1 Node boundary validation** (`wasm/validate_wasm.cjs`). The full `wasm/tests/` suite is **22 tests across 8 files** (the others cover optics/HTC/FFT/Husimi against analytic benchmarks). Run via `npm run test:quantum` (or `cargo test --manifest-path wasm/Cargo.toml`).
 
 | File | Tests | Arbiter |
 |---|---|---|
 | `wasm/tests/operator_lock.rs` | 2 (`operators_match_qutip_bit_for_bit`, `hamiltonian_is_hermitian`) | QuTiP 5.3.0 |
 | `wasm/tests/solver_golden.rs` | 2 (`dynamics_match_qutip_mesolve`, `long_run_drift_to_10x_horizon`) | QuTiP 5.3.0 `mesolve` |
 | `wasm/tests/wigner_golden.rs` | 3 (`wigner_matches_qutip`, `partial_trace_matches_qutip`, `vacuum_wigner_renders_rdbu_neutral_background`) | QuTiP 5.3.0 `wigner` / `ptrace` / matplotlib RdBu |
-| `wasm/tests/spectrum_golden.rs` | 2 (`arrowhead_matches_numpy_eigh`, `identical_resonant_gives_2g_sqrt_m_split_and_m_minus_1_dark`) | `numpy.linalg.eigh` |
+| `wasm/tests/spectrum_golden.rs` | 4 (`arrowhead_matches_numpy_eigh`, `identical_resonant_gives_2g_sqrt_m_split_and_m_minus_1_dark`, `perpendicular_dipole_decouples_into_dark_manifold`, `vacuum_rabi_oscillation_matches_analytic`) | `numpy.linalg.eigh` |
 | `wasm/validate_wasm.cjs` | 1 (boundary recheck) | QuTiP golden, through compiled WASM |
+
+**Scope caveat — pure dephasing.** The committed golden is generated with `gamma_phi = 0`, so the
+`sqrt(gamma_phi/2)·sigma_z` dephasing collapse operator (`operators.rs`) is exercised only by the cavity
+loss / emitter decay goldens with the dephasing channel off. The dephasing **convention** (§2, row 4) is
+locked, but its element-wise dynamics are not yet diffed against a `gamma_phi > 0` QuTiP run — treat that
+one channel as convention-checked, not golden-checked, until a second golden is added.
 
 The goldens themselves are committed, so the cargo tests reproduce the figures above
 with no Python or network needed:
@@ -254,8 +260,9 @@ Run from the repository root (`sim/`).
 cargo test --manifest-path wasm/Cargo.toml
 ```
 
-Expect: `9 passed` across the four test files. Add `-- --nocapture` to print the
-numeric tables in §3:
+Expect: `22 passed` for the whole `wasm/tests/` suite (11 of them the QuTiP/NumPy
+golden checks in the four files above; the rest analytic optics/HTC/FFT/Husimi).
+Add `-- --nocapture` to print the numeric tables in §3:
 
 ```
 cargo test --manifest-path wasm/Cargo.toml -- --nocapture

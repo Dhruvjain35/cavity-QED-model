@@ -1090,8 +1090,13 @@ export function App() {
     }
     hopMarks.current = marks;
     ctx.fillStyle = INK; ctx.font = "600 9px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "bottom";
-    ctx.fillText("LP", xOf(vecs[0]! * vecs[0]!), yOf(eigs[0]!) - 9);
-    ctx.fillText("UP", xOf(vecs[n - 1]! * vecs[n - 1]!), yOf(eigs[n - 1]!) - 9);
+    // LP/UP = the two largest-PHOTON-WEIGHT eigenstates (robust when disorder spreads the dark band past the
+    // energy extremes — energy rank alone would then mark a dark state); lower energy = LP, higher = UP.
+    let pa = 0, pb = 1, wpa = -1, wpb = -1;
+    for (let k = 0; k < n; k++) { const w = vecs[k]! * vecs[k]!; if (w > wpa) { wpb = wpa; pb = pa; wpa = w; pa = k; } else if (w > wpb) { wpb = w; pb = k; } }
+    const kLP = eigs[pa]! <= eigs[pb]! ? pa : pb, kUP = kLP === pa ? pb : pa;
+    ctx.fillText("LP", xOf(vecs[kLP]! * vecs[kLP]!), yOf(eigs[kLP]!) - 9);
+    ctx.fillText("UP", xOf(vecs[kUP]! * vecs[kUP]!), yOf(eigs[kUP]!) - 9);
     ctx.strokeStyle = AXIS; ctx.lineWidth = 0.75; ctx.strokeRect(HP_ML, HP_MT, HP_PW, HP_PH);
     ctx.fillStyle = DIM; ctx.font = "600 11px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top";
     ctx.fillText("photon fraction  |⟨a|ψ_k⟩|²", HP_ML + HP_PW / 2, HP_MT + HP_PH + 16);
@@ -1743,7 +1748,7 @@ export function App() {
               <div className="pane bento-3d">
                 <div className="pane-head">Live cavity · {dyn.m} two-level emitters + 1 photon · ψ(t)=Σ<sub>k</sub> c<sub>k</sub> e<sup>−iE<sub>k</sub>t</sup>φ<sub>k</sub>{inspect != null ? <> · <i style={{ color: "#fff", fontStyle: "normal" }}>inspecting eigenstate #{inspect}</i></> : <> · cavity field E(z) <i style={{ color: CYAN, fontStyle: "normal" }}>cyan standing wave</i> · emitters <i style={{ color: "#4a6a93", fontStyle: "normal" }}>ground</i>→<i style={{ color: RED, fontStyle: "normal" }}>excited</i> by |ψ<sub>i</sub>(t)|²</>}</div>
                 <PanelEqn t={"|\\psi(t)\\rangle=\\textstyle\\sum_k c_k\\,e^{-iE_k t}\\,|\\phi_k\\rangle,\\qquad \\hat H|\\phi_k\\rangle=E_k|\\phi_k\\rangle"} where="closed unitary single-excitation Tavis–Cummings" />
-                <div className="pane-sub"><b>What:</b> one quantum oscillating between light and matter in real time — the cyan <b>standing-wave field</b> grows when the photon holds the energy and collapses flat when it drains into the <b>emitters</b>, which turn red as they get excited. That oscillation is the polariton. <b>Approx:</b> single-excitation subspace (1 photon total) · RWA · ideal mirrors (κ=0 — the live evolution is lossless).</div>
+                <div className="pane-sub"><b>What:</b> one quantum oscillating between light and matter in real time — the cyan <b>standing-wave field</b> grows when the photon holds the energy and collapses flat when it drains into the <b>emitters</b>, which turn red as they get excited. That oscillation is the <b>beat between the two polaritons (LP/UP)</b> at Ω_R. <b>Approx:</b> single-excitation subspace (1 photon) · RWA · κ=0 (lossless) · the wave height is the RMS field amplitude √P<sub>photon</sub> (a 1-photon Fock state has ⟨E⟩=0, so we draw its energy envelope, not a literal field).</div>
                 <div className="live3d"><Suspense fallback={<div className="cv-loading">loading 3D…</div>}><LiveCavityScene stateRef={dynState} tRef={simT} m={dyn.m} inspectRef={inspectRef} ensemble={ensemble} waist={MODE_WAIST} polTheta={dyn.theta * Math.PI / 180} controls={scene3d} /></Suspense>
                   <ScenePanel open={scenePanelOpen} onToggle={() => setScenePanelOpen((o) => !o)} v={scene3d} set={setScene} />
                 </div>
@@ -1763,7 +1768,7 @@ export function App() {
               <div className="pane">
                 <div className="pane-head">Populations — photon <i style={{ color: CYAN, fontStyle: "normal" }}>━</i> bright/superradiant <i style={{ color: RED, fontStyle: "normal" }}>━</i> dark/subradiant <i style={{ color: PURPLE, fontStyle: "normal" }}>━</i> · <i style={{ color: "#8b949e", fontStyle: "normal" }}>closed unitary evolution (κ=γ=0 here); Γ enters the transmission spectrum only</i></div>
                 <PanelEqn t={"P_{\\mathrm{photon}}=|\\langle 0|\\psi(t)\\rangle|^2,\\ \\ P_{\\mathrm{bright}}=|\\langle B|\\psi(t)\\rangle|^2,\\qquad \\textstyle\\sum_k P_k = 1"} where="|B⟩ = symmetric bright mode" />
-                <div className="pane-sub"><b>What:</b> where the single excitation lives vs time — it sloshes photon↔bright at the vacuum-Rabi frequency Ω_R; the dark fraction stays flat (it doesn't couple to light). Undamped because the live model is lossless.</div>
+                <div className="pane-sub"><b>What:</b> where the single excitation lives vs time — it sloshes photon↔bright at the vacuum-Rabi frequency Ω_R. The dark fraction is constant only for identical emitters (σ=0); with disorder it slowly fills as the bright mode leaks into the dark manifold. Undamped because the live model is lossless.</div>
                 <PlotWrap fit cw={PP_CW} ch={PP_CH} area={{ ml: PP_ML, mt: PP_MT, pw: PP_PW, ph: PP_PH }} inv={(px, py) => [(((px - PP_ML) / PP_PW) * 6).toFixed(2), (1 - (py - PP_MT) / PP_PH).toFixed(2)]}>
                   <canvas ref={popCanvas} className="cv" />
                 </PlotWrap>
@@ -1867,7 +1872,7 @@ export function App() {
                   <Row label={<Tex t="t" />} k="simTfs" r={read} unit="fs" tip="elapsed physical time in femtoseconds" />
                   <Row label={<Tex t="P_{\mathrm{photon}}" />} k="simPh" r={read} tip="probability the excitation is in the cavity photon (dimensionless, 0–1)" />
                   <Row label={<Tex t="P_{\mathrm{bright}}" />} k="simBr" r={read} tip="probability in the bright/superradiant collective state that couples to light (dimensionless)" />
-                  <Row label={<Tex t="P_{\mathrm{dark}}" />} k="simDk" r={read} tip="probability in the dark/subradiant manifold (N−1 states invisible to the photon)" />
+                  <Row label={<Tex t="P_{\mathrm{dark}}" />} k="simDk" r={read} tip="probability in the dark/subradiant manifold (N−1 states for identical emitters; fewer once disorder σ ≳ Ω_R lets them pick up photon weight)" />
                   <Row label={<>Ω<sub>R</sub> <span className="rb-chk" style={{ color: "var(--dim)" }}>norm.</span></>} k="simRabi" r={read} unit="ω_c" tip="vacuum-Rabi splitting (LP→UP gap = 2g√N on resonance), in units of ω_c (dimensionless)" />
                   <Row label={<>Ω<sub>R</sub> <span className="rb-chk" style={{ color: "var(--dim)" }}>phys.</span></>} k="simRabiMeV" r={read} unit="meV" tip="the same vacuum-Rabi splitting in physical energy units (meV)" />
                   <Row label={<Tex t="\textstyle\sum_k P_k" />} k="simNorm" r={read} tip="total probability — must stay 1 (closed unitary evolution, no loss)" />

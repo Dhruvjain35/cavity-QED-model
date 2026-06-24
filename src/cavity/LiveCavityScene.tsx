@@ -22,6 +22,9 @@ const MOL_R = 3.2, CLUSTER_R = 13;
 // the standing-wave amplitude. Clean PBR spheres lit by the rig, no additive halos.
 const C_GROUND = new THREE.Color("#4a6a93"), C_EXCITED = new THREE.Color("#ff4d2e");
 const DIP_OFF = new THREE.Color("#3a4046"), DIP_ON = new THREE.Color("#cfe8ff");
+// smooth roll-off that fades a weakly-coupled emitter's display glow toward 0 (instead of a hard binary cut),
+// applied identically in the live AND inspect branches so dark emitters render the same either way.
+const darkGate = (b: number) => { const t = Math.min(1, Math.max(0, (b - 0.05) / 0.07)); return t * t * (3 - 2 * t); };
 // the cavity is shown in a 3/4 profile so the standing wave (displaced vertically) reads as a wave along the
 // horizontal cavity axis; the small polar clamp on OrbitControls keeps it from tumbling.
 const LIVE_TILT: [number, number, number] = [0.18, 1.40, 0];
@@ -34,7 +37,8 @@ function buildFilm(ens: Ens) {
   let fmax = 1e-6, s2 = 0, mx2 = 0;
   for (let i = 0; i < ens.m; i++) { const f = ens.factors[i]!; fmax = Math.max(fmax, Math.abs(f)); s2 += f * f; mx2 = Math.max(mx2, f * f); }
   const peakB2 = s2 > 1e-9 ? mx2 / s2 : 1;          // largest bright weight b_i² = (g_i/‖g‖)²
-  const gain = 1.0 / Math.max(0.02, peakB2);        // |ψ_i|²·gain → ≈1.0 (fully excited) at the bright peak
+  const gain = 1.0 / Math.max(0.02, peakB2);        // reference: |ψ_i|²·gain ≈ 1 at the σ=0 uniform bright peak
+                                                    // (Molecules then soft-saturates, so disorder can't clip it)
   const GA = Math.PI * (3 - Math.sqrt(5));          // golden angle → even Fibonacci-shell placement
   const mols = ens.dipoles.map((d, i) => {
     const y = ens.m > 1 ? 1 - (2 * i + 1) / ens.m : 0, rad = Math.sqrt(Math.max(0, 1 - y * y)), th = i * GA;
@@ -58,7 +62,7 @@ function SimSampler({ stateRef, tRef, inspectRef, liveRef, fieldAmpRef, m }: { s
     if (inspK != null && inspK >= 0 && inspK < n) {
       const pPhot = vecs[inspK]! * vecs[inspK]!; // row-0 photon weight of eigenvector k
       let br = 0, matter = 0;
-      for (let i = 0; i < m; i++) { const v = vecs[(i + 1) * n + inspK]!; mg[i] = v * v; matter += v * v; br += bright[i]! * v; }
+      for (let i = 0; i < m; i++) { const v = vecs[(i + 1) * n + inspK]!; mg[i] = v * v * darkGate(Math.abs(bright[i]!)); matter += v * v; br += bright[i]! * v; }
       const pBright = br * br, pDark = Math.max(0, matter - pBright);
       liveRef.current.pPhoton = pPhot; liveRef.current.pBright = pBright; liveRef.current.pDark = pDark; fieldAmpRef.current = pPhot; return;
     }
@@ -70,7 +74,7 @@ function SimSampler({ stateRef, tRef, inspectRef, liveRef, fieldAmpRef, m }: { s
       for (let k = 0; k < n; k++) { const a = vecs[row + k]! * c[k]!, ph = eigs[k]! * t; re += a * Math.cos(ph); im -= a * Math.sin(ph); }
       const exc = re * re + im * im; const b = bright[i - 1]!; // |ψ_i(t)|² = live per-molecule excitation
       pMatter += exc; brRe += b * re; brIm += b * im;
-      mg[i - 1] = Math.abs(b) < 0.1 ? 0 : exc; // glow ∝ this molecule's own excitation; decoupled stays dark
+      mg[i - 1] = exc * darkGate(Math.abs(b)); // glow ∝ this molecule's own excitation; decoupled fades to dark
     }
     const pBright = brRe * brRe + brIm * brIm, pDark = Math.max(0, pMatter - pBright);
     liveRef.current.pPhoton = pPhot; liveRef.current.pBright = pBright; liveRef.current.pDark = pDark; fieldAmpRef.current = pPhot;
@@ -82,6 +86,9 @@ function SimSampler({ stateRef, tRef, inspectRef, liveRef, fieldAmpRef, m }: { s
 // colour from ground (steel-blue) to excited (red) and lifts a modest emissive so the lit emitters read
 // against the rig without any glow halo — the matter side of the Rabi swing, shown as state change, not glow.
 // NO motion (a 2-level emitter has no nuclear coordinate). Decoupled emitters never excite → stay ground-blue.
+// The display brightness uses a SOFT saturating map g = 1−e^(−k·exc·gain): the brightest emitter reaches a
+// clear lit state at the σ=0 uniform peak, yet a disorder-LOCALIZED emitter (which can carry >1/N of the one
+// excitation) keeps brightening smoothly toward full red instead of hard-clipping and pinning off the field.
 function Molecules({ liveRef, film, scale, glow = 1 }: { liveRef: MutableRefObject<Live>; film: Film; scale: number; glow?: number }) {
   const mats = useRef<(THREE.MeshStandardMaterial | null)[]>([]);
   const gain = film.gain;
@@ -89,7 +96,7 @@ function Molecules({ liveRef, film, scale, glow = 1 }: { liveRef: MutableRefObje
   useFrame(() => {
     const mg = liveRef.current.molGlow;
     for (let i = 0; i < film.mols.length; i++) {
-      const g = Math.max(0, Math.min(1, (mg[i] || 0) * gain));   // 0 = ground, 1 = fully excited
+      const g = 1 - Math.exp(-2.4 * Math.max(0, (mg[i] || 0) * gain));   // 0 = ground → 1 = excited, no clipping
       const mt = mats.current[i]; if (!mt) continue;
       col.copy(C_GROUND).lerp(C_EXCITED, g);
       mt.color.copy(col); mt.emissive.copy(col);
@@ -212,7 +219,14 @@ function CavReadout({ liveRef, stateRef, tRef }: { liveRef: MutableRefObject<Liv
       const pP = live.pPhoton, pB = live.pBright, pD = live.pDark, sum = pP + pB + pD;
       width("barP", pP); width("barB", pB); width("barD", pD);
       set("vP", pP.toFixed(2)); set("vB", pB.toFixed(2)); set("vD", pD.toFixed(2)); set("vSum", sum.toFixed(2));
-      const OmR = ds && ds.n > 1 ? ds.eigs[ds.n - 1]! - ds.eigs[0]! : 0;
+      // Ω_R = gap between the two eigenstates of largest PHOTON weight |⟨0|φ_k⟩|² (the LP/UP polaritons),
+      // robust when disorder spreads the dark band past the polaritons — not the bare max−min eigenvalue.
+      let OmR = 0;
+      if (ds && ds.n > 1) {
+        const n = ds.n; let a = 0, b = 1, wa = -1, wb = -1;
+        for (let k = 0; k < n; k++) { const w = ds.vecs[k]! * ds.vecs[k]!; if (w > wa) { wb = wa; b = a; wa = w; a = k; } else if (w > wb) { wb = w; b = k; } }
+        OmR = Math.abs(ds.eigs[a]! - ds.eigs[b]!);
+      }
       const T = OmR > 1e-6 ? (2 * Math.PI) / OmR : 0;
       set("omR", OmR > 0 ? OmR.toFixed(3) : "—");
       set("per", T > 0 ? T.toFixed(1) : "—");
@@ -230,7 +244,7 @@ function CavReadout({ liveRef, stateRef, tRef }: { liveRef: MutableRefObject<Liv
   return (
     <div className="cav-readout">
       <span className="cr-title" title="live energy exchange between the cavity photon and the molecules at the vacuum-Rabi frequency Ω_R">VACUUM-RABI EXCHANGE</span>
-      <span className="cr-k" title="vacuum-Rabi splitting Ω_R = 2g√N, in units of ω_c">Ω<sub>R</sub> <b ref={R("omR")}>—</b></span>
+      <span className="cr-k" title="measured vacuum-Rabi splitting Ω_R = LP–UP gap (the two highest-photon-weight eigenstates), in units of ω_c; equals 2g√N at zero disorder">Ω<sub>R</sub> <b ref={R("omR")}>—</b></span>
       <div className="cr-bar" title="where the one quantum lives right now: cyan = in the photon field, orange = in the molecules (bright mode), purple = dark states">
         <div className="cr-seg cr-p" ref={R("barP")} />
         <div className="cr-seg cr-b" ref={R("barB")} />
@@ -271,7 +285,7 @@ export function LiveCavityScene({ stateRef, tRef, inspectRef, m, ensemble, polTh
     <div className="cav-stage">
       <div className="cav-tag cav-tag-l">mirror</div>
       <div className="cav-tag cav-tag-r">mirror</div>
-      <div className="cav-tag cav-tag-mode"><span style={{ color: "#23d4ff" }}>cavity field E(z)</span> ⇄ <span style={{ color: "#ff4d2e" }}>emitters</span> · one quantum, oscillating = polariton</div>
+      <div className="cav-tag cav-tag-mode"><span style={{ color: "#23d4ff" }}>cavity field E(z)</span> ⇄ <span style={{ color: "#ff4d2e" }}>emitters</span> · one quantum beating between the LP/UP polaritons at Ω<sub>R</sub></div>
       <CavReadout liveRef={liveRef} stateRef={stateRef} tRef={tRef} />
       <Canvas dpr={[1, 2]} gl={{ antialias: true, alpha: true }} camera={{ position: [0, 60, 330], fov: 50 }}>
         <color attach="background" args={["#070b12"]} />
