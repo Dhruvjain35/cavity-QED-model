@@ -339,8 +339,9 @@ export function App() {
   useEffect(() => {
     if (regime !== "dynamics") return;
     loadWasm().then(() => {
+      const det = dyn.detuning ?? 0; // guard: a pre-detuning saved hash could leave this undefined → NaN-trap the WASM
       const gi = Float64Array.from(ensemble.factors, (f) => f * dyn.g); // g_i = g_0·(μ̂_i·ε̂)·f(r_i)
-      const { eigs, vecs, n } = arrowheadModesGi(WA + dyn.detuning, WA, dyn.sigma, dyn.seed, gi);
+      const { eigs, vecs, n } = arrowheadModesGi(WA + det, WA, dyn.sigma, dyn.seed, gi);
       const c = new Float64Array(n);
       for (let k = 0; k < n; k++) c[k] = vecs[dyn.init * n + k]!; // ⟨φ_k|ψ0⟩ for the chosen initial site
       const bright = brightWeights(ensemble.factors); // per-molecule b_i = g_i/‖g‖ — drives the live glow
@@ -353,10 +354,10 @@ export function App() {
       popCurve.current = { T: T_POP, split, n: NP, data: pdata };
       simT.current = 0;
       inspectRef.current = null; setInspect(null); // a new ensemble invalidates the inspected state
-      matData.current = arrowheadMatrixGi(WA + dyn.detuning, WA, dyn.sigma, dyn.seed, gi);
-      fftData.current = cavityPowerSpectrumGi(WA + dyn.detuning, WA, dyn.sigma, dyn.seed, gi, FFT_N, FFT_DT, dyn.gamma);
-      if (Math.abs(dyn.detuning) < 1e-9) logDoublet(fftData.current, eigs, n, gi); // 1.A · console check (on-resonance only): peaks at ω_c±‖g‖, equal height
-      if (dynSweep) sweepData.current = couplingSweepGi(WA + dyn.detuning, WA, dyn.sigma, dyn.seed, ensemble.factors, 0, SWEEP_GMAX, SWEEP_STEPS); // 90 diagonalizations — only when displayed
+      matData.current = arrowheadMatrixGi(WA + det, WA, dyn.sigma, dyn.seed, gi);
+      fftData.current = cavityPowerSpectrumGi(WA + det, WA, dyn.sigma, dyn.seed, gi, FFT_N, FFT_DT, dyn.gamma);
+      if (Math.abs(det) < 1e-9) logDoublet(fftData.current, eigs, n, gi); // 1.A · console check (on-resonance only): peaks at ω_c±‖g‖, equal height
+      if (dynSweep) sweepData.current = couplingSweepGi(WA + det, WA, dyn.sigma, dyn.seed, ensemble.factors, 0, SWEEP_GMAX, SWEEP_STEPS); // 90 diagonalizations — only when displayed
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [regime, dDyn, dynSweep]);
@@ -446,8 +447,11 @@ export function App() {
     try {
       const s = JSON.parse(atob(h));
       if (s.regime) setRegime(s.regime);
-      if (s.params) setParams(s.params); if (s.sp) setSp(s.sp); if (s.cav) setCav(s.cav);
-      if (s.htc) setHtc(s.htc); if (s.dyn) setDyn(s.dyn); if (typeof s.wcEv === "number") setWcEv(s.wcEv);
+      // MERGE into the current defaults (never replace) so a hash saved before a field existed can't restore
+      // a state missing that field — e.g. an old URL without dyn.detuning would otherwise inject undefined
+      // and NaN-trap the WASM eigensolver. Spreading the live default first guarantees every field is present.
+      if (s.params) setParams((p) => ({ ...p, ...s.params })); if (s.sp) setSp((p) => ({ ...p, ...s.sp })); if (s.cav) setCav((p) => ({ ...p, ...s.cav }));
+      if (s.htc) setHtc((p) => ({ ...p, ...s.htc })); if (s.dyn) setDyn((p) => ({ ...p, ...s.dyn })); if (typeof s.wcEv === "number") setWcEv(s.wcEv);
     } catch { /* malformed hash — ignore */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -1467,7 +1471,7 @@ export function App() {
 
   function exportHamiltonian() {
     const gi = Float64Array.from(ensemble.factors, (f) => f * dyn.g);
-    const { h, n } = arrowheadMatrixGi(WA + dyn.detuning, WA, dyn.sigma, dyn.seed, gi);
+    const { h, n } = arrowheadMatrixGi(WA + (dyn.detuning ?? 0), WA, dyn.sigma, dyn.seed, gi);
     downloadNpy(`H_cavityQED_N${dyn.m}.npy`, h, [n, n]); // np.load(...) → (N+1)×(N+1) Hamiltonian in units of ω_c
   }
 
@@ -1776,7 +1780,7 @@ export function App() {
                   <div className="pf-left">
                     <div className="pane-head">Polariton formation · cavity photon + molecules → LP/UP · the coupling & detuning dials drive the live simulation</div>
                     <PanelEqn t={"\\hat H=\\begin{pmatrix}\\omega_c & G\\\\ G & \\omega_a\\end{pmatrix},\\ G=g\\sqrt N,\\quad E_\\pm=\\tfrac{\\omega_c+\\omega_a}{2}\\pm\\tfrac12\\sqrt{\\Delta^2+4G^2}"} where="Δ=ω_c−ω_a · the 2 bright modes of the (N+1)×(N+1) arrowhead" />
-                    <PolaritonFormation g={dyn.g} n={dyn.m} delta={dyn.detuning} onDelta={(d) => setDyn((s) => ({ ...s, detuning: d }))} onG={(Gv) => setDyn((s) => ({ ...s, g: Gv / Math.sqrt(Math.max(1, s.m)) }))} selected={pfSel} onSelect={setPfSel} />
+                    <PolaritonFormation g={dyn.g} n={dyn.m} delta={dyn.detuning ?? 0} onDelta={(d) => setDyn((s) => ({ ...s, detuning: d }))} onG={(Gv) => setDyn((s) => ({ ...s, g: Gv / Math.sqrt(Math.max(1, s.m)) }))} selected={pfSel} onSelect={setPfSel} />
                   </div>
                   <div className="pf-right">
                     <div className="pane-head">{pfSel ? <>▸ <i style={{ color: "#fff", fontStyle: "normal" }}>{pfSel} polariton</i> — the STABLE hybrid: the standing-wave field <b>and</b> the excited molecules are lit at once, and stay that way</> : <>Live oscillation — the Rabi beat between LP &amp; UP. A polariton is the <i style={{ color: "#fff", fontStyle: "normal" }}>stable</i> mix; this sloshing is what happens when you're not sitting in one. Freeze one →</>}</div>
