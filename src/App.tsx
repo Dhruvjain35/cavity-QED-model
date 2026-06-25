@@ -188,6 +188,7 @@ export function App() {
   const [inspect, setInspect] = useState<number | null>(null); // clicked dressed eigenstate (UI badge)
   const [dynView, setDynView] = useState<"formation" | "dynamics">("formation"); // DYNAMICS lead view
   const [pfSel, setPfSel] = useState<"LP" | "UP" | null>("LP"); // formation: start frozen on the LP polariton (show the hybrid immediately); null = oscillate
+  const [tour, setTour] = useState<number | null>(null); // guided first-run tour: step index, null = closed
   const [dynSweep, setDynSweep] = useState(false); // coupling-sweep dispersion mode (replaces the 3D)
   const [wcEv, setWcEv] = useState(2.0); // physical cavity-photon energy ℏω_c in eV (display scale only)
   // PERF: the heavy per-tab recomputes (ODE integration, arrowhead diagonalization, TMM sweeps) key off the
@@ -461,6 +462,27 @@ export function App() {
     } catch { /* malformed hash — ignore */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // guided first-run tour — drives the REAL instrument through the polariton story so the user watches the
+  // app change, not a slideshow. Each step sets the regime/view/coupling/branch to match its explanation.
+  function applyTourStep(i: number) {
+    setRegime("dynamics"); setDynView("formation");
+    if (i <= 0) { setDyn((s) => ({ ...s, g: 0.06, detuning: 0 })); setPfSel("LP"); }            // welcome — the hybrid
+    else if (i === 1) { setDyn((s) => ({ ...s, g: 0.004, detuning: 0 })); setPfSel(null); }      // bare modes cross
+    else if (i === 2) { setDyn((s) => ({ ...s, g: 0.06, detuning: 0 })); setPfSel(null); }        // polaritons form
+    else if (i === 3) { setDyn((s) => ({ ...s, g: 0.06 })); setPfSel("LP"); }                     // freeze the hybrid
+    else if (i >= 4) { setPfSel(null); setPlaying(true); }                                        // oscillate + decay
+  }
+  function goTour(i: number | null) {
+    if (i === null) { try { localStorage.setItem("cqed_tour_seen", "1"); } catch { /* */ } setTour(null); return; }
+    applyTourStep(i); setTour(i);
+  }
+  useEffect(() => {
+    let seen = "1"; try { seen = localStorage.getItem("cqed_tour_seen") || ""; } catch { /* */ }
+    if (!seen && window.location.hash.length <= 1) { applyTourStep(0); setTour(0); } // first visit, no shared link → auto-open once
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     try { window.location.replace("#" + btoa(JSON.stringify({ regime, params, sp, cav, htc, dyn, wcEv }))); } catch { /* noop */ }
   }, [regime, params, sp, cav, htc, dyn, wcEv]);
@@ -1514,11 +1536,39 @@ export function App() {
         <span className="brand">POLARITON CAVITY-QED LAB</span>
         <span className="topbar-right">
           <span className="status"><span className="live">●</span> {ready ? "WASM CORE LIVE" : "LOADING…"} · QuTiP-GOLDEN CORE + ANALYTIC-VALIDATED OPTICS/VIBRONICS</span>
+          <button className="tour-btn" onClick={() => goTour(0)} title="guided 5-step tour: build a polariton from scratch">▸ TOUR</button>
           <button className="examples-btn" onClick={() => setGallery(true)} title="load a configured example experiment to get started">▸ EXAMPLES</button>
           <button className="copy-link" onClick={copyLink} title="copy a shareable link to this exact configuration">{copied ? "COPIED" : "COPY LINK"}</button>
           <button className="about-btn" onClick={() => setAbout(true)} title="about">?</button>
         </span>
       </div>
+      {tour !== null ? (() => {
+        const STEPS = [
+          { tag: "WELCOME", title: "Build a polariton in 5 steps", body: <>This is a cavity-QED instrument: one quantum of energy, shared between <b style={{ color: CYAN }}>light</b> (a cavity photon) and <b style={{ color: RED }}>matter</b> (molecules). Let's watch the two combine into a <b>polariton</b>.</> },
+          { tag: "STEP 1 / 5", title: "No coupling → no polariton", body: <>The left plot is the bare <b style={{ color: CYAN }}>photon</b> and bare <b style={{ color: RED }}>molecule</b> energies. With the coupling near zero they just <b>cross</b> — they don't interact.</> },
+          { tag: "STEP 2 / 5", title: "Turn on the coupling", body: <>Now they <b>repel</b> and split into two new states — the <b>lower & upper polaritons (LP/UP)</b>. That gap is the vacuum-Rabi splitting Ω<sub>R</sub> = 2g√N; more coupling or more molecules → bigger gap.</> },
+          { tag: "STEP 3 / 5", title: "A polariton is a hybrid", body: <>Right (3D): the <b>LP polariton</b>, frozen. The <b style={{ color: CYAN }}>standing-wave field</b> <i>and</i> the <b style={{ color: RED }}>excited molecules</b> are lit <b>at once</b>, held still — half light, half matter. That's the hybrid.</> },
+          { tag: "STEP 4 / 5", title: "Real dynamics: sloshing + decay", body: <>Start in a pure photon and the energy <b>sloshes</b> light↔matter (the Rabi oscillation) while <b>leaking out</b> (finite lifetime — the grey trace). The polariton is the stable state behind that beat.</> },
+          { tag: "READY", title: "Now explore", body: <>That's a polariton — and everything here is live, <b>validated against QuTiP</b>. Drag the <b>coupling</b> & <b>detuning</b> dials, add molecules (<b>N</b>), add disorder (<b>σ</b>), or freeze UP vs LP. Replay anytime with <b>▸ TOUR</b>.</> },
+        ];
+        const s = STEPS[tour]!, last = tour >= STEPS.length - 1;
+        return (
+          <div className="tour-overlay">
+            <div className="tour-card">
+              <div className="tour-tag">{s.tag}</div>
+              <div className="tour-title">{s.title}</div>
+              <div className="tour-body">{s.body}</div>
+              <div className="tour-nav">
+                <button className="tour-skip" onClick={() => goTour(null)}>{last ? "Close" : "Skip"}</button>
+                <span style={{ flex: 1 }} />
+                {tour > 0 && <button className="tour-back" onClick={() => goTour(tour - 1)}>← Back</button>}
+                <button className="tour-next" onClick={() => goTour(last ? null : tour + 1)}>{tour === 0 ? "Start →" : last ? "Done ✓" : "Next →"}</button>
+              </div>
+              <div className="tour-dots">{STEPS.map((_, i) => <span key={i} className={"tour-dot" + (i === tour ? " on" : "")} />)}</div>
+            </div>
+          </div>
+        );
+      })() : null}
       {gallery ? (
         <div className="gallery-overlay" onClick={(e) => { if (e.target === e.currentTarget) setGallery(false); }}>
           <div className="gallery-panel">
