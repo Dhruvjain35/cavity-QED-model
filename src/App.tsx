@@ -187,7 +187,7 @@ export function App() {
   const [dyn, setDyn] = useState({ m: 12, g: 0.06, sigma: 0.03, seed: 1, init: 0, order: 1.0, gamma: 0.022, theta: 0, detuning: 0 }); // CANONICAL DEFAULT — σ=0.03 locks the clean strong-coupling regime; τ resets to 0; populations show 0–6 Rabi cycles; detuning=0 = resonance
   const [inspect, setInspect] = useState<number | null>(null); // clicked dressed eigenstate (UI badge)
   const [dynView, setDynView] = useState<"formation" | "dynamics">("formation"); // DYNAMICS lead view
-  const [pfSel, setPfSel] = useState<"LP" | "UP" | null>(null); // formation: selected polariton branch
+  const [pfSel, setPfSel] = useState<"LP" | "UP" | null>("LP"); // formation: start frozen on the LP polariton (show the hybrid immediately); null = oscillate
   const [dynSweep, setDynSweep] = useState(false); // coupling-sweep dispersion mode (replaces the 3D)
   const [wcEv, setWcEv] = useState(2.0); // physical cavity-photon energy ℏω_c in eV (display scale only)
   // PERF: the heavy per-tab recomputes (ODE integration, arrowhead diagonalization, TMM sweeps) key off the
@@ -256,9 +256,10 @@ export function App() {
   const sel = useRef<{ j: number; k: number } | null>(null);
   const specMap = useRef({ emin: 0, emax: 1, R: 6 });
   const read = useRef<Record<string, HTMLSpanElement | null>>({});
+  const pfSelRef = useRef(pfSel), dynViewRef = useRef(dynView); // latest values for the async compute callback
 
   regimeRef.current = regime; playingRef.current = playing; scaleRef.current = fixedScale; tolRef.current = tol; speedRef.current = simSpeed;
-  sweepRef.current = dynSweep; dynGRef.current = dyn.g; wcRef.current = wcEv;
+  sweepRef.current = dynSweep; dynGRef.current = dyn.g; wcRef.current = wcEv; pfSelRef.current = pfSel; dynViewRef.current = dynView;
   const toggle = (k: string) => setCollapsed((c) => ({ ...c, [k]: !c[k] }));
 
   useEffect(() => {
@@ -353,7 +354,12 @@ export function App() {
       for (let i = 0; i < NP; i++) { const d = decompAt(T_POP * i / (NP - 1)); pdata[i * 3] = d.ph; pdata[i * 3 + 1] = d.br; pdata[i * 3 + 2] = d.dk; }
       popCurve.current = { T: T_POP, split, n: NP, data: pdata };
       simT.current = 0;
-      inspectRef.current = null; setInspect(null); // a new ensemble invalidates the inspected state
+      // re-derive the frozen-hybrid selection from the FRESH eigenstates (handles first load + every recompute):
+      // in the formation view with a branch picked, pin the 3D to that bright polariton; else release to ψ(t).
+      if (dynViewRef.current === "formation" && pfSelRef.current) {
+        const { kLP, kUP } = brightPolaritonIdx(vecs, eigs, n);
+        const tgt = pfSelRef.current === "LP" ? kLP : kUP; inspectRef.current = tgt; setInspect(tgt);
+      } else { inspectRef.current = null; setInspect(null); }
       matData.current = arrowheadMatrixGi(WA + det, WA, dyn.sigma, dyn.seed, gi);
       fftData.current = cavityPowerSpectrumGi(WA + det, WA, dyn.sigma, dyn.seed, gi, FFT_N, FFT_DT, dyn.gamma);
       if (Math.abs(det) < 1e-9) logDoublet(fftData.current, eigs, n, gi); // 1.A · console check (on-resonance only): peaks at ω_c±‖g‖, equal height
@@ -374,7 +380,7 @@ export function App() {
     const target = pfSel === "LP" ? kLP : kUP;
     inspectRef.current = target; setInspect(target);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pfSel, regime, dynView, dDyn]);
+  }, [pfSel, regime, dynView]);
 
   useEffect(() => {
     if (regime !== "vibronic") return;
