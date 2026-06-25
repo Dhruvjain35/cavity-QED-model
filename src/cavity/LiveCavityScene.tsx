@@ -14,7 +14,7 @@ import { DBRMirror, HALF, LENGTH, LightRig, N_ANTINODES, STAGE_OFFSET, STAGE_SCA
 
 type Dyn = { eigs: Float64Array; vecs: Float64Array; n: number; c: Float64Array; bright: Float64Array; modeAmp: Float64Array; hist: unknown } | null;
 type Ens = { m: number; centers: [number, number, number][]; dipoles: [number, number, number][]; factors: Float64Array };
-type Live = { pPhoton: number; pBright: number; pDark: number; molGlow: Float64Array };
+type Live = { pPhoton: number; pBright: number; pDark: number; leaked: number; molGlow: Float64Array };
 
 const MOL_R = 3.2, CLUSTER_R = 13;
 // two-level emitter colours: ground state = cool steel-blue, excited state = warm red — the live excitation
@@ -55,29 +55,34 @@ type Film = ReturnType<typeof buildFilm>;
 // Sample the live state once per frame → P_photon/P_bright/P_dark + per-molecule glow into refs (no React
 // re-render). Inspect mode (inspectRef) freezes onto a chosen eigenstate, decomposed the SAME way so the
 // partition still sums to 1.
-function SimSampler({ stateRef, tRef, inspectRef, liveRef, fieldAmpRef, m }: { stateRef: MutableRefObject<Dyn>; tRef: MutableRefObject<number>; inspectRef: MutableRefObject<number | null>; liveRef: MutableRefObject<Live>; fieldAmpRef: MutableRefObject<number>; m: number }) {
+function SimSampler({ stateRef, tRef, inspectRef, liveRef, fieldAmpRef, m, loss = 0 }: { stateRef: MutableRefObject<Dyn>; tRef: MutableRefObject<number>; inspectRef: MutableRefObject<number | null>; liveRef: MutableRefObject<Live>; fieldAmpRef: MutableRefObject<number>; m: number; loss?: number }) {
   useFrame(() => {
     const ds = stateRef.current; if (!ds || ds.n !== m + 1) return;
     const n = ds.n, t = tRef.current, inspK = inspectRef.current, { eigs, vecs, c, bright } = ds, mg = liveRef.current.molGlow;
     if (inspK != null && inspK >= 0 && inspK < n) {
+      // FREEZE on a polariton eigenstate — show the IDEAL stable hybrid (no decay), so its composition is legible.
       const pPhot = vecs[inspK]! * vecs[inspK]!; // row-0 photon weight of eigenvector k
       let br = 0, matter = 0;
       for (let i = 0; i < m; i++) { const v = vecs[(i + 1) * n + inspK]!; mg[i] = v * v * darkGate(Math.abs(bright[i]!)); matter += v * v; br += bright[i]! * v; }
       const pBright = br * br, pDark = Math.max(0, matter - pBright);
-      liveRef.current.pPhoton = pPhot; liveRef.current.pBright = pBright; liveRef.current.pDark = pDark; fieldAmpRef.current = pPhot; return;
+      liveRef.current.pPhoton = pPhot; liveRef.current.pBright = pBright; liveRef.current.pDark = pDark; liveRef.current.leaked = 0; fieldAmpRef.current = pPhot; return;
     }
+    // LIVE oscillation with finite polariton lifetime: the excitation amplitude decays as e^{−γt} (so the
+    // population decays as e^{−2γt}), matching the e^{−γt}-windowed transmission. The "leaked" fraction =
+    // 1 − e^{−2γt} is the quantum that has left the cavity (mirror leakage κ + emitter decay γ).
+    const env = loss > 0 ? Math.exp(-2 * loss * t) : 1;
     let re0 = 0, im0 = 0; for (let k = 0; k < n; k++) { const a = vecs[k]! * c[k]!, ph = eigs[k]! * t; re0 += a * Math.cos(ph); im0 -= a * Math.sin(ph); }
-    const pPhot = re0 * re0 + im0 * im0;
+    const pPhot = (re0 * re0 + im0 * im0) * env;
     let brRe = 0, brIm = 0, pMatter = 0;
     for (let i = 1; i < n; i++) {
       let re = 0, im = 0; const row = i * n;
       for (let k = 0; k < n; k++) { const a = vecs[row + k]! * c[k]!, ph = eigs[k]! * t; re += a * Math.cos(ph); im -= a * Math.sin(ph); }
       const exc = re * re + im * im; const b = bright[i - 1]!; // |ψ_i(t)|² = live per-molecule excitation
       pMatter += exc; brRe += b * re; brIm += b * im;
-      mg[i - 1] = exc * darkGate(Math.abs(b)); // glow ∝ this molecule's own excitation; decoupled fades to dark
+      mg[i - 1] = exc * env * darkGate(Math.abs(b)); // glow ∝ this molecule's own (decaying) excitation
     }
-    const pBright = brRe * brRe + brIm * brIm, pDark = Math.max(0, pMatter - pBright);
-    liveRef.current.pPhoton = pPhot; liveRef.current.pBright = pBright; liveRef.current.pDark = pDark; fieldAmpRef.current = pPhot;
+    const pBright = (brRe * brRe + brIm * brIm) * env, pDark = Math.max(0, pMatter - (brRe * brRe + brIm * brIm)) * env;
+    liveRef.current.pPhoton = pPhot; liveRef.current.pBright = pBright; liveRef.current.pDark = pDark; liveRef.current.leaked = Math.max(0, 1 - env); fieldAmpRef.current = pPhot;
   });
   return null;
 }
@@ -216,9 +221,9 @@ function CavReadout({ liveRef, stateRef, tRef }: { liveRef: MutableRefObject<Liv
     let raf = 0;
     const loop = () => {
       const live = liveRef.current, ds = stateRef.current, t = tRef.current;
-      const pP = live.pPhoton, pB = live.pBright, pD = live.pDark, sum = pP + pB + pD;
-      width("barP", pP); width("barB", pB); width("barD", pD);
-      set("vP", pP.toFixed(2)); set("vB", pB.toFixed(2)); set("vD", pD.toFixed(2)); set("vSum", sum.toFixed(2));
+      const pP = live.pPhoton, pB = live.pBright, pD = live.pDark, lk = live.leaked || 0, sum = pP + pB + pD;
+      width("barP", pP); width("barB", pB); width("barD", pD); width("barLeak", lk);
+      set("vP", pP.toFixed(2)); set("vB", pB.toFixed(2)); set("vD", pD.toFixed(2)); set("vLeak", lk.toFixed(2)); set("vSum", sum.toFixed(2));
       // Ω_R = gap between the two eigenstates of largest PHOTON weight |⟨0|φ_k⟩|² (the LP/UP polaritons),
       // robust when disorder spreads the dark band past the polaritons — not the bare max−min eigenvalue.
       let OmR = 0;
@@ -245,14 +250,16 @@ function CavReadout({ liveRef, stateRef, tRef }: { liveRef: MutableRefObject<Liv
     <div className="cav-readout">
       <span className="cr-title" title="live energy exchange between the cavity photon and the molecules at the vacuum-Rabi frequency Ω_R">VACUUM-RABI EXCHANGE</span>
       <span className="cr-k" title="measured vacuum-Rabi splitting Ω_R = LP–UP gap (the two highest-photon-weight eigenstates), in units of ω_c; equals 2g√N at zero disorder">Ω<sub>R</sub> <b ref={R("omR")}>—</b></span>
-      <div className="cr-bar" title="where the one quantum lives right now: cyan = in the photon field, orange = in the molecules (bright mode), purple = dark states">
+      <div className="cr-bar" title="where the one quantum lives right now: cyan = photon field, orange = molecules (bright mode), purple = dark states, grey = leaked out of the cavity (finite polariton lifetime)">
         <div className="cr-seg cr-p" ref={R("barP")} />
         <div className="cr-seg cr-b" ref={R("barB")} />
         <div className="cr-seg cr-d" ref={R("barD")} />
+        <div className="cr-seg cr-leak" ref={R("barLeak")} />
       </div>
       <span className="cr-leg"><i className="sw-p" />photon <b ref={R("vP")}>0.00</b></span>
       <span className="cr-leg"><i className="sw-b" />matter <b ref={R("vB")}>0.00</b></span>
       <span className="cr-leg"><i className="sw-d" />dark <b ref={R("vD")}>0.00</b></span>
+      <span className="cr-leg"><i className="sw-leak" />leaked <b ref={R("vLeak")}>0.00</b></span>
       <span className="cr-flow" ref={R("flow")}>—</span>
       <canvas className="cr-spark" ref={spark} width={1} height={1} style={{ display: "none" }} />
     </div>
@@ -277,9 +284,9 @@ function drawSpark(cv: HTMLCanvasElement | null, ring: { t: Float32Array; p: Flo
 export interface SceneControls { autoRotate: boolean; fieldGlow: number; moleculeScale: number; moleculeGlow: number; showFieldDiscs: boolean; showDipoleArrows: boolean }
 const DEFAULT_CTRL: SceneControls = { autoRotate: false, fieldGlow: 1.0, moleculeScale: 1.0, moleculeGlow: 1.0, showFieldDiscs: true, showDipoleArrows: true };
 
-export function LiveCavityScene({ stateRef, tRef, inspectRef, m, ensemble, polTheta, controls = DEFAULT_CTRL }: { stateRef: MutableRefObject<Dyn>; tRef: MutableRefObject<number>; inspectRef: MutableRefObject<number | null>; m: number; ensemble: Ens; waist?: number; polTheta: number; controls?: SceneControls }) {
+export function LiveCavityScene({ stateRef, tRef, inspectRef, m, ensemble, polTheta, controls = DEFAULT_CTRL, loss = 0 }: { stateRef: MutableRefObject<Dyn>; tRef: MutableRefObject<number>; inspectRef: MutableRefObject<number | null>; m: number; ensemble: Ens; waist?: number; polTheta: number; controls?: SceneControls; loss?: number }) {
   const film = useMemo(() => buildFilm(ensemble), [ensemble]);
-  const liveRef = useRef<Live>({ pPhoton: 0, pBright: 0, pDark: 0, molGlow: new Float64Array(64) });
+  const liveRef = useRef<Live>({ pPhoton: 0, pBright: 0, pDark: 0, leaked: 0, molGlow: new Float64Array(64) });
   const fieldAmpRef = useRef(0);
   return (
     <div className="cav-stage">
@@ -291,7 +298,7 @@ export function LiveCavityScene({ stateRef, tRef, inspectRef, m, ensemble, polTh
         <color attach="background" args={["#070b12"]} />
         <PerspectiveCamera makeDefault fov={50} position={[0, 60, 330]} />
         <LightRig />
-        <SimSampler stateRef={stateRef} tRef={tRef} inspectRef={inspectRef} liveRef={liveRef} fieldAmpRef={fieldAmpRef} m={m} />
+        <SimSampler stateRef={stateRef} tRef={tRef} inspectRef={inspectRef} liveRef={liveRef} fieldAmpRef={fieldAmpRef} m={m} loss={loss} />
         <group rotation={LIVE_TILT} scale={STAGE_SCALE} position={STAGE_OFFSET}>
           <DBRMirror side={-1} />
           <DBRMirror side={1} />

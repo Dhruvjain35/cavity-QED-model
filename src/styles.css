@@ -169,6 +169,7 @@ tr[title] { cursor: help; }
 .pf-row input[type="range"] { flex: 1; min-width: 60px; }
 .pf-row b { font-family: var(--mono); font-size: 11px; font-variant-numeric: tabular-nums; min-width: 44px; text-align: right; }
 .pf-hint { font-size: 9px; color: var(--faint); line-height: 1.4; }
+.pf-warn { font-size: 9px; color: var(--amber); line-height: 1.4; border: 1px solid #8a6a13; padding: 4px 6px; background: #1a1505; }
 .pf-comps { display: flex; gap: 8px; }
 .pf-comp { flex: 1; min-width: 0; text-align: left; background: transparent; border: 1px solid var(--rule-2); padding: 6px 8px; cursor: pointer; }
 .pf-comp:hover { background: #11161d; border-color: var(--axis); }
@@ -253,12 +254,14 @@ tr[title] { cursor: help; }
 .cr-seg.cr-p { background: var(--cyan); }
 .cr-seg.cr-b { background: #ff5a1e; }
 .cr-seg.cr-d { background: var(--purple); }
+.cr-seg.cr-leak { background: #3a4046; }
 .cr-seg + .cr-seg { border-left: 1px solid #000; }
 .cr-leg { display: inline-flex; align-items: center; gap: 3px; font-size: 8.5px; color: var(--dim); white-space: nowrap; }
 .cr-leg i { display: inline-block; width: 8px; height: 8px; }
 .cr-leg .sw-p { background: var(--cyan); }
 .cr-leg .sw-b { background: #ff5a1e; }
 .cr-leg .sw-d { background: var(--purple); }
+.cr-leg .sw-leak { background: #3a4046; }
 /* the bento adapts to the CENTER column's own width (container query), not the viewport — so it stacks
    exactly when its own space gets tight, regardless of rail/dock widths. Once stacked, a single column
    can't fit four fit-to-viewport panes, so the panes become content-height and the plots size by WIDTH

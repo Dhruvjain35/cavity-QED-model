@@ -1066,7 +1066,10 @@ export function App() {
     let reB = 0, imB = 0, pm = 0;
     for (let i = 1; i < n; i++) { const w = b[i - 1]!; reB += w * re[i]!; imB += w * im[i]!; pm += re[i]! * re[i]! + im[i]! * im[i]!; }
     const br = reB * reB + imB * imB;
-    return { ph, br, dk: Math.max(0, pm - br) };
+    // finite polariton lifetime: population decays as e^{−2γt} (amplitude e^{−γt}, matching the windowed
+    // transmission). 1 − (ph+br+dk) is the fraction that has leaked out of the cavity.
+    const env = dyn.gamma > 0 ? Math.exp(-2 * dyn.gamma * t) : 1;
+    return { ph: ph * env, br: br * env, dk: Math.max(0, pm - br) * env };
   }
 
   const DARKC = PURPLE; // dark-manifold (subradiant) colour
@@ -1399,12 +1402,17 @@ export function App() {
     trace(2, DARKC, true);   // dark / subradiant manifold (dephasing leakage at σ>0)
     trace(0, COBALT, false); // photon
     trace(1, RED, false);    // bright / superradiant matter
+    if (dyn.gamma > 0) {     // leaked-out fraction = 1 − (photon+bright+dark): the quantum that left the cavity
+      ctx.beginPath();
+      for (let i = 0; i < pc.n; i++) { const x = xOf(pc.T * i / (pc.n - 1)), s = pc.data[i * 3]! + pc.data[i * 3 + 1]! + pc.data[i * 3 + 2]!, y = yOf(Math.min(1, Math.max(0, 1 - s))); i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); }
+      ctx.strokeStyle = "#6a7079"; ctx.lineWidth = 1.4; ctx.setLineDash([4, 2]); ctx.stroke(); ctx.setLineDash([]);
+    }
     const tnow = ((simT.current % pc.T) + pc.T) % pc.T; // live cursor, wraps every 6 cycles
     ctx.strokeStyle = "rgba(255,204,0,0.7)"; ctx.lineWidth = 1; ctx.setLineDash([3, 3]); seg(ctx, xOf(tnow), PP_MT, xOf(tnow), PP_MT + PP_PH); ctx.setLineDash([]);
     ctx.lineWidth = 0.75; ctx.strokeStyle = AXIS; ctx.strokeRect(PP_ML, PP_MT, PP_PW, PP_PH);
     ctx.fillStyle = INK; ctx.font = "600 11px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
     ctx.fillText("time   t Ω_R / 2π   (Rabi cycles)", PP_ML + PP_PW / 2, PP_CH - 8);
-    ctx.save(); ctx.translate(13, PP_MT + PP_PH / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top"; ctx.fillText("population  P  (dimensionless, Σ=1)", 0, 0); ctx.restore();
+    ctx.save(); ctx.translate(13, PP_MT + PP_PH / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top"; ctx.fillText("population  P   (─ leaked when Γ>0)", 0, 0); ctx.restore();
   }
 
   function updateSimReadouts(d: { ph: number; br: number; dk: number }) {
@@ -1413,9 +1421,10 @@ export function App() {
     const split = ds.eigs[ds.n - 1]! - ds.eigs[0]!; // LP→UP polariton splitting Ω_R (≈ 2g√M on resonance)
     const cycles = split * simT.current / (2 * Math.PI); // dimensionless time in vacuum-Rabi periods
     set("simTau", cycles.toFixed(2)); set("simTfs", toFs(simT.current).toFixed(1));
-    set("simPh", d.ph.toFixed(4)); set("simBr", d.br.toFixed(4)); set("simDk", d.dk.toFixed(4));
+    const leaked = Math.max(0, 1 - (d.ph + d.br + d.dk)); // quantum that has leaked out of the cavity
+    set("simPh", d.ph.toFixed(4)); set("simBr", d.br.toFixed(4)); set("simDk", d.dk.toFixed(4)); set("simLeak", leaked.toFixed(4));
     set("simRabi", fmt(split, 4)); set("simRabiMeV", Math.round(toMeV(split)).toString());
-    set("simNorm", (d.ph + d.br + d.dk).toFixed(6));
+    set("simNorm", (d.ph + d.br + d.dk + leaked).toFixed(6)); // photon+bright+dark+leaked = 1 (excitation conserved)
   }
 
   function exportCSV() {
@@ -1604,7 +1613,7 @@ export function App() {
               <Field sym="σ" texSym="(\sigma_\omega/\omega_c)" label="inhomogeneous linewidth" value={dyn.sigma} min={0} max={0.25} step={0.005} unit="" tip="static spread of emitter energies in units of ω_c (dimensionless); locked at 0.03 by default for a clean doublet" onChange={(sigma) => setDyn((s) => ({ ...s, sigma }))} />
               <Field sym="ω" texSym="(\hbar\omega_c)" label="cavity resonance energy" value={wcEv} min={0.5} max={4} step={0.05} unit="eV" tip="cavity photon energy ħω_c — sets the absolute meV scale for the readouts" onChange={setWcEv} />
               <Field sym="η" texSym="(\eta)" label="orientational order" value={dyn.order} min={0} max={1} step={0.02} unit="" tip="alignment of the molecular transition dipoles (dimensionless, 0=random, 1=fully aligned); lower order = weaker collective coupling" onChange={(order) => setDyn((s) => ({ ...s, order }))} />
-              <Field sym="Γ" texSym="\Gamma_{\mathrm{spec}}/\omega_c" label="spectral linewidth (transmission only)" value={dyn.gamma} min={0.003} max={0.06} step={0.002} unit="" tip="peak width Γ in the transmission spectrum (dimensionless). NOTE: spectral-only — the live 3D/populations stay lossless." onChange={(gamma) => setDyn((s) => ({ ...s, gamma }))} />
+              <Field sym="Γ" texSym="\Gamma/\omega_c" label="loss / linewidth" value={dyn.gamma} min={0} max={0.06} step={0.002} unit="" tip="polariton linewidth Γ = finite-lifetime loss rate (mirror leakage κ + emitter decay γ), dimensionless. Drives BOTH the transmission peak width AND the decay of the live 3D / populations (population ∝ e^{−2Γt}). Set to 0 for the ideal lossless limit." onChange={(gamma) => setDyn((s) => ({ ...s, gamma }))} />
               <Field sym="θ" texSym="(\theta_E)" label="polarization angle" value={dyn.theta} min={0} max={90} step={1} unit="°" tip="angle of the cavity field polarization vs the dipoles (degrees); at 90° the coupling vanishes" onChange={(theta) => setDyn((s) => ({ ...s, theta }))} />
               <div className="btn-row">
                 <button className={polAnim ? "on" : ""} onClick={animatePol}>{polAnim ? "■ SWEEPING θ…" : "▶ ANIMATE θ SWEEP 0→90°"}</button>
@@ -1790,7 +1799,7 @@ export function App() {
                   </div>
                   <div className="pf-right">
                     <div className="pane-head">{pfSel ? <>▸ <i style={{ color: "#fff", fontStyle: "normal" }}>{pfSel} polariton</i> — the STABLE hybrid: the standing-wave field <b>and</b> the excited molecules are lit at once, and stay that way</> : <>Live oscillation — the Rabi beat between LP &amp; UP. A polariton is the <i style={{ color: "#fff", fontStyle: "normal" }}>stable</i> mix; this sloshing is what happens when you're not sitting in one. Freeze one →</>}</div>
-                    <div className="live3d"><Suspense fallback={<div className="cv-loading">loading 3D…</div>}><LiveCavityScene stateRef={dynState} tRef={simT} m={dyn.m} inspectRef={inspectRef} ensemble={ensemble} waist={MODE_WAIST} polTheta={dyn.theta * Math.PI / 180} controls={scene3d} /></Suspense>
+                    <div className="live3d"><Suspense fallback={<div className="cv-loading">loading 3D…</div>}><LiveCavityScene stateRef={dynState} tRef={simT} m={dyn.m} inspectRef={inspectRef} ensemble={ensemble} waist={MODE_WAIST} polTheta={dyn.theta * Math.PI / 180} controls={scene3d} loss={dyn.gamma} /></Suspense>
                       <ScenePanel open={scenePanelOpen} onToggle={() => setScenePanelOpen((o) => !o)} v={scene3d} set={setScene} />
                     </div>
                     <div className="pf-3dctrls">
@@ -1810,8 +1819,8 @@ export function App() {
               <div className="pane bento-3d">
                 <div className="pane-head">Live cavity · {dyn.m} two-level emitters + 1 photon · ψ(t)=Σ<sub>k</sub> c<sub>k</sub> e<sup>−iE<sub>k</sub>t</sup>φ<sub>k</sub>{inspect != null ? <> · <i style={{ color: "#fff", fontStyle: "normal" }}>inspecting eigenstate #{inspect}</i></> : <> · cavity field E(z) <i style={{ color: CYAN, fontStyle: "normal" }}>cyan standing wave</i> · emitters <i style={{ color: "#4a6a93", fontStyle: "normal" }}>ground</i>→<i style={{ color: RED, fontStyle: "normal" }}>excited</i> by |ψ<sub>i</sub>(t)|²</>}</div>
                 <PanelEqn t={"|\\psi(t)\\rangle=\\textstyle\\sum_k c_k\\,e^{-iE_k t}\\,|\\phi_k\\rangle,\\qquad \\hat H|\\phi_k\\rangle=E_k|\\phi_k\\rangle"} where="closed unitary single-excitation Tavis–Cummings" />
-                <div className="pane-sub"><b>What:</b> one quantum oscillating between light and matter in real time — the cyan <b>standing-wave field</b> grows when the photon holds the energy and collapses flat when it drains into the <b>emitters</b>, which turn red as they get excited. That oscillation is the <b>beat between the two polaritons (LP/UP)</b> at Ω_R. <b>Approx:</b> single-excitation subspace (1 photon) · RWA · κ=0 (lossless) · the wave height is the RMS field amplitude √P<sub>photon</sub> (a 1-photon Fock state has ⟨E⟩=0, so we draw its energy envelope, not a literal field).</div>
-                <div className="live3d"><Suspense fallback={<div className="cv-loading">loading 3D…</div>}><LiveCavityScene stateRef={dynState} tRef={simT} m={dyn.m} inspectRef={inspectRef} ensemble={ensemble} waist={MODE_WAIST} polTheta={dyn.theta * Math.PI / 180} controls={scene3d} /></Suspense>
+                <div className="pane-sub"><b>What:</b> one quantum oscillating between light and matter in real time — the cyan <b>standing-wave field</b> grows when the photon holds the energy and collapses flat when it drains into the <b>emitters</b>, which turn red as they get excited. That oscillation is the <b>beat between the two polaritons (LP/UP)</b> at Ω_R, decaying at the loss rate Γ (set Γ=0 for the ideal lossless case). <b>Approx:</b> single-excitation subspace (1 photon) · RWA · phenomenological linewidth Γ (not a full Lindblad sim) · the wave height is the RMS field amplitude √P<sub>photon</sub> (a 1-photon Fock state has ⟨E⟩=0, so we draw its energy envelope, not a literal field).</div>
+                <div className="live3d"><Suspense fallback={<div className="cv-loading">loading 3D…</div>}><LiveCavityScene stateRef={dynState} tRef={simT} m={dyn.m} inspectRef={inspectRef} ensemble={ensemble} waist={MODE_WAIST} polTheta={dyn.theta * Math.PI / 180} controls={scene3d} loss={dyn.gamma} /></Suspense>
                   <ScenePanel open={scenePanelOpen} onToggle={() => setScenePanelOpen((o) => !o)} v={scene3d} set={setScene} />
                 </div>
                 <div className="transport">
@@ -1828,7 +1837,7 @@ export function App() {
                 </div>
               </div>
               <div className="pane">
-                <div className="pane-head">Populations — photon <i style={{ color: CYAN, fontStyle: "normal" }}>━</i> bright/superradiant <i style={{ color: RED, fontStyle: "normal" }}>━</i> dark/subradiant <i style={{ color: PURPLE, fontStyle: "normal" }}>━</i> · <i style={{ color: "#8b949e", fontStyle: "normal" }}>closed unitary evolution (κ=γ=0 here); Γ enters the transmission spectrum only</i></div>
+                <div className="pane-head">Populations — photon <i style={{ color: CYAN, fontStyle: "normal" }}>━</i> bright/superradiant <i style={{ color: RED, fontStyle: "normal" }}>━</i> dark/subradiant <i style={{ color: PURPLE, fontStyle: "normal" }}>━</i> · <i style={{ color: "#8b949e", fontStyle: "normal" }}>grey ─ = leaked out (finite lifetime, decays as e^(−2Γt)); set Γ=0 for lossless</i></div>
                 <PanelEqn t={"P_{\\mathrm{photon}}=|\\langle 0|\\psi(t)\\rangle|^2,\\ \\ P_{\\mathrm{bright}}=|\\langle B|\\psi(t)\\rangle|^2,\\qquad \\textstyle\\sum_k P_k = 1"} where="|B⟩ = symmetric bright mode" />
                 <div className="pane-sub"><b>What:</b> where the single excitation lives vs time — it sloshes photon↔bright at the vacuum-Rabi frequency Ω_R. The dark fraction is constant only for identical emitters (σ=0); with disorder it slowly fills as the bright mode leaks into the dark manifold. Undamped because the live model is lossless.</div>
                 <PlotWrap fit cw={PP_CW} ch={PP_CH} area={{ ml: PP_ML, mt: PP_MT, pw: PP_PW, ph: PP_PH }} inv={(px, py) => [(((px - PP_ML) / PP_PW) * 6).toFixed(2), (1 - (py - PP_MT) / PP_PH).toFixed(2)]}>
@@ -1929,17 +1938,18 @@ export function App() {
             <>
               <RegimeBadge gEff={dyn.g * Math.sqrt(dyn.m)} wc={1} loss={Math.max(dyn.sigma, 1e-9)} lossSym="σ" splitSym="2g√N" />
               <div className="pane">
-                <div className="pane-head">Live observables · closed unitary Tavis–Cummings</div>
-                <div className="pane-sub">one excitation shared among 1 photon + N emitters; populations conserve Σ P_k = 1.</div>
+                <div className="pane-head">Live observables · single-excitation Tavis–Cummings</div>
+                <div className="pane-sub">one excitation shared among 1 photon + N emitters, with a finite polariton lifetime — it leaks out at the linewidth Γ. Photon+bright+dark+leaked = 1.</div>
                 <table className="metrics"><tbody>
                   <Row label={<Tex t="\tau = \Omega_R t/2\pi" />} k="simTau" r={read} unit="cyc" tip="elapsed time in vacuum-Rabi cycles (τ = Ω_R·t/2π); the master clock" />
                   <Row label={<Tex t="t" />} k="simTfs" r={read} unit="fs" tip="elapsed physical time in femtoseconds" />
                   <Row label={<Tex t="P_{\mathrm{photon}}" />} k="simPh" r={read} tip="probability the excitation is in the cavity photon (dimensionless, 0–1)" />
                   <Row label={<Tex t="P_{\mathrm{bright}}" />} k="simBr" r={read} tip="probability in the bright/superradiant collective state that couples to light (dimensionless)" />
                   <Row label={<Tex t="P_{\mathrm{dark}}" />} k="simDk" r={read} tip="probability in the dark/subradiant manifold (N−1 states for identical emitters; fewer once disorder σ ≳ Ω_R lets them pick up photon weight)" />
+                  <Row label={<Tex t="P_{\mathrm{leaked}}" />} k="simLeak" r={read} tip="fraction that has LEAKED out of the cavity (mirror leakage κ + emitter decay γ): rises as 1 − e^{−2Γt}. Set the linewidth Γ to 0 for the ideal lossless limit." />
                   <Row label={<>Ω<sub>R</sub> <span className="rb-chk" style={{ color: "var(--dim)" }}>norm.</span></>} k="simRabi" r={read} unit="ω_c" tip="vacuum-Rabi splitting (LP→UP gap = 2g√N on resonance), in units of ω_c (dimensionless)" />
                   <Row label={<>Ω<sub>R</sub> <span className="rb-chk" style={{ color: "var(--dim)" }}>phys.</span></>} k="simRabiMeV" r={read} unit="meV" tip="the same vacuum-Rabi splitting in physical energy units (meV)" />
-                  <Row label={<Tex t="\textstyle\sum_k P_k" />} k="simNorm" r={read} tip="total probability — must stay 1 (closed unitary evolution, no loss)" />
+                  <Row label={<Tex t="\textstyle\sum_k P_k" />} k="simNorm" r={read} tip="photon + bright + dark + leaked — must stay 1 (the excitation is conserved; loss just moves it into the 'leaked' channel)" />
                 </tbody></table>
               </div>
               <div className="pane">
@@ -2094,7 +2104,7 @@ function Row({ label, k, r, unit, v, tip }: { label: React.ReactNode; k?: string
 function regimeClass(gEff: number, wc: number, loss: number) {
   const eta = gEff / wc;
   if (2 * gEff <= loss) return { label: "WEAK", cls: "wk", note: "2g ≤ κ — Purcell regime, no resolvable splitting" };
-  if (eta >= 0.1) return { label: "ULTRASTRONG", cls: "us", note: "η = g/ω_c ≥ 0.1 — RWA corrections become significant" };
+  if (eta >= 0.1) return { label: "ULTRASTRONG", cls: "us", note: "η ≥ 0.1: this RWA model is QUALITATIVE only — the full quantum Rabi model (counter-rotating terms, virtual ground-state photons) would shift the numbers" };
   return { label: "STRONG", cls: "st", note: "2g > κ, η < 0.1 — resolvable vacuum-Rabi doublet, RWA valid" };
 }
 function RegimeBadge({ gEff, wc, loss, lossSym = "κ", splitSym = "2g" }: { gEff: number; wc: number; loss: number; lossSym?: string; splitSym?: string }) {
