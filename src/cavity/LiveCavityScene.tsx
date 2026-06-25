@@ -290,9 +290,10 @@ export function LiveCavityScene({ stateRef, tRef, inspectRef, m, ensemble, polTh
   const fieldAmpRef = useRef(0);
   return (
     <div className="cav-stage">
-      <div className="cav-tag cav-tag-l">mirror</div>
-      <div className="cav-tag cav-tag-r">mirror</div>
-      <div className="cav-tag cav-tag-mode"><span style={{ color: "#23d4ff" }}>cavity field E(z)</span> ⇄ <span style={{ color: "#ff4d2e" }}>emitters</span> · one quantum beating between the LP/UP polaritons at Ω<sub>R</sub></div>
+      <div className="cav-tag cav-tag-l">cavity mirror</div>
+      <div className="cav-tag cav-tag-r">cavity mirror</div>
+      <div className="cav-lab cav-lab-field"><span className="cav-lab-t">light field</span><span className="cav-lab-s">the photon, as a standing wave</span></div>
+      <div className="cav-lab cav-lab-mol"><span className="cav-lab-t">molecules</span><span className="cav-lab-s">the matter, in the field</span></div>
       <CavReadout liveRef={liveRef} stateRef={stateRef} tRef={tRef} />
       <Canvas dpr={[1, 2]} gl={{ antialias: true, alpha: true }} camera={{ position: [0, 60, 330], fov: 50 }}>
         <color attach="background" args={["#070b12"]} />

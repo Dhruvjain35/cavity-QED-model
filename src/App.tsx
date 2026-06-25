@@ -466,12 +466,14 @@ export function App() {
   // guided first-run tour — drives the REAL instrument through the polariton story so the user watches the
   // app change, not a slideshow. Each step sets the regime/view/coupling/branch to match its explanation.
   function applyTourStep(i: number) {
-    setRegime("dynamics"); setDynView("formation");
-    if (i <= 0) { setDyn((s) => ({ ...s, g: 0.06, detuning: 0 })); setPfSel("LP"); }            // welcome — the hybrid
-    else if (i === 1) { setDyn((s) => ({ ...s, g: 0.004, detuning: 0 })); setPfSel(null); }      // bare modes cross
-    else if (i === 2) { setDyn((s) => ({ ...s, g: 0.06, detuning: 0 })); setPfSel(null); }        // polaritons form
-    else if (i === 3) { setDyn((s) => ({ ...s, g: 0.06 })); setPfSel("LP"); }                     // freeze the hybrid
-    else if (i >= 4) { setPfSel(null); setPlaying(true); }                                        // oscillate + decay
+    // each step switches to the tab it describes so the user sees the real thing while reading
+    if (i <= 0) { setRegime("dynamics"); setDynView("formation"); setDyn((s) => ({ ...s, g: 0.06, detuning: 0 })); setPfSel("LP"); } // welcome on the hero view
+    else if (i === 1) setRegime("single");
+    else if (i === 2) setRegime("cavity");
+    else if (i === 3) setRegime("collective");
+    else if (i === 4) { setRegime("dynamics"); setDynView("formation"); setDyn((s) => ({ ...s, g: 0.06, detuning: 0 })); setPfSel("LP"); }
+    else if (i === 5) setRegime("vibronic");
+    else if (i >= 6) { setRegime("dynamics"); setDynView("formation"); setPfSel("LP"); }
   }
   function goTour(i: number | null) {
     if (i === null) { try { localStorage.setItem("cqed_tour_seen", "1"); } catch { /* */ } setTour(null); return; }
@@ -1544,25 +1546,26 @@ export function App() {
       </div>
       {tour !== null ? (() => {
         const STEPS = [
-          { tag: "WELCOME", title: "Build a polariton in 5 steps", body: <>This is a cavity-QED instrument: one quantum of energy, shared between <b style={{ color: CYAN }}>light</b> (a cavity photon) and <b style={{ color: RED }}>matter</b> (molecules). Let's watch the two combine into a <b>polariton</b>.</> },
-          { tag: "STEP 1 / 5", title: "No coupling → no polariton", body: <>The left plot is the bare <b style={{ color: CYAN }}>photon</b> and bare <b style={{ color: RED }}>molecule</b> energies. With the coupling near zero they just <b>cross</b> — they don't interact.</> },
-          { tag: "STEP 2 / 5", title: "Turn on the coupling", body: <>Now they <b>repel</b> and split into two new states — the <b>lower & upper polaritons (LP/UP)</b>. That gap is the vacuum-Rabi splitting Ω<sub>R</sub> = 2g√N; more coupling or more molecules → bigger gap.</> },
-          { tag: "STEP 3 / 5", title: "A polariton is a hybrid", body: <>Right (3D): the <b>LP polariton</b>, frozen. The <b style={{ color: CYAN }}>standing-wave field</b> <i>and</i> the <b style={{ color: RED }}>excited molecules</b> are lit <b>at once</b>, held still — half light, half matter. That's the hybrid.</> },
-          { tag: "STEP 4 / 5", title: "Real dynamics: sloshing + decay", body: <>Start in a pure photon and the energy <b>sloshes</b> light↔matter (the Rabi oscillation) while <b>leaking out</b> (finite lifetime — the grey trace). The polariton is the stable state behind that beat.</> },
-          { tag: "READY", title: "Now explore", body: <>That's a polariton — and everything here is live, <b>validated against QuTiP</b>. Drag the <b>coupling</b> & <b>detuning</b> dials, add molecules (<b>N</b>), add disorder (<b>σ</b>), or freeze UP vs LP. Replay anytime with <b>▸ TOUR</b>.</> },
+          { tag: "Welcome", title: "What this is", body: <>This is a working simulator of cavity quantum electrodynamics. It models molecules placed inside an optical cavity, which is two mirrors that trap light. When the light and the molecules couple strongly enough, they combine into a <b style={{ color: CYAN }}>polariton</b>, a state that is part light and part matter. This tour goes through all five tabs so you understand the whole tool. It takes about two minutes.</> },
+          { tag: "Tab 1 of 5: Single emitter", title: "One molecule, one photon", body: <>Start with the simplest case. One molecule sits in the cavity with one photon. When the coupling is strong, the energy moves back and forth between the photon and the molecule. This is called the vacuum Rabi oscillation. The sliders on the left set the coupling strength and the two ways energy escapes, through the mirrors and through the molecule. Turn those losses up and the oscillation fades out.</> },
+          { tag: "Tab 2 of 5: Cavity", title: "Where the coupling comes from", body: <>The coupling strength is set by the cavity itself. This tab shows the mirror stack and the standing wave of light held between the mirrors. Pushing the light into a smaller space raises the coupling. The sliders change the wavelength and the mirrors, and the table on the right recalculates every step, ending at the single molecule coupling.</> },
+          { tag: "Tab 3 of 5: Many molecules", title: "Collective coupling", body: <>Now put many molecules in the cavity. They couple together, and the energy splitting grows with the square root of how many there are. The plot shows two bright polariton branches that repel and never touch, plus a flat band of dark states that do not interact with the light. Raise the number of molecules to widen the splitting, or add disorder to see the branches blur.</> },
+          { tag: "Tab 4 of 5: Dynamics", title: "The polariton in real time", body: <>This is the main view. On the left you build the polariton: raise the coupling and the separate light and matter levels split into a lower and an upper polariton. On the right you see it in 3D. With a polariton selected, the light field and the molecules glow together and hold steady, which is the hybrid state. Press oscillate to release it and watch the energy slosh between light and matter and slowly leak away.</> },
+          { tag: "Tab 5 of 5: Vibronic", title: "Real molecules that vibrate", body: <>Real molecules vibrate, which spreads their absorption into a series of peaks called a comb. This tab shows that comb on its own in grey, and how the cavity pulls it into clean polariton peaks in cyan. It also shows motional narrowing, where the polariton stays sharp even when the molecules are disordered, because it averages across all of them at once.</> },
+          { tag: "Done", title: "Explore on your own", body: <>That covers the whole simulator. Every number it shows is checked against QuTiP, a standard quantum optics library, so the physics is trustworthy. Move any slider and the whole tool updates live. You can replay this tour at any time from the Tour button at the top right.</> },
         ];
-        const s = STEPS[tour]!, last = tour >= STEPS.length - 1;
+        const s = STEPS[tour]!, last = tour >= STEPS.length - 1, intro = tour === 0;
         return (
-          <div className="tour-overlay">
+          <div className={"tour-overlay" + (intro ? " tour-intro" : "")}>
             <div className="tour-card">
               <div className="tour-tag">{s.tag}</div>
               <div className="tour-title">{s.title}</div>
               <div className="tour-body">{s.body}</div>
               <div className="tour-nav">
-                <button className="tour-skip" onClick={() => goTour(null)}>{last ? "Close" : "Skip"}</button>
+                <button className="tour-skip" onClick={() => goTour(null)}>{last ? "Close" : "Skip tour"}</button>
                 <span style={{ flex: 1 }} />
-                {tour > 0 && <button className="tour-back" onClick={() => goTour(tour - 1)}>← Back</button>}
-                <button className="tour-next" onClick={() => goTour(last ? null : tour + 1)}>{tour === 0 ? "Start →" : last ? "Done ✓" : "Next →"}</button>
+                {tour > 0 && <button className="tour-back" onClick={() => goTour(tour - 1)}>Back</button>}
+                <button className="tour-next" onClick={() => goTour(last ? null : tour + 1)}>{intro ? "Start tour" : last ? "Done" : "Next"}</button>
               </div>
               <div className="tour-dots">{STEPS.map((_, i) => <span key={i} className={"tour-dot" + (i === tour ? " on" : "")} />)}</div>
             </div>

@@ -41,7 +41,12 @@ body { background: var(--bg); color: var(--ink); font-family: var(--sans); font-
 /* guided tour — a non-blocking card pinned to the bottom so the instrument is visible BEHIND it as each
    step drives the real app state. Instrument-styled: hairlines, IBM Plex, cyan accents, zero radius. */
 .tour-overlay { position: fixed; left: 0; right: 0; bottom: 0; z-index: 1200; display: flex; justify-content: center; padding: 0 12px 14px; pointer-events: none; }
+/* the welcome step is a prominent centred panel over a dimmed app (the first thing a new user sees); every
+   later step is the non-blocking bottom strip so the tab it switched to stays fully visible behind it. */
+.tour-overlay.tour-intro { top: 0; align-items: center; padding: 16px; background: rgba(3, 5, 8, 0.62); pointer-events: auto; }
 .tour-card { pointer-events: auto; width: min(540px, calc(100vw - 24px)); background: rgba(8, 11, 17, 0.97); border: 1px solid var(--cyan); box-shadow: 0 0 0 1px #00ffff22, 0 -6px 30px rgba(0, 0, 0, 0.6); padding: 12px 15px 11px; font-family: var(--sans); }
+.tour-intro .tour-card { width: min(580px, calc(100vw - 28px)); padding: 18px 20px 15px; box-shadow: 0 0 0 1px #00ffff33, 0 12px 56px rgba(0, 0, 0, 0.7); }
+.tour-intro .tour-title { font-size: 17px; }
 .tour-tag { font-size: 8.5px; font-weight: 700; letter-spacing: 0.12em; color: var(--cyan); text-transform: uppercase; margin-bottom: 5px; }
 .tour-title { font-size: 14px; font-weight: 700; color: var(--ink); margin-bottom: 5px; letter-spacing: 0.01em; }
 .tour-body { font-size: 11.5px; line-height: 1.55; color: var(--dim); }
@@ -254,12 +259,21 @@ tr[title] { cursor: help; }
 .sc-slide input[type="range"] { width: 88px; }
 .sc-slide b { font-family: var(--mono); font-size: 8.5px; font-weight: 700; color: var(--cyan); font-variant-numeric: tabular-nums; min-width: 26px; text-align: right; }
 .sc-check input[type="checkbox"] { accent-color: var(--cyan); width: 12px; height: 12px; cursor: pointer; }
-.cav-tag { position: absolute; font-family: var(--sans); font-size: 9px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--dim); pointer-events: none; text-shadow: 1px 1px 0 #000; }
+.cav-tag { position: absolute; z-index: 28; font-family: var(--sans); font-size: 9px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--dim); pointer-events: none; text-shadow: 1px 1px 0 #000; }
 .cav-tag sub { font-size: 0.74em; }
-.cav-tag-l { top: 10px; left: 10px; }
-.cav-tag-r { top: 10px; right: 10px; }
+.cav-tag-l { top: 50%; left: 10px; transform: translateY(-50%); }
+.cav-tag-r { top: 50%; right: 10px; transform: translateY(-50%); }
 .cav-tag-mode { top: 10px; left: 50%; transform: translateX(-50%); color: var(--cyan); }
-.cav-tag-mol { bottom: 10px; left: 50%; transform: translateX(-50%); color: var(--red); }
+/* clean in-scene callouts: a colour-coded label with a thin leader line pointing down to the element it
+   names, so the 3D reads on its own (cyan = the light field / photon, orange = the molecules / matter). */
+.cav-lab { position: absolute; z-index: 28; font-family: var(--sans); pointer-events: none; line-height: 1.25; }
+.cav-lab-t { display: block; font-size: 10.5px; font-weight: 700; letter-spacing: 0.03em; text-shadow: 0 1px 3px #000, 0 0 2px #000; }
+.cav-lab-s { display: block; font-size: 8px; font-weight: 500; color: #aeb6bf; text-shadow: 0 1px 3px #000; }
+.cav-lab-field { top: 13%; left: 25%; color: #3df2ff; }
+.cav-lab-field::after { content: ""; position: absolute; left: 7px; top: calc(100% + 2px); width: 1px; height: clamp(20px, 9vh, 52px); background: linear-gradient(#3df2ff, rgba(61, 242, 255, 0)); }
+.cav-lab-mol { top: 30%; left: 60%; color: #ff8a4d; text-align: right; }
+.cav-lab-mol::after { content: ""; position: absolute; right: 8px; top: calc(100% + 2px); width: 1px; height: clamp(14px, 6vh, 34px); background: linear-gradient(#ff8a4d, rgba(255, 138, 77, 0)); }
+@container center (max-width: 560px) { .cav-lab-s { display: none; } .cav-lab-t { font-size: 9px; } }
 /* docked live readout — the on-scene vacuum-Rabi energy partition (instrument CSS only: mono, tabular-nums,
    hairlines, zero radius, no glassmorphism) */
 /* live energy-partition readout — a compact strip pinned to the BOTTOM edge of the viewport (where there's
