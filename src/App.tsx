@@ -432,7 +432,12 @@ export function App() {
           singleFrame.current++; singleDirty.current = false;
         }
       } else if (regimeRef.current === "dynamics" && dynState.current) {
-        if (playingRef.current && !scrubbing.current) simT.current += DT_DYN * speedRef.current;
+        if (playingRef.current && !scrubbing.current) {
+          simT.current += DT_DYN * speedRef.current;
+          // loop the demo: a single quantum oscillates, decays and leaks out, then we re-inject a fresh one
+          // and repeat (instead of the 3D going dead after one decay). Wrap to the 6-cycle populations window.
+          const Tw = popCurve.current?.T; if (Tw && simT.current >= Tw) simT.current -= Tw;
+        }
         const d = decompAt(simT.current);
         // transport sync (DOM, no React re-render): scrub slider tracks simT over the 6-cycle window; τ readout
         const pc = popCurve.current, T = pc ? pc.T : 1, sc = scrubRef.current;
@@ -466,22 +471,27 @@ export function App() {
   // guided first-run tour — drives the REAL instrument through the polariton story so the user watches the
   // app change, not a slideshow. Each step sets the regime/view/coupling/branch to match its explanation.
   function applyTourStep(i: number) {
-    // each step switches to the tab it describes so the user sees the real thing while reading
+    // each step switches to the tab/view it describes so the user sees the real thing while reading
     if (i <= 0) { setRegime("dynamics"); setDynView("formation"); setDyn((s) => ({ ...s, g: 0.06, detuning: 0 })); setPfSel("LP"); } // welcome on the hero view
     else if (i === 1) setRegime("single");
     else if (i === 2) setRegime("cavity");
     else if (i === 3) setRegime("collective");
-    else if (i === 4) { setRegime("dynamics"); setDynView("formation"); setDyn((s) => ({ ...s, g: 0.06, detuning: 0 })); setPfSel("LP"); }
-    else if (i === 5) setRegime("vibronic");
-    else if (i >= 6) { setRegime("dynamics"); setDynView("formation"); setPfSel("LP"); }
+    else if (i === 4) { setRegime("dynamics"); setDynView("formation"); setDyn((s) => ({ ...s, g: 0.06, detuning: 0 })); setPfSel("LP"); } // formation
+    else if (i === 5) { setRegime("dynamics"); setDynView("dynamics"); setPfSel(null); setPlaying(true); } // live dynamics (the bento)
+    else if (i === 6) setRegime("vibronic");
+    else if (i >= 7) { setRegime("dynamics"); setDynView("formation"); setPfSel("LP"); }
   }
   function goTour(i: number | null) {
-    if (i === null) { try { localStorage.setItem("cqed_tour_seen", "1"); } catch { /* */ } setTour(null); return; }
+    if (i === null) { try { localStorage.setItem("cqed_tour_seen_v2", "1"); } catch { /* */ } setTour(null); return; }
     applyTourStep(i); setTour(i);
   }
   useEffect(() => {
-    let seen = "1"; try { seen = localStorage.getItem("cqed_tour_seen") || ""; } catch { /* */ }
-    if (!seen && window.location.hash.length <= 1) { applyTourStep(0); setTour(0); } // first visit, no shared link → auto-open once
+    let seen = ""; try { seen = localStorage.getItem("cqed_tour_seen_v2") || ""; } catch { seen = "1"; }
+    if (seen) return;
+    // auto-open on first visit. If the URL carries a shared #state, leave that state untouched behind the
+    // welcome (do not run step 0); otherwise open on the hero view. Either way the tour is the first thing seen.
+    if (window.location.hash.length <= 1) applyTourStep(0);
+    setTour(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -1546,13 +1556,14 @@ export function App() {
       </div>
       {tour !== null ? (() => {
         const STEPS = [
-          { tag: "Welcome", title: "What this is", body: <>This is a working simulator of cavity quantum electrodynamics. It models molecules placed inside an optical cavity, which is two mirrors that trap light. When the light and the molecules couple strongly enough, they combine into a <b style={{ color: CYAN }}>polariton</b>, a state that is part light and part matter. This tour goes through all five tabs so you understand the whole tool. It takes about two minutes.</> },
-          { tag: "Tab 1 of 5: Single emitter", title: "One molecule, one photon", body: <>Start with the simplest case. One molecule sits in the cavity with one photon. When the coupling is strong, the energy moves back and forth between the photon and the molecule. This is called the vacuum Rabi oscillation. The sliders on the left set the coupling strength and the two ways energy escapes, through the mirrors and through the molecule. Turn those losses up and the oscillation fades out.</> },
-          { tag: "Tab 2 of 5: Cavity", title: "Where the coupling comes from", body: <>The coupling strength is set by the cavity itself. This tab shows the mirror stack and the standing wave of light held between the mirrors. Pushing the light into a smaller space raises the coupling. The sliders change the wavelength and the mirrors, and the table on the right recalculates every step, ending at the single molecule coupling.</> },
-          { tag: "Tab 3 of 5: Many molecules", title: "Collective coupling", body: <>Now put many molecules in the cavity. They couple together, and the energy splitting grows with the square root of how many there are. The plot shows two bright polariton branches that repel and never touch, plus a flat band of dark states that do not interact with the light. Raise the number of molecules to widen the splitting, or add disorder to see the branches blur.</> },
-          { tag: "Tab 4 of 5: Dynamics", title: "The polariton in real time", body: <>This is the main view. On the left you build the polariton: raise the coupling and the separate light and matter levels split into a lower and an upper polariton. On the right you see it in 3D. With a polariton selected, the light field and the molecules glow together and hold steady, which is the hybrid state. Press oscillate to release it and watch the energy slosh between light and matter and slowly leak away.</> },
-          { tag: "Tab 5 of 5: Vibronic", title: "Real molecules that vibrate", body: <>Real molecules vibrate, which spreads their absorption into a series of peaks called a comb. This tab shows that comb on its own in grey, and how the cavity pulls it into clean polariton peaks in cyan. It also shows motional narrowing, where the polariton stays sharp even when the molecules are disordered, because it averages across all of them at once.</> },
-          { tag: "Done", title: "Explore on your own", body: <>That covers the whole simulator. Every number it shows is checked against QuTiP, a standard quantum optics library, so the physics is trustworthy. Move any slider and the whole tool updates live. You can replay this tour at any time from the Tour button at the top right.</> },
+          { tag: "Welcome", title: "What this is", body: <>This is a cavity quantum electrodynamics simulator. It models a single quantum of excitation shared between a confined optical mode and a set of molecular emitters. Once their coupling exceeds the rates at which energy escapes, the light and the matter hybridize into new eigenstates called <b style={{ color: CYAN }}>polaritons</b>, each one part photon and part molecular excitation. This tour covers all six views and the controls behind them, so you can read the whole instrument on your own. It runs about three minutes.</> },
+          { tag: "View 1 of 6: Single emitter", title: "One emitter, one mode", body: <>Begin with one emitter coupled to one cavity mode, the Jaynes Cummings model. A single excitation oscillates coherently between the photon and the emitter at the vacuum Rabi frequency 2g. The left sliders set that coupling g and the two loss channels, cavity decay <Tex t="\kappa" /> and emitter decay <Tex t="\gamma" />. While 2g exceeds those rates you are in strong coupling and the oscillation is resolved; raise the losses and it crosses into the weak regime, where the excitation simply leaks away before it can return.</> },
+          { tag: "View 2 of 6: Cavity", title: "Where the coupling comes from", body: <>The coupling g is not a free parameter. It is fixed by the cavity geometry through the vacuum field amplitude, which scales as one over the square root of the mode volume. This tab builds a distributed Bragg reflector cavity layer by layer and shows the standing wave and finesse it produces. As you change the wavelength, the mirror pairs, and the refractive indices, the table propagates each quantity down to the single emitter coupling and the emitter number needed for strong coupling.</> },
+          { tag: "View 3 of 6: Many emitters", title: "Collective coupling", body: <>With N emitters in the mode, only one symmetric superposition couples to the light, the bright state, and its coupling is enhanced to g times the square root of N. Diagonalizing the single excitation Hamiltonian gives two bright polariton branches, lower and upper, split by 2g times root N, plus N minus one dark states that carry no photon weight and sit at the bare emitter energy. Raise N to widen the splitting, or add inhomogeneous disorder <Tex t="\sigma" /> to broaden the branches and bleed weight into the dark band.</> },
+          { tag: "View 4 of 6: Formation", title: "Building the polariton", body: <>This is the central view. The left panel is the avoided crossing: sweep the coupling and the bare photon and matter levels repel into a lower and an upper polariton, each coloured by its photon fraction, the Hopfield coefficient. At zero detuning both polaritons are an equal light and matter mixture. Selecting a branch freezes the 3D scene on that eigenstate, where the field and the excited emitters are populated together and held steady, which is the hybrid.</> },
+          { tag: "View 5 of 6: Live dynamics", title: "Real time evolution", body: <>Switch to Live dynamics for the time evolution. Starting from a pure photon, the excitation beats between the field and the emitters at the Rabi frequency, which is the two polaritons interfering. The four panels show the 3D scene, the populations over six Rabi cycles, the transmission doublet a spectrometer would measure, and the dressed state ladder. Raise the linewidth and the oscillation damps as the quantum leaks out, then a fresh one is injected and the cycle repeats.</> },
+          { tag: "View 6 of 6: Vibronic", title: "Emitters that vibrate", body: <>Real molecules have vibrational structure, so their absorption is a Franck Condon progression rather than a single line. This tab, the Holstein Tavis Cummings model, shows that vibronic comb in grey and how the cavity reorganizes it into polariton peaks in cyan. It also demonstrates motional narrowing, where the polariton linewidth stays narrow under disorder because the bright state averages over the entire inhomogeneous ensemble at once.</> },
+          { tag: "Done", title: "Explore on your own", body: <>That is the full instrument. Every quantity it reports is checked element by element against QuTiP, a standard quantum optics package, so the numbers are reliable. Adjust any control and the whole tool recomputes live. You can reopen this tour at any time from the Tour button at the top right.</> },
         ];
         const s = STEPS[tour]!, last = tour >= STEPS.length - 1, intro = tour === 0;
         return (

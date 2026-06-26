@@ -6,7 +6,7 @@
 // energy-partition readout (the vacuum-Rabi exchange, numerically), a hard anti-phase swing between the
 // field discs and the emitter glow, static standing-wave annotation, and brighter per-emitter glow (the
 // live Canvas has NO bloom, so glow must carry itself).
-import { OrbitControls, PerspectiveCamera } from "@react-three/drei";
+import { Html, OrbitControls, PerspectiveCamera } from "@react-three/drei";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { MutableRefObject, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
@@ -281,6 +281,17 @@ function drawSpark(cv: HTMLCanvasElement | null, ring: { t: Float32Array; p: Flo
 }
 
 
+// a label anchored to a real 3D point. drei's Html projects it to screen each frame, so it stays on the
+// element it names as the camera orbits, zooms, or the scene is reconfigured. Sits below the on-screen
+// controls in the stacking order so it never covers them.
+function SceneLabel({ pos, cls, t, s }: { pos: [number, number, number]; cls: string; t: string; s?: string }) {
+  return (
+    <Html position={pos} center zIndexRange={[24, 8]} wrapperClass="scene-lab-wrap" style={{ pointerEvents: "none" }}>
+      <div className={"scene-lab " + cls}><span className="l-t">{t}</span>{s ? <span className="l-s">{s}</span> : null}</div>
+    </Html>
+  );
+}
+
 export interface SceneControls { autoRotate: boolean; fieldGlow: number; moleculeScale: number; moleculeGlow: number; showFieldDiscs: boolean; showDipoleArrows: boolean }
 const DEFAULT_CTRL: SceneControls = { autoRotate: false, fieldGlow: 1.0, moleculeScale: 1.0, moleculeGlow: 1.0, showFieldDiscs: true, showDipoleArrows: true };
 
@@ -290,10 +301,6 @@ export function LiveCavityScene({ stateRef, tRef, inspectRef, m, ensemble, polTh
   const fieldAmpRef = useRef(0);
   return (
     <div className="cav-stage">
-      <div className="cav-tag cav-tag-l">cavity mirror</div>
-      <div className="cav-tag cav-tag-r">cavity mirror</div>
-      <div className="cav-lab cav-lab-field"><span className="cav-lab-t">light field</span><span className="cav-lab-s">the photon, as a standing wave</span></div>
-      <div className="cav-lab cav-lab-mol"><span className="cav-lab-t">molecules</span><span className="cav-lab-s">the matter, in the field</span></div>
       <CavReadout liveRef={liveRef} stateRef={stateRef} tRef={tRef} />
       <Canvas dpr={[1, 2]} gl={{ antialias: true, alpha: true }} camera={{ position: [0, 60, 330], fov: 50 }}>
         <color attach="background" args={["#070b12"]} />
@@ -307,6 +314,12 @@ export function LiveCavityScene({ stateRef, tRef, inspectRef, m, ensemble, polTh
           <Molecules liveRef={liveRef} film={film} scale={controls.moleculeScale} glow={controls.moleculeGlow} />
           {controls.showDipoleArrows ? <Dipoles film={film} scale={controls.moleculeScale} /> : null}
           <PolarizationAxis theta={polTheta} />
+          {/* in-scene labels anchored to real 3D points — they follow the camera and any orbit/zoom */}
+          <SceneLabel pos={[0, 50, -46]} cls="field" t="light field" s="the photon, as a standing wave" />
+          <SceneLabel pos={[0, -42, 26]} cls="matter" t="molecules" s="the matter, in the field" />
+          {/* anchored just inside each mirror (the cavity ends sit at z = ±HALF) so the full label stays in frame */}
+          <SceneLabel pos={[0, 62, -HALF + 26]} cls="mirror" t="cavity mirror" />
+          <SceneLabel pos={[0, 62, HALF - 26]} cls="mirror" t="cavity mirror" />
         </group>
         <OrbitControls makeDefault enablePan={false} autoRotate={controls.autoRotate} autoRotateSpeed={1.2} enableDamping dampingFactor={0.06} minDistance={150} maxDistance={600} minPolarAngle={Math.PI / 2 - 0.55} maxPolarAngle={Math.PI / 2 + 0.55} target={[0, 0, 0]} />
       </Canvas>

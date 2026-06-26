@@ -264,16 +264,17 @@ tr[title] { cursor: help; }
 .cav-tag-l { top: 50%; left: 10px; transform: translateY(-50%); }
 .cav-tag-r { top: 50%; right: 10px; transform: translateY(-50%); }
 .cav-tag-mode { top: 10px; left: 50%; transform: translateX(-50%); color: var(--cyan); }
-/* clean in-scene callouts: a colour-coded label with a thin leader line pointing down to the element it
-   names, so the 3D reads on its own (cyan = the light field / photon, orange = the molecules / matter). */
-.cav-lab { position: absolute; z-index: 28; font-family: var(--sans); pointer-events: none; line-height: 1.25; }
-.cav-lab-t { display: block; font-size: 10.5px; font-weight: 700; letter-spacing: 0.03em; text-shadow: 0 1px 3px #000, 0 0 2px #000; }
-.cav-lab-s { display: block; font-size: 8px; font-weight: 500; color: #aeb6bf; text-shadow: 0 1px 3px #000; }
-.cav-lab-field { top: 13%; left: 25%; color: #3df2ff; }
-.cav-lab-field::after { content: ""; position: absolute; left: 7px; top: calc(100% + 2px); width: 1px; height: clamp(20px, 9vh, 52px); background: linear-gradient(#3df2ff, rgba(61, 242, 255, 0)); }
-.cav-lab-mol { top: 30%; left: 60%; color: #ff8a4d; text-align: right; }
-.cav-lab-mol::after { content: ""; position: absolute; right: 8px; top: calc(100% + 2px); width: 1px; height: clamp(14px, 6vh, 34px); background: linear-gradient(#ff8a4d, rgba(255, 138, 77, 0)); }
-@container center (max-width: 560px) { .cav-lab-s { display: none; } .cav-lab-t { font-size: 9px; } }
+/* in-scene callouts anchored to real 3D points via drei <Html>: they project to screen each frame, so a
+   label stays pinned to the element it names (cyan = light field / photon, orange = molecules / matter,
+   grey = the mirrors) no matter how the camera is orbited, zoomed, or the scene reconfigured. */
+.scene-lab-wrap { pointer-events: none; }
+.scene-lab { font-family: var(--sans); pointer-events: none; line-height: 1.2; text-align: center; white-space: nowrap; user-select: none; transform: translateZ(0); }
+.scene-lab .l-t { display: block; font-size: 10.5px; font-weight: 700; letter-spacing: 0.03em; text-shadow: 0 1px 3px #000, 0 0 4px #000; }
+.scene-lab .l-s { display: block; font-size: 8px; font-weight: 500; color: #aeb6bf; text-shadow: 0 1px 3px #000; }
+.scene-lab.field { color: #3df2ff; }
+.scene-lab.matter { color: #ff8a4d; }
+.scene-lab.mirror .l-t { font-size: 8.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #9aa4b0; }
+@container center (max-width: 560px) { .scene-lab .l-s { display: none; } .scene-lab .l-t { font-size: 9px; } }
 /* docked live readout — the on-scene vacuum-Rabi energy partition (instrument CSS only: mono, tabular-nums,
    hairlines, zero radius, no glassmorphism) */
 /* live energy-partition readout — a compact strip pinned to the BOTTOM edge of the viewport (where there's
