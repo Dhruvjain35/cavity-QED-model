@@ -135,6 +135,11 @@ body { background: var(--bg); color: var(--ink); font-family: var(--sans); font-
 /* in the narrow live-dynamics bento, drop the supplementary "where" annotation so the equation renders
    clean and at a consistent size (the pane header and the What line already carry that context) */
 .dyn-bento .panel-eqn .pe-where { display: none; }
+/* the bento is the viz-first live view: hide the long explanatory "What:" prose and trim the header so the
+   plots and the 3D scene get the room (the full explanations live in the tour and the Formation view). */
+.dyn-bento .pane-sub { display: none; }
+.dyn-bento .pane-head { font-size: 8.5px; line-height: 1.3; margin-bottom: 2px; padding-top: 3px; }
+.dyn-bento .panel-eqn { margin-bottom: 3px; padding: 3px 9px; }
 .panel-eqn .pe-tag { flex: 0 0 auto; font-size: 8px; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase; color: var(--faint); }
 /* keep the equation at its NATURAL width (KaTeX can't wrap), if it doesn't fit, the strip scrolls
    horizontally as a unit. Never let flex shrink the box below the formula, which made the math paint
