@@ -299,7 +299,7 @@ function SceneLabel({ pos, cls, t, s }: { pos: [number, number, number]; cls: st
 export interface SceneControls { autoRotate: boolean; fieldGlow: number; moleculeScale: number; moleculeGlow: number; showFieldDiscs: boolean; showDipoleArrows: boolean }
 const DEFAULT_CTRL: SceneControls = { autoRotate: false, fieldGlow: 1.0, moleculeScale: 1.0, moleculeGlow: 1.0, showFieldDiscs: true, showDipoleArrows: true };
 
-export function LiveCavityScene({ stateRef, tRef, inspectRef, m, ensemble, polTheta, controls = DEFAULT_CTRL, loss = 0 }: { stateRef: MutableRefObject<Dyn>; tRef: MutableRefObject<number>; inspectRef: MutableRefObject<number | null>; m: number; ensemble: Ens; waist?: number; polTheta: number; controls?: SceneControls; loss?: number }) {
+export function LiveCavityScene({ stateRef, tRef, inspectRef, m, ensemble, polTheta, controls = DEFAULT_CTRL, loss = 0, showLabels = true }: { stateRef: MutableRefObject<Dyn>; tRef: MutableRefObject<number>; inspectRef: MutableRefObject<number | null>; m: number; ensemble: Ens; waist?: number; polTheta: number; controls?: SceneControls; loss?: number; showLabels?: boolean }) {
   const film = useMemo(() => buildFilm(ensemble), [ensemble]);
   const liveRef = useRef<Live>({ pPhoton: 0, pBright: 0, pDark: 0, leaked: 0, molGlow: new Float64Array(64) });
   const fieldAmpRef = useRef(0);
@@ -318,12 +318,16 @@ export function LiveCavityScene({ stateRef, tRef, inspectRef, m, ensemble, polTh
           <Molecules liveRef={liveRef} film={film} scale={controls.moleculeScale} glow={controls.moleculeGlow} />
           {controls.showDipoleArrows ? <Dipoles film={film} scale={controls.moleculeScale} /> : null}
           <PolarizationAxis theta={polTheta} />
-          {/* in-scene labels anchored to real 3D points, they follow the camera and any orbit/zoom */}
-          <SceneLabel pos={[0, 50, -46]} cls="field" t="light field" s="the photon, as a standing wave" />
-          <SceneLabel pos={[0, -42, 26]} cls="matter" t="molecules" s="the matter, in the field" />
-          {/* anchored just inside each mirror (the cavity ends sit at z = ±HALF) so the full label stays in frame */}
-          <SceneLabel pos={[0, 62, -HALF + 36]} cls="mirror" t="cavity mirror" />
-          <SceneLabel pos={[0, 62, HALF - 36]} cls="mirror" t="cavity mirror" />
+          {/* in-scene labels anchored to real 3D points, they follow the camera and any orbit/zoom. Only in
+             the roomy formation view; the small live-dynamics bento would have them overlap, and its pane
+             header already names the field / emitters. */}
+          {showLabels ? <>
+            <SceneLabel pos={[0, 50, -46]} cls="field" t="light field" s="the photon, as a standing wave" />
+            <SceneLabel pos={[0, -42, 26]} cls="matter" t="molecules" s="the matter, in the field" />
+            {/* anchored just inside each mirror (the cavity ends sit at z = ±HALF) so the full label stays in frame */}
+            <SceneLabel pos={[0, 62, -HALF + 36]} cls="mirror" t="cavity mirror" />
+            <SceneLabel pos={[0, 62, HALF - 36]} cls="mirror" t="cavity mirror" />
+          </> : null}
         </group>
         <OrbitControls makeDefault enablePan={false} autoRotate={controls.autoRotate} autoRotateSpeed={1.2} enableDamping dampingFactor={0.06} minDistance={150} maxDistance={600} minPolarAngle={Math.PI / 2 - 0.55} maxPolarAngle={Math.PI / 2 + 0.55} target={[0, 0, 0]} />
       </Canvas>
