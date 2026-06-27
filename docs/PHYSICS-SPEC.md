@@ -2,8 +2,8 @@
 
 > This document is the single physics reference the simulation code is built against.
 > Every equation carries a citation: `[paper, Eq./page]` for the local PDFs, or `[author, venue]` for
-> web/textbook sources. All equations were extracted by a 7-paper + 6-web research workflow
-> (`RESEARCH-EVIDENCE.json`, 166 equations / 67 sources) and the **central result (N_max) was
+> web/textbook sources. Equations were extracted from the primary papers and standard texts (166
+> equations / 67 sources), and the **central result (N_max) was
 > re-derived by hand** (see §6). Where a printed form is dimensionally inconsistent, the corrected
 > form is given and flagged.
 >
@@ -142,7 +142,7 @@ $$\cos\Theta = \sqrt{\tfrac12 + \tfrac12\frac{\Delta/2}{\sqrt{(\Delta/2)^2+(N-1)
 
 ### C.9 Cavity-modified Marcus / FGR ET rate (the kernel)
 $$\mathcal{K}(V,E_a) = \sqrt{\frac{\pi}{E_r k_B T}}\,\frac{|V|^2}{2\hbar}\,\exp\!\Big[-\frac{E_a^2}{4 k_B T E_r}\Big], \qquad E_a = E_{fi} + E_r$$
-[Eq. 35, p.8]. Equal to the classical Marcus rate `k = (1/ℏ)|V|² √(π/λk_BT) exp[−(λ+ΔG)²/4λk_BT]` (λ=E_r, ΔG=E_fi) **up to an overall factor of 1/2**: Sharma & Chen print `|V|²/(2ℏ)`, textbook/Semenov–Nitzan have `|V|²/ℏ` (verified refuted in deep-verify — see VERIFICATION-REPORT). We keep the paper's normalization so output matches its Fig. 2; the 1/2 is an overall prefactor that **cancels in every rate ratio (quantum yields, branching) and does not affect N_max or the barrier-less condition.** The activation energy `E_a` depends on the polariton energy Ω, so **a path goes barrier-less when Ω hits ℏω_c** → the turnover.
+[Eq. 35, p.8]. Equal to the classical Marcus rate `k = (1/ℏ)|V|² √(π/λk_BT) exp[−(λ+ΔG)²/4λk_BT]` (λ=E_r, ΔG=E_fi) **up to an overall factor of 1/2**: Sharma & Chen print `|V|²/(2ℏ)`, textbook/Semenov–Nitzan have `|V|²/ℏ` (independently re-derived by hand). We keep the paper's normalization so output matches its Fig. 2; the 1/2 is an overall prefactor that **cancels in every rate ratio (quantum yields, branching) and does not affect N_max or the barrier-less condition.** The activation energy `E_a` depends on the polariton energy Ω, so **a path goes barrier-less when Ω hits ℏω_c** → the turnover.
 
 The photon-coupled ET paths (RWA-I) are evaluated as:
 $$k_{P_\pm\to\{A_1\}1} = \mathcal{K}\big(\mathcal{T}_{11}\sin/\cos\Theta,\; \Omega_\pm^{(\mathrm{I})} - \hbar\omega_c\big)$$

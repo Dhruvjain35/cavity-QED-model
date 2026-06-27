@@ -31,3 +31,6 @@ scratch/
 
 # temp workflow scripts
 .wf/
+
+# internal planning/build/evidence docs — kept locally, never in the public repo
+_internal/

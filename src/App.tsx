@@ -1453,7 +1453,7 @@ export function App() {
       if (fill) { path(); ctx.lineTo(PP_ML + PP_PW, yOf(0)); ctx.lineTo(PP_ML, yOf(0)); ctx.closePath(); ctx.fillStyle = color + "22"; ctx.fill(); }
       path(); ctx.strokeStyle = color; ctx.lineWidth = 1.6; ctx.stroke();
     };
-    trace(2, DARKC, true);   // dark / subradiant manifold (dephasing leakage at σ>0)
+    trace(2, DARKC, true);   // dark / subradiant manifold (fills via unitary bright→dark transfer at σ>0; it carries no photon weight, so it does NOT leak — the reservoir stays long-lived)
     trace(0, COBALT, false); // photon
     trace(1, RED, false);    // bright / superradiant matter
     if (dyn.gamma > 0) {     // leaked-out fraction = 1 − (photon+bright+dark): the quantum that left the cavity
@@ -1719,7 +1719,7 @@ export function App() {
                 <button onClick={() => setDyn((s) => ({ ...s, seed: s.seed + 1 }))}>RE-ROLL σ</button>
               </div>
               <div className="btn-row">
-                <button className={dynSweep ? "on" : ""} onClick={() => setDynSweep((v) => !v)}>{dynSweep ? "● SWEEP g vs Ω_R" : "SWEEP g vs Ω_R"}</button>
+                <button className={dynSweep ? "on" : ""} onClick={() => { if (!dynSweep) setDynView("dynamics"); setDynSweep((v) => !v); }}>{dynSweep ? "● SWEEP g vs Ω_R" : "SWEEP g vs Ω_R"}</button>
               </div>
             </Group>
           ) : (
@@ -1750,7 +1750,7 @@ export function App() {
             <>
               <div className="pane">
                 <div className="pane-head">Panel C · observables ⟨a†a⟩ <i style={{ color: COBALT }}>━</i> ⟨P_e⟩ <i style={{ color: CRIMSON }}>━</i> purity <i style={{ color: EMERALD }}>━</i></div>
-                <PanelEqn t={"\\begin{aligned}\\dot{\\rho} &= -i[\\hat H,\\rho] + \\kappa\\,\\mathcal{D}[\\hat a]\\rho + \\gamma\\,\\mathcal{D}[\\hat\\sigma]\\rho \\\\ \\hat H &= \\omega_c \\hat a^\\dagger \\hat a + \\Omega\\,\\hat\\sigma^\\dagger\\hat\\sigma + g(\\hat a^\\dagger\\hat\\sigma + \\hat a\\hat\\sigma^\\dagger)\\end{aligned}"} />
+                <PanelEqn t={"\\begin{aligned}\\dot{\\rho} &= -i[\\hat H,\\rho] + \\kappa\\,\\mathcal{D}[\\hat a]\\rho + \\gamma\\,\\mathcal{D}[\\hat\\sigma]\\rho \\\\ \\hat H &= \\omega_c \\hat a^\\dagger \\hat a + \\omega_a\\,\\hat\\sigma^\\dagger\\hat\\sigma + g(\\hat a^\\dagger\\hat\\sigma + \\hat a\\hat\\sigma^\\dagger)\\end{aligned}"} />
                 <div className="pane-sub"><b>What:</b> one quantum sloshes photon↔atom, the cyan/red anti-phase wiggle is the vacuum-Rabi oscillation at frequency 2g; the envelope decays as κ,γ leak it out. ⟨a†a⟩=mean photon number, ⟨P_e⟩=excited-state prob, all dimensionless ∈[0,1] here.</div>
                 <PlotWrap cw={S_CW} ch={S_CH} area={{ ml: S_ML, mt: S_MT, pw: S_PW, ph: S_PH }} inv={(px, py) => { const T = popSeries.current?.T ?? T_LOOP; return [(((px - S_ML) / S_PW) * T).toFixed(1), (1 - (py - S_MT) / S_PH).toFixed(2)]; }}>
                   <canvas ref={seriesCanvas} className="cv" />
@@ -1942,7 +1942,7 @@ export function App() {
               <div className="pane">
                 <div className="pane-head">Transmission S(ω) · |FFT of the photon return amplitude ⟨0|ψ(t)⟩, e<sup>−Γt</sup>-windowed|² · Lorentzian vacuum-Rabi doublet weighted by photon fraction</div>
                 <PanelEqn t={"S(\\omega)=\\big|\\,\\mathrm{FFT}\\big[\\langle 0|\\psi(t)\\rangle\\,e^{-\\Gamma t}\\big]\\,\\big|^2"} where="peaks at the polariton energies E_k" />
-                <div className="pane-sub"><b>What:</b> what a transmission/PL spectrometer would measure, two polariton peaks (LP and UP); their separation is the Rabi splitting Ω_R. The width Γ is set by the spectral-linewidth slider (this is the only place loss enters).</div>
+                <div className="pane-sub"><b>What:</b> what a transmission/PL spectrometer would measure, two polariton peaks (LP and UP); their separation is the Rabi splitting Ω_R. The same linewidth Γ that leaks the live populations also sets the peak width here; this panel applies it as a uniform spectral broadening, so each peak is drawn at half-width Γ.</div>
                 <PlotWrap fit cw={FF_CW} ch={FF_CH} area={{ ml: FF_ML, mt: FF_MT, pw: FF_PW, ph: FF_PH }} inv={(px, py) => { const ds = dynState.current; if (!ds) return null; const lo = ds.eigs[0]!, hi = ds.eigs[ds.n - 1]!, hw = Math.max(0.5, (hi - lo) * 0.7 + 0.08), mid = (lo + hi) / 2, wlo = mid - hw, whi = mid + hw; return [(wlo + ((px - FF_ML) / FF_PW) * (whi - wlo)).toFixed(3), (1 - (py - FF_MT) / FF_PH).toFixed(2)]; }}>
                   <canvas ref={fftCanvas} className="cv" />
                 </PlotWrap>

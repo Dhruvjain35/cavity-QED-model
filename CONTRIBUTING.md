@@ -6,8 +6,8 @@ Thanks for looking at the cavity-QED instrument. The bar for this project is sim
 
 There are two physics layers, on purpose:
 
-- **`wasm/` — the shipping quantum core (Rust → WebAssembly).** This is what the app actually runs: the single-excitation Jaynes–Cummings / Tavis–Cummings spectra, the Lindblad time evolution (Dormand–Prince / Dopri5), the Wigner function, the partial trace, and the Holstein–Tavis–Cummings vibronic matrix. It is checked element by element against QuTiP 5.3 / NumPy goldens committed under `wasm/golden/`.
-- **`engine/` — a closed-form analytic oracle (TypeScript).** Marcus electron-transfer rates, transfer-matrix optics, and Franck–Condon sums in closed form. The app does not import it; it exists as an independent self-check and as a fast reference. Its vitest suite lives in `engine/__tests__/`.
+- **`wasm/`, the shipping quantum core (Rust → WebAssembly).** This is what the app actually runs: the single-excitation Jaynes–Cummings / Tavis–Cummings spectra, the Lindblad time evolution (Dormand–Prince / Dopri5), the Wigner function, the partial trace, and the Holstein–Tavis–Cummings vibronic matrix. It is checked element by element against QuTiP 5.3 / NumPy goldens committed under `wasm/golden/`.
+- **`engine/`, a closed-form analytic oracle (TypeScript).** Marcus electron-transfer rates, transfer-matrix optics, and Franck–Condon sums in closed form. The app does not import it; it exists as an independent self-check and as a fast reference. Its vitest suite lives in `engine/__tests__/`.
 
 The React UI is in `src/`. The 3D scene is `src/cavity/LiveCavityScene.tsx`. The avoided-crossing centerpiece is `src/PolaritonFormation.tsx`.
 
@@ -17,7 +17,7 @@ The React UI is in `src/`. The 3D scene is `src/cavity/LiveCavityScene.tsx`. The
 npm install
 npm run dev          # local dev server
 
-# rebuild the WASM core (only if you change wasm/src/*.rs — needs the Rust toolchain + wasm-pack)
+# rebuild the WASM core (only if you change wasm/src/*.rs, needs the Rust toolchain + wasm-pack)
 wasm-pack build wasm --target web    --out-dir pkg-web
 wasm-pack build wasm --target nodejs --out-dir pkg-node
 ```

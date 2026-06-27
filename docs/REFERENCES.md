@@ -7,8 +7,7 @@
 > Lumerical, Tidy3D, Falstad, nanoHUB, PhET) and the cited convention figures the field
 > reproduces. Accessibility/uncertainty is flagged inline with **[UNCERTAIN]** or **[INACCESSIBLE]**.
 >
-> Companion docs: physics in `PHYSICS-SPEC.md`, verification ledger in `VERIFICATION-REPORT.md`,
-> engine in `../engine/`.
+> Companion docs: physics in `PHYSICS-SPEC.md`, validation in `VALIDATION.md`.
 
 ---
 
@@ -116,8 +115,8 @@ model becomes a Kuramoto synchronisation network.
 arrows**; **solid-blue (FM) / dashed-red (AFM)** edges; relative phase read off **interference fringe
 parity** (even=π, odd=0); k-space tomography with a k_c ring. Frame value the way Berloff does —
 "magic dust that shines only at the deepest valley," bosonic stimulation reaching the global minimum
-bottom-up. Honesty lesson directly relevant to our anti-slop stance: it is a **classical mean-field**
-simulator whose speed-up is from BEC statistics — reproduce that careful framing, do not overclaim
+bottom-up. Honesty lesson directly relevant to this project's accuracy bar: it is a **classical mean-field**
+simulator whose speed-up is from BEC statistics; reproduce that careful framing, do not overclaim
 "quantum." **[INACCESSIBLE]** The DAMTP page failed WebFetch (TLS "unable to verify first certificate")
 and was retrieved via `curl -k`; the hero image and embedded YouTube were not visually rendered.
 PMC/Sci.Rep. full texts were CAPTCHA/redirect-blocked — gain-dissipative figure details rely on the

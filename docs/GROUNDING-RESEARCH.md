@@ -118,8 +118,8 @@ from Sharma-Chen. → *Source:* arXiv:2406.17101 (full text).
 
 ❌ **REFUTED — `κ ≈ c(1−R)/(2nL)` is NOT the energy decay rate, and is NOT equal to 2π·FSR/F.**
 Both skeptics caught this independently; it is off by a **factor of 2**. Our Lindblad κ is the
-**energy/FWHM** rate (L=√κ·a makes ⟨a†a⟩ decay at κ; τ=1/κ; Q=ω/κ — confirmed against
-`OPEN-QUANTUM-SPEC.md` and the Aspelmeyer RMP convention). The correct self-consistent forms:
+**energy/FWHM** rate (L=√κ·a makes ⟨a†a⟩ decay at κ; τ=1/κ; Q=ω/κ; confirmed against
+the Aspelmeyer RMP convention). The correct self-consistent forms:
 
 | quantity | high-R form | exact (equal mirrors) |
 |---|---|---|
