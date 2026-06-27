@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import katex from "katex";
 import type { SceneControls } from "./cavity/LiveCavityScene";
 import "katex/dist/katex.min.css";
@@ -20,11 +20,25 @@ function Tex({ t }: { t: string }) {
 // (KaTeX). `where` is an optional compact symbol key. Renders as a thin instrument-style band.
 function PanelEqn({ t, where }: { t: string; where?: string }) {
   const html = useMemo(() => katex.renderToString(t, { throwOnError: false, displayMode: true }), [t]);
+  const zone = useRef<HTMLDivElement>(null), scale = useRef<HTMLDivElement>(null);
+  // scale the equation down to fit its pane instead of clipping it (the bento panes are ~half width, so the
+  // long equations would otherwise overflow and get cut off mid-formula). Re-fits on any container resize.
+  useLayoutEffect(() => {
+    const z = zone.current, s = scale.current; if (!z || !s) return;
+    const fit = () => { s.style.transform = "scale(1)"; const avail = z.clientWidth, nat = s.scrollWidth; const k = nat > avail && nat > 0 ? Math.max(0.62, avail / nat) : 1; s.style.transform = k < 1 ? `scale(${k})` : ""; };
+    fit();
+    const ro = new ResizeObserver(fit); ro.observe(z);
+    return () => ro.disconnect();
+  }, [html, where]);
   return (
     <div className="panel-eqn">
       <span className="pe-tag">computes</span>
-      <span className="pe-tex" dangerouslySetInnerHTML={{ __html: html }} />
-      {where ? <span className="pe-where">{where}</span> : null}
+      <div className="pe-fitzone" ref={zone}>
+        <div className="pe-scale" ref={scale}>
+          <span className="pe-tex" dangerouslySetInnerHTML={{ __html: html }} />
+          {where ? <span className="pe-where">{where}</span> : null}
+        </div>
+      </div>
     </div>
   );
 }
