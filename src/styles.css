@@ -1,4 +1,4 @@
-/* Cavity-QED computational workbench — high-density instrument console (Bruker OPUS / VMD / lab
+/* Cavity-QED computational workbench, high-density instrument console (Bruker OPUS / VMD / lab
    hardware lineage). Scientific type system: IBM Plex Sans for all UI/labels/axes (matplotlib/QuTiP
    convention), IBM Plex Mono for tabular data/numbers, KaTeX (Computer Modern) for equations. Zero
    radii, single-pixel metallic-gray rules, no shadows/glows; spectroscopic colour system: cyan
@@ -10,7 +10,7 @@
   /* legacy aliases kept so existing class names resolve to the new industrial palette */
   --cobalt: var(--cyan); --crimson: var(--red); --emerald: var(--green);
   /* scientific-instrument type system: neutral sans for all UI/labels, tabular mono for data/numbers,
-     KaTeX (Computer Modern) for equations — matches matplotlib/QuTiP-style scientific software. */
+     KaTeX (Computer Modern) for equations, matches matplotlib/QuTiP-style scientific software. */
   --sans: "IBM Plex Sans", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
   --mono: "IBM Plex Mono", "SF Mono", "SFMono-Regular", ui-monospace, monospace;
   --serif: var(--sans);
@@ -38,7 +38,7 @@ body { background: var(--bg); color: var(--ink); font-family: var(--sans); font-
 .examples-btn:hover { background: #66ffff; }
 .tour-btn { font-family: var(--sans); font-size: 11px; font-weight: 700; letter-spacing: 0.04em; background: transparent; color: var(--cyan); border: 1px solid var(--cyan); padding: 2px 10px; cursor: pointer; text-transform: none; }
 .tour-btn:hover { background: #0c2630; }
-/* guided tour — a non-blocking card pinned to the bottom so the instrument is visible BEHIND it as each
+/* guided tour, a non-blocking card pinned to the bottom so the instrument is visible BEHIND it as each
    step drives the real app state. Instrument-styled: hairlines, IBM Plex, cyan accents, zero radius. */
 .tour-overlay { position: fixed; left: 0; right: 0; bottom: 0; z-index: 1200; display: flex; justify-content: center; padding: 0 12px 14px; pointer-events: none; }
 /* the welcome step is a prominent centred panel over a dimmed app (the first thing a new user sees); every
@@ -84,7 +84,7 @@ body { background: var(--bg); color: var(--ink); font-family: var(--sans); font-
 .about-overlay p:last-child { margin-bottom: 0; }
 .about-link { color: var(--green); cursor: pointer; text-decoration: none; }
 .about-link:hover { text-decoration: underline; }
-/* honest, in-app validation scope — every module → its arbiter, mirroring docs/VALIDATION.md */
+/* honest, in-app validation scope, every module → its arbiter, mirroring docs/VALIDATION.md */
 .about-val { border: 1px solid var(--rule-2); margin: 0 0 10px; }
 .about-val-head { font-size: 8.5px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--faint); padding: 5px 7px; border-bottom: 1px solid var(--rule); }
 .about-val-row { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; padding: 5px 7px; font-size: 9.5px; line-height: 1.4; }
@@ -107,14 +107,14 @@ body { background: var(--bg); color: var(--ink); font-family: var(--sans); font-
 .rail, .dock { overflow-y: auto; min-height: 0; }
 .center { display: flex; flex-direction: column; min-height: 0; overflow-y: auto; container-type: inline-size; container-name: center; }
 
-/* panes — zero radius, 1px rules, 4-6px padding */
+/* panes, zero radius, 1px rules, 4-6px padding */
 .pane { border-bottom: 1px solid var(--rule); padding: 4px 6px; }
 .pane:last-child { border-bottom: none; }
 .pane.grow { flex: 1; min-height: 0; }
 /* 2.3 / 2.4 · center the plot inside grow panes so leftover height is symmetric padding, never a
    one-sided black gap between panels (single / collective / vibronic columns). */
 .center > .pane.grow { display: flex; flex-direction: column; }
-/* hero canvases are CENTERED at their native size inside the grow pane (never CSS-upscaled — upscaling a
+/* hero canvases are CENTERED at their native size inside the grow pane (never CSS-upscaled, upscaling a
    fixed buffer both blurs the plot and balloons its fonts). max-* only ever scales DOWN on a tight pane. */
 .center > .pane.grow > .plotwrap, .center > .pane.grow > .cv, .center > .pane.grow > .bloch-wrap { align-self: center; margin: auto; max-width: 100%; max-height: 100%; min-height: 0; }
 /* CAVITY tab: two panels (R, N) side-by-side so they fill the column width instead of stacking small */
@@ -122,16 +122,16 @@ body { background: var(--bg); color: var(--ink); font-family: var(--sans); font-
 .cav-row > .pane { flex: 1; min-width: 0; border-bottom: none; border-right: 1px solid var(--rule); display: flex; flex-direction: column; }
 .cav-row > .pane:last-child { border-right: none; }
 .cav-row > .pane > .cv { margin: auto; }
-/* 3.E · panel-header hierarchy — cyan hairline above every panel title */
+/* 3.E · panel-header hierarchy, cyan hairline above every panel title */
 .pane-head { font-family: var(--sans); font-size: 9px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: #888; margin-bottom: 3px; line-height: 1.35; border-top: 1px solid #00ffff22; padding-top: 4px; }
 .pane-head i { font-style: normal; }
 /* plain-language one-liner under a technical pane title (Standard 4) */
 .pane-sub { font-family: var(--sans); font-size: 9px; font-weight: 400; line-height: 1.35; color: var(--faint); text-transform: none; letter-spacing: 0.01em; margin: 0 0 4px; }
 .pane-sub b { color: var(--dim); font-weight: 600; }
-/* governing-equation strip — the exact formula each panel computes (Standard: show the math) */
+/* governing-equation strip, the exact formula each panel computes (Standard: show the math) */
 .panel-eqn { display: flex; align-items: center; gap: 10px; padding: 5px 9px; margin: 0 0 5px; background: #0b1018; border-top: 1px solid #00ffff1f; border-bottom: 1px solid var(--rule-soft); overflow-x: auto; }
 .panel-eqn .pe-tag { flex: 0 0 auto; font-size: 8px; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase; color: var(--faint); }
-/* keep the equation at its NATURAL width (KaTeX can't wrap) — if it doesn't fit, the strip scrolls
+/* keep the equation at its NATURAL width (KaTeX can't wrap), if it doesn't fit, the strip scrolls
    horizontally as a unit. Never let flex shrink the box below the formula, which made the math paint
    over the annotation that follows it. */
 .panel-eqn .pe-tex { flex: 0 0 auto; }
@@ -153,7 +153,7 @@ tr[title] { cursor: help; }
 .regime-badge.rb-st { border-color: #1e6b7a; } .rb-st .rb-dot, .rb-st .rb-label { color: var(--cyan); } .rb-st .rb-dot { background: var(--cyan); }
 .regime-badge.rb-us { border-color: #8a6a13; } .rb-us .rb-dot, .rb-us .rb-label { color: var(--amber); } .rb-us .rb-dot { background: var(--amber); }
 .rb-chk { font-size: 8px; color: var(--green); font-weight: 600; margin-left: 3px; vertical-align: middle; }
-/* tab subtitle — the one-line "what is this tab" entry point (Standard 8) */
+/* tab subtitle, the one-line "what is this tab" entry point (Standard 8) */
 .tab-sub { font-family: var(--sans); font-size: 9.5px; line-height: 1.4; color: var(--dim); padding: 5px 8px 6px; border-bottom: 1px solid var(--rule); background: #0a0d12; }
 .tab-sub b { color: var(--ink); font-weight: 700; }
 .tab-sub .ts-watch { color: var(--cyan); }
@@ -164,13 +164,21 @@ tr[title] { cursor: help; }
 .tex { display: inline-block; line-height: 1; }
 .tex .katex { font-size: 1.0em; color: inherit; }
 .cv.click { cursor: crosshair; }
-/* 3.C · hover crosshair overlay — sits exactly over a plot canvas, never intercepts its clicks */
+/* 3.C · hover crosshair overlay, sits exactly over a plot canvas, never intercepts its clicks */
 .plotwrap { position: relative; display: inline-block; max-width: 100%; line-height: 0; }
 .plot-ov { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; }
 .cavity3d { width: 100%; height: 460px; min-height: 360px; overflow: hidden; background: #050708; }
 .cav-stage { position: relative; width: 100%; height: 100%; }
 .cav-stage canvas { width: 100% !important; height: 100% !important; display: block; }
 .cv-loading { display: flex; align-items: center; justify-content: center; height: 100%; font-family: var(--sans); font-size: 11px; color: var(--dim); }
+/* shown only if the lazy 3D chunk fails to load or WebGL cannot start, the rest of the instrument is unaffected */
+.scene-fallback { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; height: 100%; padding: 18px; text-align: center; font-family: var(--sans); background: #050708; }
+.scene-fallback-t { font-size: 12px; font-weight: 600; letter-spacing: 0.04em; color: var(--ink); }
+.scene-fallback-s { font-size: 10.5px; line-height: 1.5; color: var(--dim); max-width: 320px; }
+/* non-blocking "computing" state over the vibronic plot during the heavy exact diagonalization */
+.cv-computing { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 8px; font-family: var(--sans); font-size: 11px; color: var(--cyan); background: rgba(5, 7, 8, 0.55); backdrop-filter: blur(1px); z-index: 5; pointer-events: none; }
+.cv-spin { width: 11px; height: 11px; border: 1.5px solid rgba(0, 255, 255, 0.25); border-top-color: var(--cyan); border-radius: 50%; animation: cv-spin 0.7s linear infinite; }
+@keyframes cv-spin { to { transform: rotate(360deg); } }
 .phase-row { display: flex; gap: 8px; flex-wrap: wrap; }
 
 /* DYNAMICS view toggle: polariton FORMATION (the avoided crossing) vs the live dynamics (the oscillation) */
@@ -178,7 +186,7 @@ tr[title] { cursor: help; }
 .dyn-viewtabs button { font-family: var(--sans); font-size: 10px; font-weight: 600; letter-spacing: 0.03em; padding: 7px 14px; border: none; border-right: 1px solid var(--rule); background: transparent; color: var(--faint); cursor: pointer; }
 .dyn-viewtabs button:hover { color: var(--ink); background: var(--rule-soft); }
 .dyn-viewtabs button.on { color: var(--cyan); border-bottom: 2px solid var(--cyan); background: #0b1016; }
-/* polariton FORMATION — 2-panel fit-to-screen: avoided crossing (left) + the selected polariton in 3D (right).
+/* polariton FORMATION, 2-panel fit-to-screen: avoided crossing (left) + the selected polariton in 3D (right).
    Fills the center column height with no scroll; stacks to one column when the center gets narrow. */
 .pf-grid { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1.06fr) minmax(272px, 0.94fr); }
 .pf-grid > .pf-left, .pf-grid > .pf-right { min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; padding: 6px 9px 8px; }
@@ -187,7 +195,7 @@ tr[title] { cursor: help; }
 /* left: the avoided-crossing diagram (fits) + the dials + composition */
 .pf-root { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; font-family: var(--sans); }
 .pf-plotwrap { flex: 1 1 0; min-height: 0; min-width: 0; display: flex; align-items: center; justify-content: center; }
-.pf-canvas { aspect-ratio: 600 / 360; width: auto; height: auto; max-width: 100%; max-height: 100%; display: block; cursor: ew-resize; }
+.pf-canvas { aspect-ratio: 600 / 430; width: auto; height: auto; max-width: 100%; max-height: 100%; display: block; cursor: ew-resize; }
 .pf-ctrls { flex: 0 0 auto; display: flex; flex-direction: column; gap: 6px; }
 .pf-row { display: flex; align-items: center; gap: 8px; font-size: 10px; color: var(--dim); }
 .pf-row > span:first-child { white-space: nowrap; min-width: 64px; }
@@ -215,7 +223,7 @@ tr[title] { cursor: help; }
 @container center (max-width: 620px) { .pf-grid { grid-template-columns: 1fr; grid-auto-rows: auto; overflow-y: auto; } .pf-grid > .pf-left { border-right: none; border-bottom: 1px solid var(--rule-2); } .pf-right .live3d { min-height: 260px; } }
 @supports not (container-type: inline-size) { @media (max-width: 1180px) { .pf-grid { grid-template-columns: 1fr; overflow-y: auto; } .pf-grid > .pf-left { border-right: none; border-bottom: 1px solid var(--rule-2); } } }
 
-/* live dynamics: bento grid — 3D viewport + diagnostic cells, single-pixel metallic dividers.
+/* live dynamics: bento grid, 3D viewport + diagnostic cells, single-pixel metallic dividers.
    FIT-TO-VIEWPORT: all four panes are visible at once, never clipped, never scrolled. Each plot scales
    DOWN to fill whatever height is left in its quadrant after the header / equation / caption, so the
    dashboard reflows to any window height instead of cutting the bottom row off. */
@@ -232,7 +240,7 @@ tr[title] { cursor: help; }
 .pw-fit > .plot-ov { position: absolute; inset: auto; top: 50%; left: 50%; transform: translate(-50%, -50%); width: auto !important; height: auto !important; max-width: 100%; max-height: 100%; }
 .bento-3d { padding-bottom: 0; position: relative; }
 .live3d { position: relative; flex: 1 1 0; width: 100%; min-height: 150px; overflow: hidden; background: #050708; }
-/* DYNAMICS transport bar — thin industrial controls, zero radius, cyan accents */
+/* DYNAMICS transport bar, thin industrial controls, zero radius, cyan accents */
 .transport { flex-shrink: 0; display: flex; align-items: center; gap: 6px; padding: 5px 8px; border-top: 1px solid var(--rule-2); background: var(--panel); }
 .transport .tp-btn { font-family: var(--sans); font-size: 10px; line-height: 1; width: 26px; height: 22px; padding: 0; border: 1px solid var(--rule); border-radius: 0; background: transparent; color: var(--dim); cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .transport .tp-btn:hover { background: var(--rule); color: var(--ink); }
@@ -241,11 +249,11 @@ tr[title] { cursor: help; }
 .transport .tp-scrub::-moz-range-thumb { width: 9px; height: 15px; border: none; border-radius: 0; background: var(--cyan); cursor: pointer; }
 .transport .tp-time { font-family: var(--sans); font-size: 9px; letter-spacing: 0.03em; color: var(--cyan); min-width: 58px; text-align: right; }
 .transport .tp-speed { font-family: var(--sans); font-size: 9px; padding: 3px 4px; border: 1px solid var(--rule); border-radius: 0; background: var(--panel); color: var(--dim); cursor: pointer; }
-/* 3D-scene controls — a plain instrument panel docked in the 3D viewport's top-right corner. Absolute +
+/* 3D-scene controls, a plain instrument panel docked in the 3D viewport's top-right corner. Absolute +
    z-index:50 so it paints ABOVE the WebGL canvas and every control is genuinely clickable (the old Leva
    panel sat under the canvas and swallowed clicks). Collapsed = just the header button; open = controls. */
 .scene-ctrl { position: absolute; top: 6px; right: 6px; z-index: 50; width: max-content; background: rgba(8, 11, 17, 0.92); border: 1px solid var(--rule-2); font-family: var(--sans); }
-.scene-ctrl.open { width: min(186px, 64%); }
+.scene-ctrl.open { width: min(214px, 72%); }
 .sc-head { display: flex; align-items: center; gap: 6px; width: 100%; background: transparent; border: none; color: var(--cyan); font-family: var(--sans); font-size: 8.5px; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; padding: 5px 8px; cursor: pointer; text-align: left; }
 .scene-ctrl.open .sc-head { border-bottom: 1px solid var(--rule); }
 .sc-head:hover { color: #66ffff; }
@@ -256,7 +264,7 @@ tr[title] { cursor: help; }
 .sc-row.sc-check { justify-content: flex-start; gap: 6px; }
 .sc-row > span:first-child { white-space: nowrap; }
 .sc-slide { display: inline-flex; align-items: center; gap: 7px; }
-.sc-slide input[type="range"] { width: 88px; }
+.sc-slide input[type="range"] { width: 72px; }
 .sc-slide b { font-family: var(--mono); font-size: 8.5px; font-weight: 700; color: var(--cyan); font-variant-numeric: tabular-nums; min-width: 26px; text-align: right; }
 .sc-check input[type="checkbox"] { accent-color: var(--cyan); width: 12px; height: 12px; cursor: pointer; }
 .cav-tag { position: absolute; z-index: 28; font-family: var(--sans); font-size: 9px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--dim); pointer-events: none; text-shadow: 1px 1px 0 #000; }
@@ -275,9 +283,9 @@ tr[title] { cursor: help; }
 .scene-lab.matter { color: #ff8a4d; }
 .scene-lab.mirror .l-t { font-size: 8.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #9aa4b0; }
 @container center (max-width: 560px) { .scene-lab .l-s { display: none; } .scene-lab .l-t { font-size: 9px; } }
-/* docked live readout — the on-scene vacuum-Rabi energy partition (instrument CSS only: mono, tabular-nums,
+/* docked live readout, the on-scene vacuum-Rabi energy partition (instrument CSS only: mono, tabular-nums,
    hairlines, zero radius, no glassmorphism) */
-/* live energy-partition readout — a compact strip pinned to the BOTTOM edge of the viewport (where there's
+/* live energy-partition readout, a compact strip pinned to the BOTTOM edge of the viewport (where there's
    only empty space), so it never covers the photon core or the molecules in the centre of the scene. */
 .cav-readout { position: absolute; left: 8px; right: 8px; bottom: 8px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 4px 9px; background: rgba(5, 8, 13, 0.78); border: 1px solid var(--rule-2); font-family: var(--sans); pointer-events: none; z-index: 30; }
 .cr-title { font-size: 8px; font-weight: 700; letter-spacing: 0.06em; color: var(--cyan); text-transform: uppercase; white-space: nowrap; }
@@ -298,10 +306,10 @@ tr[title] { cursor: help; }
 .cr-leg .sw-b { background: #ff5a1e; }
 .cr-leg .sw-d { background: var(--purple); }
 .cr-leg .sw-leak { background: #3a4046; }
-/* the bento adapts to the CENTER column's own width (container query), not the viewport — so it stacks
+/* the bento adapts to the CENTER column's own width (container query), not the viewport, so it stacks
    exactly when its own space gets tight, regardless of rail/dock widths. Once stacked, a single column
    can't fit four fit-to-viewport panes, so the panes become content-height and the plots size by WIDTH
-   (the column scrolls) — the fit wrapper falls back to ordinary block flow. */
+   (the column scrolls), the fit wrapper falls back to ordinary block flow. */
 @container center (max-width: 700px) {
   .dyn-bento { grid-template-columns: 1fr; grid-template-rows: none; grid-auto-rows: auto; }
   .dyn-bento > .pane { border-right: none; }
@@ -334,7 +342,7 @@ tr[title] { cursor: help; }
 .leg-field::before { background: var(--amber); }
 .leg-mol::before { width: 8px; height: 8px; background: var(--ink); }
 
-/* rail — system-constraints deck */
+/* rail, system-constraints deck */
 .rail-head { font-family: var(--sans); font-size: 9px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--faint); padding: 7px 8px 6px; border-bottom: 1px solid var(--rule-2); }
 .regime-toggle { display: flex; flex-wrap: wrap; margin: 6px 8px; border: 1px solid var(--rule-2); }
 .regime-toggle button { flex: 1; font-family: var(--sans); font-size: 8.5px; font-weight: 600; letter-spacing: 0.02em; padding: 6px 2px; border: none; border-right: 1px solid var(--rule); background: transparent; color: var(--faint); cursor: pointer; }
@@ -347,7 +355,7 @@ tr[title] { cursor: help; }
 .tree-caret { color: var(--cyan); margin-right: 7px; font-weight: 700; }
 .tree-body { padding: 3px 8px 8px; }
 
-/* controls — active terminal command decks */
+/* controls, active terminal command decks */
 .knob { margin-bottom: 9px; }
 .knob-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; gap: 6px; }
 .knob-name { font-size: 10.5px; font-weight: 500; color: var(--ink); letter-spacing: 0.01em; }
@@ -365,14 +373,14 @@ tr[title] { cursor: help; }
 .knob-entry .u, .u { font-family: var(--sans); font-size: 9.5px; color: var(--faint); }
 .knob-sub { font-size: 8px; color: var(--faint); font-weight: 400; }
 .knob-readout { display: inline-block; min-width: 60px; font-family: var(--sans); font-size: 11.5px; font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; color: var(--cyan); background: #000; border: 1px solid var(--rule-2); padding: 3px 6px; }
-/* 3.D · slider overhaul — 2px rule track, 3px cyan blade thumb, flashes white while dragging */
+/* 3.D · slider overhaul, 2px rule track, 3px cyan blade thumb, flashes white while dragging */
 input[type="range"] { width: 100%; height: 2px; -webkit-appearance: none; appearance: none; background: var(--rule); cursor: col-resize; }
 input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 3px; height: 14px; background: var(--cyan); border: none; cursor: col-resize; transition: background 0.1s; }
 input[type="range"]::-moz-range-thumb { width: 3px; height: 14px; background: var(--cyan); border: none; cursor: col-resize; transition: background 0.1s; }
 input[type="range"]:active::-webkit-slider-thumb { background: #ffffff; }
 input[type="range"]:active::-moz-range-thumb { background: #ffffff; }
 
-/* buttons — sharp command nodes */
+/* buttons, sharp command nodes */
 .btn-row { display: flex; margin-top: 7px; border: 1px solid var(--rule-2); width: fit-content; flex-wrap: wrap; }
 .btn-row button { font-family: var(--sans); font-size: 9px; font-weight: 600; letter-spacing: 0.03em; text-transform: uppercase; padding: 6px 9px; border: none; border-right: 1px solid var(--rule); background: transparent; color: var(--dim); cursor: pointer; }
 .btn-row button:last-child { border-right: none; }
@@ -424,7 +432,7 @@ table.metrics { width: 100%; border-collapse: collapse; }
   .dyn-bento .pw-fit > .cv { width: 100% !important; height: auto !important; max-width: 100%; max-height: none; margin: 4px auto; }
   .dyn-bento .pw-fit > .plot-ov { top: 0; left: 0; transform: none; width: 100% !important; height: 100% !important; max-width: none; max-height: none; }
   .dyn-bento .live3d { flex: none; height: clamp(240px, 52vw, 360px); }
-  .scene-ctrl.open { width: min(186px, 56vw); }
+  .scene-ctrl.open { width: min(214px, 72vw); }
 }
 @media (max-width: 640px) {
   .topbar { height: auto; flex-wrap: wrap; padding: 3px 8px; row-gap: 2px; }

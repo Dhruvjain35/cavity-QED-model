@@ -1,10 +1,10 @@
-// Shared molecular ensemble — the single source of truth for BOTH the physics and the 3D view.
+// Shared molecular ensemble, the single source of truth for BOTH the physics and the 3D view.
 // Each molecule i gets a position r_i, a transition-dipole unit vector μ̂_i, and the per-molecule
 // light–matter coupling factor
 //     g_i / g_0 = (μ̂_i · ε̂) · f(r_i),   ε̂ = cavity field polarization (ŷ),
 //     f(r) = exp(−r²/w²) = TEM00 Gaussian mode amplitude transverse to the cavity axis.
 // The SAME factors are fed to the WASM arrowhead (so a dipole ⟂ ε̂, or a molecule at the mode edge,
-// genuinely decouples into the dark manifold) AND drive the arrows/orientation in the 3D — they are
+// genuinely decouples into the dark manifold) AND drive the arrows/orientation in the 3D, they are
 // never out of sync. Deterministic in `seed` so a sweep stays on one realization.
 
 export const POLAR: readonly [number, number, number] = [0, 1, 0]; // cavity mode polarization ε̂ = ŷ
@@ -14,10 +14,10 @@ export interface Ensemble {
   centers: [number, number, number][]; // molecule positions (cavity mid-plane, x ≈ 0 antinode)
   dipoles: [number, number, number][]; // unit transition-dipole vectors μ̂_i
   factors: Float64Array;               // g_i/g_0 = (μ̂_i·ε̂)·f(r_i), signed
-  modeAmp: Float64Array;               // f(r_i) = exp(−r²/w²) — the spatial mode amplitude alone
+  modeAmp: Float64Array;               // f(r_i) = exp(−r²/w²), the spatial mode amplitude alone
 }
 
-// deterministic PRNG (mulberry32) — pure JS, fixed by seed
+// deterministic PRNG (mulberry32), pure JS, fixed by seed
 export function mulberry32(a: number) {
   return function () {
     a |= 0; a = (a + 0x6d2b79f5) | 0;
@@ -62,12 +62,12 @@ export function buildEnsemble(m: number, seed: number, order: number, waist: num
 
 /** Deterministic 3D layout for the m molecules in the live 3D view: a THIN molecular film ON the central
  *  field antinode. Spread across the beam cross-section (x,y ∈ [−26,26]) but tightly confined ALONG the
- *  cavity axis (z ∈ [−5,5]) — physically a sub-wavelength film at the antinode, and visually essential:
+ *  cavity axis (z ∈ [−5,5]), physically a sub-wavelength film at the antinode, and visually essential:
  *  the cavity is shown in profile (local-z runs left↔right on screen), so any axial spread becomes a
  *  HORIZONTAL smear that drifts the cluster off the centre disc toward its neighbours. Pinning z tight
  *  keeps the cluster locked on the bright centre antinode. A Poisson-disk-ish minimum 3D separation of 12
  *  keeps emitters from merging; the centroid is then recentred to (0,0,0) exactly (small-N random draws
- *  are otherwise biased off-centre). Visualisation only — the physics couplings g_i still come from
+ *  are otherwise biased off-centre). Visualisation only, the physics couplings g_i still come from
  *  buildEnsemble. Stable per m. */
 export function clusterLayout(m: number, seed: number): [number, number, number][] {
   const rng = mulberry32(Math.floor(seed) * 40503 + 1337), pts: [number, number, number][] = [], minSep2 = 12 * 12;

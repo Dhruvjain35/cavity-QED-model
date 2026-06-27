@@ -1,8 +1,8 @@
-// Polariton FORMATION — the avoided crossing, made interactive and CONTROLLED. The cavity photon and the
+// Polariton FORMATION, the avoided crossing, made interactive and CONTROLLED. The cavity photon and the
 // (bright) molecular excitation are two coupled modes: H = [[ω_c, G], [G, ω_a]] with G = g√N. Turning up the
 // coupling makes the two bare levels REPEL and split into the lower/upper polaritons (LP/UP); each branch is
 // a light–matter blend whose composition (Hopfield |⟨a|±⟩|²) is drawn in colour. At zero detuning each
-// polariton is exactly 50/50 — the hybrid. Same 2×2 bright-mode physics the validated (N+1)×(N+1) arrowhead
+// polariton is exactly 50/50, the hybrid. Same 2×2 bright-mode physics the validated (N+1)×(N+1) arrowhead
 // reduces to. State (g via onG, detuning via onDelta, branch via onSelect) is lifted to the app so the
 // coupling/detuning dials drive the REAL simulation and the 3D hybrid stays in lockstep.
 import { useEffect, useMemo, useRef } from "react";
@@ -31,7 +31,7 @@ export function PolaritonFormation({ g, n, delta, onDelta, onG, selected, onSele
 }) {
   const G = useMemo(() => g * Math.sqrt(Math.max(1, n)), [g, n]);
   const cv = useRef<HTMLCanvasElement>(null);
-  const CW = 600, CH = 360, ML = 52, MR = 36, MT = 16, MB = 34, PW = CW - ML - MR, PH = CH - MT - MB;
+  const CW = 600, CH = 430, ML = 52, MR = 36, MT = 18, MB = 36, PW = CW - ML - MR, PH = CH - MT - MB;
   const xOf = (d: number) => ML + ((d + DX) / (2 * DX)) * PW;
   const yOf = (e: number) => MT + (1 - (e - (1 - EY)) / (2 * EY)) * PH;
   const dAt = (px: number) => Math.max(-DX, Math.min(DX, ((px - ML) / PW) * 2 * DX - DX));
@@ -93,8 +93,8 @@ export function PolaritonFormation({ g, n, delta, onDelta, onG, selected, onSele
       <div className="pf-ctrls">
         <div className="pf-row"><span>coupling <i>g√N</i></span><input type="range" min={0} max={GMAX} step={GMAX / 200} value={Math.min(GMAX, G)} onChange={(e) => onG(Number(e.target.value))} /><b style={{ color: G > 0.02 ? CY : DIMC }}>{G.toFixed(3)}</b></div>
         <div className="pf-row"><span>detuning <i>Δ</i></span><input type="range" min={-DX} max={DX} step={DX / 100} value={Math.max(-DX, Math.min(DX, delta))} onChange={(e) => onDelta(Number(e.target.value))} /><b>{delta >= 0 ? "+" : ""}{delta.toFixed(2)}</b></div>
-        <div className="pf-hint">{G < 0.012 ? "g√N ≈ 0 → no polaritons: the bare photon and molecule just cross." : "the bare modes repel into LP/UP — that splitting Ω_R is the polariton. Click a branch to freeze it in 3D →"}</div>
-        {G >= 0.1 ? <div className="pf-warn">⚠ ultrastrong (η = g√N/ω_c = {G.toFixed(2)} ≥ 0.1): this RWA picture is qualitative here — the full quantum Rabi model (counter-rotating terms) would shift the numbers.</div> : null}
+        <div className="pf-hint">{G < 0.012 ? "g√N ≈ 0 → no polaritons: the bare photon and molecule just cross." : "the bare modes repel into LP/UP, that splitting Ω_R is the polariton. Click a branch to freeze it in 3D →"}</div>
+        {G >= 0.1 ? <div className="pf-warn">⚠ ultrastrong (η = g√N/ω_c = {G.toFixed(2)} ≥ 0.1): this RWA picture is qualitative here, the full quantum Rabi model (counter-rotating terms) would shift the numbers.</div> : null}
         <div className="pf-comps">
           <Comp name="UP" pf={here.pfUP} />
           <Comp name="LP" pf={here.pfLP} />

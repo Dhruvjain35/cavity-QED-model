@@ -1,4 +1,4 @@
-// Fabry–Pérot cavity-QED schematic for the optics regime (CATEGORY 2 rebuild) — same open-resonator
+// Fabry–Pérot cavity-QED schematic for the optics regime (CATEGORY 2 rebuild), same open-resonator
 // language as the live view: two flat DBR mirror stacks, a TEM₀₀ standing-wave field rendered as flat
 // cyan discs at the antinodes (brightness rising with the light–matter coupling g), and a single
 // molecular emitter at the central antinode. Structural, not a live state. No cylinders, no chrome.
@@ -26,7 +26,7 @@ function Emitter({ g }: { g: number }) {
 }
 
 // Decorative looping breath for the optics schematic: the optical cavity is steady-state (no time
-// dynamics), so this is a slow, real-time sine envelope that makes the resonant mode pulse — purely
+// dynamics), so this is a slow, real-time sine envelope that makes the resonant mode pulse, purely
 // cosmetic, NOT the TC P_photon(t). Slow (~0.14 Hz of phase) so it never approaches ω_c / aliasing.
 function FieldBreath({ ampRef, g }: { ampRef: MutableRefObject<number>; g: number }) {
   useFrame((state) => {

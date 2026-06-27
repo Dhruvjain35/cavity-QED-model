@@ -1,8 +1,9 @@
-// Live single-excitation cavity-QED view — this IS the simulation, painted in 3D. It reads the same
+// Live single-excitation cavity-QED view, this IS the simulation, painted in 3D. It reads the same
 // arrowhead eigen-modes (dynState) and clock (simT) the 2D plots use, reconstructs ψ(t)=Σ_k c_k e^{−iE_k t}φ_k
 // every frame, and renders it inside an OPEN Fabry–Pérot cavity. Everything that moves is driven by a real
-// SimSampler quantity (P_photon, P_bright, P_dark, |ψ_i(t)|², E_k) — no invented physics, strictly unitary,
-// one excitation conserved (P_photon+P_bright+P_dark ≡ 1). The legibility upgrades are: a docked live
+// SimSampler quantity (P_photon, P_bright, P_dark, |ψ_i(t)|², E_k), no invented physics. The excitation is
+// conserved as P_photon+P_bright+P_dark+P_leaked = 1; with Γ>0 the in-cavity three-way partition sums to
+// less than 1 (the photon-weighted loss moves weight into the leaked channel), and = 1 only at Γ=0. The legibility upgrades are: a docked live
 // energy-partition readout (the vacuum-Rabi exchange, numerically), a hard anti-phase swing between the
 // field discs and the emitter glow, static standing-wave annotation, and brighter per-emitter glow (the
 // live Canvas has NO bloom, so glow must carry itself).
@@ -17,7 +18,7 @@ type Ens = { m: number; centers: [number, number, number][]; dipoles: [number, n
 type Live = { pPhoton: number; pBright: number; pDark: number; leaked: number; molGlow: Float64Array };
 
 const MOL_R = 3.2, CLUSTER_R = 13;
-// two-level emitter colours: ground state = cool steel-blue, excited state = warm red — the live excitation
+// two-level emitter colours: ground state = cool steel-blue, excited state = warm red, the live excitation
 // |ψ_i(t)|² lerps each emitter between them, so the matter visibly cycles ground↔excited in anti-phase with
 // the standing-wave amplitude. Clean PBR spheres lit by the rig, no additive halos.
 const C_GROUND = new THREE.Color("#4a6a93"), C_EXCITED = new THREE.Color("#ff4d2e");
@@ -30,7 +31,7 @@ const darkGate = (b: number) => { const t = Math.min(1, Math.max(0, (b - 0.05) /
 const LIVE_TILT: [number, number, number] = [0.18, 1.40, 0];
 
 // Map the shared ensemble into the cavity frame. POSITIONS: a clean, even Fibonacci-shell cluster of emitters
-// at the central antinode (visualisation only — a tidy molecular cluster, not a random blob). COUPLINGS: the
+// at the central antinode (visualisation only, a tidy molecular cluster, not a random blob). COUPLINGS: the
 // real g_i/g_0 from the shared ensemble, so which emitters light up is physically correct. The emissive gain
 // makes the brightest emitter reach a clear lit state at P_bright=1 (each carries only b_i²·P_bright).
 function buildFilm(ens: Ens) {
@@ -60,36 +61,38 @@ function SimSampler({ stateRef, tRef, inspectRef, liveRef, fieldAmpRef, m, loss 
     const ds = stateRef.current; if (!ds || ds.n !== m + 1) return;
     const n = ds.n, t = tRef.current, inspK = inspectRef.current, { eigs, vecs, c, bright } = ds, mg = liveRef.current.molGlow;
     if (inspK != null && inspK >= 0 && inspK < n) {
-      // FREEZE on a polariton eigenstate — show the IDEAL stable hybrid (no decay), so its composition is legible.
+      // FREEZE on a polariton eigenstate, show the IDEAL stable hybrid (no decay), so its composition is legible.
       const pPhot = vecs[inspK]! * vecs[inspK]!; // row-0 photon weight of eigenvector k
       let br = 0, matter = 0;
       for (let i = 0; i < m; i++) { const v = vecs[(i + 1) * n + inspK]!; mg[i] = v * v * darkGate(Math.abs(bright[i]!)); matter += v * v; br += bright[i]! * v; }
       const pBright = br * br, pDark = Math.max(0, matter - pBright);
       liveRef.current.pPhoton = pPhot; liveRef.current.pBright = pBright; liveRef.current.pDark = pDark; liveRef.current.leaked = 0; fieldAmpRef.current = pPhot; return;
     }
-    // LIVE oscillation with finite polariton lifetime: the excitation amplitude decays as e^{−γt} (so the
-    // population decays as e^{−2γt}), matching the e^{−γt}-windowed transmission. The "leaked" fraction =
-    // 1 − e^{−2γt} is the quantum that has left the cavity (mirror leakage κ + emitter decay γ).
-    const env = loss > 0 ? Math.exp(-2 * loss * t) : 1;
-    let re0 = 0, im0 = 0; for (let k = 0; k < n; k++) { const a = vecs[k]! * c[k]!, ph = eigs[k]! * t; re0 += a * Math.cos(ph); im0 -= a * Math.sin(ph); }
-    const pPhot = (re0 * re0 + im0 * im0) * env;
-    let brRe = 0, brIm = 0, pMatter = 0;
+    // LIVE oscillation with finite polariton lifetime, done correctly: cavity loss acts on the photon, so
+    // each eigenstate k decays in proportion to its photon fraction f_k = |⟨0|φ_k⟩|² = vecs[k]² (amplitude
+    // e^{−Γ f_k t}). Bright polaritons (f≈½) leak through the mirrors; the dark/subradiant manifold (f≈0)
+    // stays trapped. The "leaked" fraction is whatever has left the cavity, 1 − Σ_i |ψ_i(t)|².
+    const dec = new Float64Array(n);
+    if (loss > 0) { for (let k = 0; k < n; k++) dec[k] = Math.exp(-loss * vecs[k]! * vecs[k]! * t); } else { dec.fill(1); }
+    let re0 = 0, im0 = 0; for (let k = 0; k < n; k++) { const a = vecs[k]! * c[k]! * dec[k]!, ph = eigs[k]! * t; re0 += a * Math.cos(ph); im0 -= a * Math.sin(ph); }
+    const pPhot = re0 * re0 + im0 * im0;
+    let brRe = 0, brIm = 0, pMatter = 0, surviving = pPhot;
     for (let i = 1; i < n; i++) {
       let re = 0, im = 0; const row = i * n;
-      for (let k = 0; k < n; k++) { const a = vecs[row + k]! * c[k]!, ph = eigs[k]! * t; re += a * Math.cos(ph); im -= a * Math.sin(ph); }
-      const exc = re * re + im * im; const b = bright[i - 1]!; // |ψ_i(t)|² = live per-molecule excitation
-      pMatter += exc; brRe += b * re; brIm += b * im;
-      mg[i - 1] = exc * env * darkGate(Math.abs(b)); // glow ∝ this molecule's own (decaying) excitation
+      for (let k = 0; k < n; k++) { const a = vecs[row + k]! * c[k]! * dec[k]!, ph = eigs[k]! * t; re += a * Math.cos(ph); im -= a * Math.sin(ph); }
+      const exc = re * re + im * im; const b = bright[i - 1]!; // |ψ_i(t)|² = live per-molecule excitation (already decayed)
+      pMatter += exc; surviving += exc; brRe += b * re; brIm += b * im;
+      mg[i - 1] = exc * darkGate(Math.abs(b)); // glow ∝ this molecule's own (decaying) excitation
     }
-    const pBright = (brRe * brRe + brIm * brIm) * env, pDark = Math.max(0, pMatter - (brRe * brRe + brIm * brIm)) * env;
-    liveRef.current.pPhoton = pPhot; liveRef.current.pBright = pBright; liveRef.current.pDark = pDark; liveRef.current.leaked = Math.max(0, 1 - env); fieldAmpRef.current = pPhot;
+    const pBright = brRe * brRe + brIm * brIm, pDark = Math.max(0, pMatter - pBright);
+    liveRef.current.pPhoton = pPhot; liveRef.current.pBright = pBright; liveRef.current.pDark = pDark; liveRef.current.leaked = Math.max(0, 1 - surviving); fieldAmpRef.current = pPhot;
   });
   return null;
 }
 
 // Emitters: clean two-level-system spheres. Each frame the live excitation |ψ_i(t)|²·gain lerps the sphere's
 // colour from ground (steel-blue) to excited (red) and lifts a modest emissive so the lit emitters read
-// against the rig without any glow halo — the matter side of the Rabi swing, shown as state change, not glow.
+// against the rig without any glow halo, the matter side of the Rabi swing, shown as state change, not glow.
 // NO motion (a 2-level emitter has no nuclear coordinate). Decoupled emitters never excite → stay ground-blue.
 // The display brightness uses a SOFT saturating map g = 1−e^(−k·exc·gain): the brightest emitter reaches a
 // clear lit state at the σ=0 uniform peak, yet a disorder-LOCALIZED emitter (which can carry >1/N of the one
@@ -105,7 +108,7 @@ function Molecules({ liveRef, film, scale, glow = 1 }: { liveRef: MutableRefObje
       const mt = mats.current[i]; if (!mt) continue;
       col.copy(C_GROUND).lerp(C_EXCITED, g);
       mt.color.copy(col); mt.emissive.copy(col);
-      mt.emissiveIntensity = (0.12 + 0.95 * g) * glow;           // modest, clean — no bloom needed
+      mt.emissiveIntensity = (0.12 + 0.95 * g) * glow;           // modest, clean, no bloom needed
     }
   });
   return (
@@ -122,7 +125,7 @@ function Molecules({ liveRef, film, scale, glow = 1 }: { liveRef: MutableRefObje
   );
 }
 
-// Transition-dipole arrows μ̂_i — the SAME vectors that set g_i = g_0(μ̂·ε̂)f(r): coupled (∥ ε̂) → bright,
+// Transition-dipole arrows μ̂_i, the SAME vectors that set g_i = g_0(μ̂·ε̂)f(r): coupled (∥ ε̂) → bright,
 // decoupled (⟂ ε̂ or at the mode edge) → dim gray. Static per ensemble.
 function Dipoles({ film, scale }: { film: Film; scale: number }) {
   const shaftRef = useRef<THREE.InstancedMesh>(null), headRef = useRef<THREE.InstancedMesh>(null);
@@ -156,7 +159,7 @@ function Dipoles({ film, scale }: { film: Film; scale: number }) {
   );
 }
 
-// Cavity field polarization ε̂(θ) — amber double-arrow through the centre (cavity-frame remap of the lab-frame
+// Cavity field polarization ε̂(θ), amber double-arrow through the centre (cavity-frame remap of the lab-frame
 // ε̂=(0,cosθ,sinθ) defined in ensemble.ts; here it is drawn as (cosθ,sinθ,0)). Rotating it off the dipoles
 // collapses g_i = g_0(μ̂·ε̂); at θ=90° the Rabi splitting vanishes.
 function PolarizationAxis({ theta }: { theta: number }) {
@@ -172,11 +175,11 @@ function PolarizationAxis({ theta }: { theta: number }) {
 }
 
 // ── THE CAVITY PHOTON, drawn as it physically is: the q-antinode standing electromagnetic wave E(z) of the
-// resonant longitudinal mode — a sine with N_ANTINODES bellies, field maximum at the centre where the
+// resonant longitudinal mode, a sine with N_ANTINODES bellies, field maximum at the centre where the
 // molecules sit. The mode SHAPE is fixed; its AMPLITUDE breathes as √P_photon(t): a full standing wave when
 // the one quantum is in the light, collapsing to the flat cavity axis as it drains into the matter. Two
 // mirror-image strands trace the ±E envelope so it reads as a genuine standing wave, not a travelling
-// ripple, and faint vertical bars mark the antinode planes. No bloom — a clean field line, not a glow.
+// ripple, and faint vertical bars mark the antinode planes. No bloom, a clean field line, not a glow.
 const WAVE_AMP = 30;
 function StandingWaveField({ ampRef, intensity = 1, visible = true }: { ampRef: MutableRefObject<number>; intensity?: number; visible?: boolean }) {
   const grp = useRef<THREE.Group>(null);
@@ -191,7 +194,7 @@ function StandingWaveField({ ampRef, intensity = 1, visible = true }: { ampRef: 
   if (!visible) return null;
   return (
     <group>
-      {/* fixed antinode guide bars (do not breathe) — mark where |E| peaks, so the mode order q is legible */}
+      {/* fixed antinode guide bars (do not breathe), mark where |E| peaks, so the mode order q is legible */}
       {antinodeZ.map((z, j) => (
         <mesh key={j} position={[0, 0, z]}>
           <boxGeometry args={[0.6, WAVE_AMP * 2.1, 0.6]} />
@@ -206,10 +209,11 @@ function StandingWaveField({ ampRef, intensity = 1, visible = true }: { ampRef: 
   );
 }
 
-// ── docked LIVE READOUT (plain DOM, own rAF loop, zero React re-renders) — the missing on-scene quantitative
-// view of the vacuum-Rabi exchange. Reads liveRef (P_photon/P_bright/P_dark, conserved to 1) + stateRef (Ω_R
-// from the eigen-energy split) + tRef (clock) every frame and writes widths/text directly. Never renormalizes
-// (drift would be a real bug, so the printed Σ must read 1.00).
+// ── docked LIVE READOUT (plain DOM, own rAF loop, zero React re-renders), the missing on-scene quantitative
+// view of the vacuum-Rabi exchange. Reads liveRef (P_photon/P_bright/P_dark/P_leaked) + stateRef (Ω_R
+// from the eigen-energy split) + tRef (clock) every frame and writes widths/text directly. The conserved
+// quantity is photon+bright+dark+leaked = 1; with Γ>0 the in-cavity three sum to less than 1 as the
+// polaritons leak out (the difference is the leaked segment), and sum to 1 only at Γ=0.
 function CavReadout({ liveRef, stateRef, tRef }: { liveRef: MutableRefObject<Live>; stateRef: MutableRefObject<Dyn>; tRef: MutableRefObject<number> }) {
   const el = useRef<Record<string, HTMLElement | null>>({});
   const spark = useRef<HTMLCanvasElement>(null);
@@ -221,11 +225,11 @@ function CavReadout({ liveRef, stateRef, tRef }: { liveRef: MutableRefObject<Liv
     let raf = 0;
     const loop = () => {
       const live = liveRef.current, ds = stateRef.current, t = tRef.current;
-      const pP = live.pPhoton, pB = live.pBright, pD = live.pDark, lk = live.leaked || 0, sum = pP + pB + pD;
+      const pP = live.pPhoton, pB = live.pBright, pD = live.pDark, lk = live.leaked || 0;
       width("barP", pP); width("barB", pB); width("barD", pD); width("barLeak", lk);
-      set("vP", pP.toFixed(2)); set("vB", pB.toFixed(2)); set("vD", pD.toFixed(2)); set("vLeak", lk.toFixed(2)); set("vSum", sum.toFixed(2));
+      set("vP", pP.toFixed(2)); set("vB", pB.toFixed(2)); set("vD", pD.toFixed(2)); set("vLeak", lk.toFixed(2));
       // Ω_R = gap between the two eigenstates of largest PHOTON weight |⟨0|φ_k⟩|² (the LP/UP polaritons),
-      // robust when disorder spreads the dark band past the polaritons — not the bare max−min eigenvalue.
+      // robust when disorder spreads the dark band past the polaritons, not the bare max−min eigenvalue.
       let OmR = 0;
       if (ds && ds.n > 1) {
         const n = ds.n; let a = 0, b = 1, wa = -1, wb = -1;
@@ -233,11 +237,11 @@ function CavReadout({ liveRef, stateRef, tRef }: { liveRef: MutableRefObject<Liv
         OmR = Math.abs(ds.eigs[a]! - ds.eigs[b]!);
       }
       const T = OmR > 1e-6 ? (2 * Math.PI) / OmR : 0;
-      set("omR", OmR > 0 ? OmR.toFixed(3) : "—");
-      set("per", T > 0 ? T.toFixed(1) : "—");
-      set("phi", T > 0 ? ((((t % T) + T) % T) / T).toFixed(2) : "—");
+      set("omR", OmR > 0 ? OmR.toFixed(3) : "·");
+      set("per", T > 0 ? T.toFixed(1) : "·");
+      set("phi", T > 0 ? ((((t % T) + T) % T) / T).toFixed(2) : "·");
       const dP = pP - prevP.current; prevP.current = pP;
-      set("flow", Math.abs(dP) < 2e-4 ? "— balanced" : dP < 0 ? "▸ into matter" : "▸ into field");
+      set("flow", Math.abs(dP) < 2e-4 ? "· balanced" : dP < 0 ? "▸ into matter" : "▸ into field");
       ring.t[ring.head] = t; ring.p[ring.head] = pP; ring.b[ring.head] = pB; ring.head = (ring.head + 1) % 320; ring.n = Math.min(320, ring.n + 1);
       drawSpark(spark.current, ring, T);
       raf = requestAnimationFrame(loop);
@@ -249,7 +253,7 @@ function CavReadout({ liveRef, stateRef, tRef }: { liveRef: MutableRefObject<Liv
   return (
     <div className="cav-readout">
       <span className="cr-title" title="live energy exchange between the cavity photon and the molecules at the vacuum-Rabi frequency Ω_R">VACUUM-RABI EXCHANGE</span>
-      <span className="cr-k" title="measured vacuum-Rabi splitting Ω_R = LP–UP gap (the two highest-photon-weight eigenstates), in units of ω_c; equals 2g√N at zero disorder">Ω<sub>R</sub> <b ref={R("omR")}>—</b></span>
+      <span className="cr-k" title="measured vacuum-Rabi splitting Ω_R = LP–UP gap (the two highest-photon-weight eigenstates), in units of ω_c; equals 2g√N at zero disorder">Ω<sub>R</sub> <b ref={R("omR")}>━</b></span>
       <div className="cr-bar" title="where the one quantum lives right now: cyan = photon field, orange = molecules (bright mode), purple = dark states, grey = leaked out of the cavity (finite polariton lifetime)">
         <div className="cr-seg cr-p" ref={R("barP")} />
         <div className="cr-seg cr-b" ref={R("barB")} />
@@ -260,7 +264,7 @@ function CavReadout({ liveRef, stateRef, tRef }: { liveRef: MutableRefObject<Liv
       <span className="cr-leg"><i className="sw-b" />matter <b ref={R("vB")}>0.00</b></span>
       <span className="cr-leg"><i className="sw-d" />dark <b ref={R("vD")}>0.00</b></span>
       <span className="cr-leg"><i className="sw-leak" />leaked <b ref={R("vLeak")}>0.00</b></span>
-      <span className="cr-flow" ref={R("flow")}>—</span>
+      <span className="cr-flow" ref={R("flow")}>━</span>
       <canvas className="cr-spark" ref={spark} width={1} height={1} style={{ display: "none" }} />
     </div>
   );
@@ -314,12 +318,12 @@ export function LiveCavityScene({ stateRef, tRef, inspectRef, m, ensemble, polTh
           <Molecules liveRef={liveRef} film={film} scale={controls.moleculeScale} glow={controls.moleculeGlow} />
           {controls.showDipoleArrows ? <Dipoles film={film} scale={controls.moleculeScale} /> : null}
           <PolarizationAxis theta={polTheta} />
-          {/* in-scene labels anchored to real 3D points — they follow the camera and any orbit/zoom */}
+          {/* in-scene labels anchored to real 3D points, they follow the camera and any orbit/zoom */}
           <SceneLabel pos={[0, 50, -46]} cls="field" t="light field" s="the photon, as a standing wave" />
           <SceneLabel pos={[0, -42, 26]} cls="matter" t="molecules" s="the matter, in the field" />
           {/* anchored just inside each mirror (the cavity ends sit at z = ±HALF) so the full label stays in frame */}
-          <SceneLabel pos={[0, 62, -HALF + 26]} cls="mirror" t="cavity mirror" />
-          <SceneLabel pos={[0, 62, HALF - 26]} cls="mirror" t="cavity mirror" />
+          <SceneLabel pos={[0, 62, -HALF + 36]} cls="mirror" t="cavity mirror" />
+          <SceneLabel pos={[0, 62, HALF - 36]} cls="mirror" t="cavity mirror" />
         </group>
         <OrbitControls makeDefault enablePan={false} autoRotate={controls.autoRotate} autoRotateSpeed={1.2} enableDamping dampingFactor={0.06} minDistance={150} maxDistance={600} minPolarAngle={Math.PI / 2 - 0.55} maxPolarAngle={Math.PI / 2 + 0.55} target={[0, 0, 0]} />
       </Canvas>

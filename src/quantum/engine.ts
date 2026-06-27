@@ -9,14 +9,14 @@ export function loadWasm(): Promise<unknown> {
 }
 
 /** RGBA Wigner (n·n·4) of an arbitrary cavity density matrix supplied as row-major re/im arrays.
- *  Reuses the QuTiP-validated Clenshaw + RdBu pipeline — used for the disorder→Wigner bridge. */
+ *  Reuses the QuTiP-validated Clenshaw + RdBu pipeline, used for the disorder→Wigner bridge. */
 export function wignerRgbaOfRho(
   re: Float64Array, im: Float64Array, dim: number, n: number, wMax: number,
 ): Uint8Array {
   return wigner_rgba_of_rho(re, im, dim, -5, 5, n, wMax);
 }
 
-/** Raw real-valued Wigner grid (n·n, row-major) of an arbitrary cavity density matrix — colour
+/** Raw real-valued Wigner grid (n·n, row-major) of an arbitrary cavity density matrix, colour
  *  mapping is left to the caller (the dark-theme colormap lives in the UI). */
 export function wignerRawOfRho(re: Float64Array, im: Float64Array, dim: number, n: number): Float64Array {
   return wigner_of_rho(re, im, dim, -5, 5, n);
@@ -73,7 +73,7 @@ export function cavityPowerSpectrum(
 }
 
 /** Coupling sweep: the (M+1) eigen-energies at each of `steps` values of g in [g0, g1] (Rust loop).
- *  Reshaped to one Float64Array of energies per step — the polariton dispersion fan. */
+ *  Reshaped to one Float64Array of energies per step, the polariton dispersion fan. */
 export function couplingSweep(
   wc: number, wa: number, m: number, sigma: number, seed: number, g0: number, g1: number, steps: number,
 ): { gs: Float64Array; eigs: Float64Array[] } {
@@ -124,7 +124,7 @@ export function htcSpectrum(wc: number, wx: number, wv: number, lambda: number, 
   return { eigs: flat.slice(0, d), photon: flat.slice(d, 2 * d), absorption: flat.slice(2 * d, 3 * d) };
 }
 
-/** EXACT N-molecule HTC absorption (no 1/N shortcut) — for small N. Returns d = (N+1)·nVib^N
+/** EXACT N-molecule HTC absorption (no 1/N shortcut), for small N. Returns d = (N+1)·nVib^N
  *  eigenvalues, photon weights, and collective absorption sticks. Validated: N=1 ≡ htcSpectrum. */
 export function htcSpectrumMulti(wc: number, wx: number, wv: number, lambda: number, g: number, nMol: number, nVib: number): { eigs: Float64Array; photon: Float64Array; absorption: Float64Array } {
   const flat = htc_spectrum_multi(wc, wx, wv, lambda, g, nMol, nVib);
@@ -132,7 +132,7 @@ export function htcSpectrumMulti(wc: number, wx: number, wv: number, lambda: num
   return { eigs: flat.slice(0, d), photon: flat.slice(d, 2 * d), absorption: flat.slice(2 * d, 3 * d) };
 }
 
-/** HTC Hamiltonian matrix-inspector view (block-max downsampled to ≤cap×cap) — reveals the Holstein/
+/** HTC Hamiltonian matrix-inspector view (block-max downsampled to ≤cap×cap), reveals the Holstein/
  *  Franck–Condon off-diagonal coupling blocks. Returns the raw matrix as {h, n}. */
 export function htcMatrixView(wc: number, wx: number, wv: number, lambda: number, g: number, nMol: number, nVib: number, cap: number): { h: Float64Array; n: number } {
   const flat = htc_matrix_view(wc, wx, wv, lambda, g, nMol, nVib, cap);
@@ -194,11 +194,11 @@ export class Quantum {
   rhoAbs(): Float64Array {
     return this.sim.rho_abs();
   }
-  /** Flattened SIGNED Re ρ[i,j] ((2·n_fock)², row-major) — symmetric; diagonal = real populations. */
+  /** Flattened SIGNED Re ρ[i,j] ((2·n_fock)², row-major), symmetric; diagonal = real populations. */
   rhoReal(): Float64Array {
     return this.sim.rho_real();
   }
-  /** Flattened SIGNED Im ρ[i,j] ((2·n_fock)², row-major) — antisymmetric; carries the (imaginary) JC
+  /** Flattened SIGNED Im ρ[i,j] ((2·n_fock)², row-major), antisymmetric; carries the (imaginary) JC
    *  vacuum-Rabi coherence ρ[|0,e⟩,|1,g⟩]. Pair with rhoReal for a diverging density-matrix colour map. */
   rhoImag(): Float64Array {
     return this.sim.rho_imag();

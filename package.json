@@ -10,13 +10,13 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "screenshot": "tsx scripts/screenshot-and-report.ts",
-    "test": "vitest run",
+    "test": "vitest run && node wasm/validate_wasm.cjs",
     "test:watch": "vitest",
     "test:quantum": "cargo test --manifest-path wasm/Cargo.toml",
     "test:wasm": "node wasm/validate_wasm.cjs",
-    "test:all": "vitest run && cargo test --manifest-path wasm/Cargo.toml"
+    "test:all": "vitest run && node wasm/validate_wasm.cjs && cargo test --manifest-path wasm/Cargo.toml"
   },
-  "//test": "`npm test` runs only the analytic-engine vitest suite (optics/HTC/Marcus closed-form checks). The QuTiP 5.3 / NumPy golden validation of the Rust quantum core runs via `npm run test:quantum` (cargo) — both are gated in CI (.github/workflows/ci.yml).",
+  "//test": "Two engines, on purpose. engine/ is a closed-form analytic oracle (Marcus/optics/HTC) used as a self-check; the app SHIPS the Rust->WASM quantum core in wasm/. `npm test` runs the analytic vitest suite AND re-checks the shipping WASM core against its QuTiP 5.3 / NumPy goldens through the Node boundary (no Rust toolchain needed). `npm run test:quantum` runs the full native cargo golden suite (22 tests, needs Rust). CI gates the cargo suite + the Node boundary recheck (.github/workflows/ci.yml); see docs/VALIDATION.md and CONTRIBUTING.md.",
   "dependencies": {
     "@react-three/drei": "^9.122.0",
     "@react-three/fiber": "^8.18.0",

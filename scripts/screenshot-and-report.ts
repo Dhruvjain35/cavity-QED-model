@@ -48,6 +48,8 @@ function waitForServer(timeoutMs = 20000): Promise<void> {
       args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"],
     });
     const page = await browser.newPage({ viewport: { width: 1512, height: 900 }, deviceScaleFactor: 1 });
+    // skip the first-run guided tour so it doesn't sit over every tab in the captures
+    await page.addInitScript(() => { try { localStorage.setItem("cqed_tour_seen_v2", "1"); } catch { /* */ } });
     await page.goto(URL, { waitUntil: "networkidle" });
     await page.waitForTimeout(4000); // WASM core + first paint
 
