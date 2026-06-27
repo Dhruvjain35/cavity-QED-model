@@ -132,6 +132,9 @@ body { background: var(--bg); color: var(--ink); font-family: var(--sans); font-
 .panel-eqn { display: flex; align-items: center; gap: 10px; padding: 5px 9px; margin: 0 0 5px; background: #0b1018; border-top: 1px solid #00ffff1f; border-bottom: 1px solid var(--rule-soft); overflow: hidden; }
 .panel-eqn .pe-fitzone { flex: 1 1 0; min-width: 0; overflow: hidden; display: flex; align-items: center; }
 .panel-eqn .pe-scale { display: inline-flex; align-items: center; gap: 10px; width: max-content; transform-origin: left center; }
+/* in the narrow live-dynamics bento, drop the supplementary "where" annotation so the equation renders
+   clean and at a consistent size (the pane header and the What line already carry that context) */
+.dyn-bento .panel-eqn .pe-where { display: none; }
 .panel-eqn .pe-tag { flex: 0 0 auto; font-size: 8px; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase; color: var(--faint); }
 /* keep the equation at its NATURAL width (KaTeX can't wrap), if it doesn't fit, the strip scrolls
    horizontally as a unit. Never let flex shrink the box below the formula, which made the math paint
