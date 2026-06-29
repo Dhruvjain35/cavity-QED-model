@@ -1,6 +1,6 @@
-//! WASM boundary — a JS-friendly `Sim` wrapping the QuTiP-validated solver + Wigner.
+//! WASM boundary, a JS-friendly `Sim` wrapping the QuTiP-validated solver + Wigner.
 //! Only `f64` and `Float64Array` cross the boundary; nalgebra stays internal. Arrays are
-//! returned by value (a copy) — correctness-first, which sidesteps the `memory.grow`
+//! returned by value (a copy), correctness-first, which sidesteps the `memory.grow`
 //! detached-view trap entirely. Zero-copy views are a later, measured optimization.
 
 use crate::operators::{CMat, Params};
@@ -72,7 +72,7 @@ impl Sim {
         Solver::min_eigenvalue(&self.rho)
     }
 
-    /// Flattened |ρ_c[n,n′]| (row-major, n_fock²) of the current cavity-reduced state — a
+    /// Flattened |ρ_c[n,n′]| (row-major, n_fock²) of the current cavity-reduced state, a
     /// hinton-style density-matrix diagnostic. ρ_c = Tr_atom ρ (validated vs QuTiP ptrace(0)).
     pub fn cavity_rho_abs(&self) -> Vec<f64> {
         let rc = partial_trace_atom(&self.rho, self.n_fock);
@@ -87,7 +87,7 @@ impl Sim {
 
     /// Flattened |ρ[i,j]| (row-major, (2·n_fock)²) of the FULL joint cavity⊗emitter state.
     /// Unlike the cavity-reduced ρ_c (diagonal in vacuum-Rabi), the joint state carries the
-    /// oscillating-and-decaying coherence ρ[|0,e⟩,|1,g⟩] — the honest picture of decoherence.
+    /// oscillating-and-decaying coherence ρ[|0,e⟩,|1,g⟩], the honest picture of decoherence.
     pub fn rho_abs(&self) -> Vec<f64> {
         let d = 2 * self.n_fock;
         let mut out = Vec::with_capacity(d * d);
@@ -134,12 +134,12 @@ impl Sim {
         self.rho.iter().map(|z| z.norm_sqr()).sum()
     }
 
-    /// Bloch vector of the single-excitation effective qubit {|0,e⟩, |1,g⟩} — the two states the vacuum
+    /// Bloch vector of the single-excitation effective qubit {|0,e⟩, |1,g⟩}, the two states the vacuum
     /// Rabi oscillation swaps the excitation between. Returns [x, y, z] = [2 Re ρ_01, 2 Im ρ_01, ρ_00 −
     /// ρ_11] with 0 ≡ |0,e⟩ (basis index 2·0+0 = 0) and 1 ≡ |1,g⟩ (index 2·1+1 = 3). Tracing out the
     /// cavity kills the BARE-atom g–e coherence (the photon-number entanglement is orthogonal), so this
     /// manifold coherence ρ[|0,e⟩,|1,g⟩] is the honest one: its (x,z) projection spirals inward as κ,γ
-    /// leak population to |0,g⟩ and damp the coherence — the geometric signature of decoherence.
+    /// leak population to |0,g⟩ and damp the coherence, the geometric signature of decoherence.
     pub fn emitter_bloch(&self) -> Vec<f64> {
         let r00 = self.rho[(0, 0)].re; // |0,e⟩ population
         let r11 = self.rho[(3, 3)].re; // |1,g⟩ population
@@ -152,7 +152,7 @@ impl Sim {
         crate::entropy::von_neumann_entropy(&self.rho)
     }
 
-    /// Live Husimi Q-function grid (row-major n×n, r→y c→x) of the cavity-reduced state — a
+    /// Live Husimi Q-function grid (row-major n×n, r→y c→x) of the cavity-reduced state, a
     /// strictly non-negative phase-space density that complements the (signed) Wigner.
     pub fn husimi(&self, xmin: f64, xmax: f64, n: usize) -> Vec<f64> {
         let xvec = linspace(xmin, xmax, n);
@@ -166,7 +166,7 @@ impl Sim {
         grid.compute(&partial_trace_atom(&self.rho, self.n_fock))
     }
 
-    /// Live cavity-reduced Wigner mapped to a flat RGBA buffer (n²·4 bytes) — ready for
+    /// Live cavity-reduced Wigner mapped to a flat RGBA buffer (n²·4 bytes), ready for
     /// `putImageData`. Colour mapping happens here so only RGBA crosses the boundary.
     /// `w_max ≤ 0` auto-scales; otherwise fixed (use 1/π for the absolute physical scale).
     pub fn wigner_rgba(&self, xmin: f64, xmax: f64, n: usize, w_max: f64) -> Vec<u8> {
@@ -213,7 +213,7 @@ pub fn arrowhead_modes(w_c: f64, w_a: f64, g: f64, m: usize, sigma: f64, seed: f
 /// w_i come from Gaussian energy disorder (w_a + σ·N(0,1)); the couplings g_i are passed in directly
 /// (g_i = g_0·(μ̂_i·ε̂)·f(r_i), computed in the UI from the shared ensemble). Returns the same flat
 /// [eigs(M+1), then (M+1)² eigenvectors] as `arrowhead_modes`. A perpendicular dipole (g_i=0) yields a
-/// dark eigenstate localized on that molecule — the physics is identical to the validated arrowhead.
+/// dark eigenstate localized on that molecule, the physics is identical to the validated arrowhead.
 #[wasm_bindgen]
 pub fn arrowhead_modes_gi(w_c: f64, w_a: f64, sigma: f64, seed: f64, gi: &[f64]) -> Vec<f64> {
     let m = gi.len();
@@ -246,7 +246,7 @@ pub fn arrowhead_matrix_gi(w_c: f64, w_a: f64, sigma: f64, seed: f64, gi: &[f64]
     out
 }
 
-/// Cavity power spectrum for per-molecule couplings g_i — flat [ω (n/2), power (n/2)]. As above, w_i
+/// Cavity power spectrum for per-molecule couplings g_i, flat [ω (n/2), power (n/2)]. As above, w_i
 /// from (σ, seed); the doublet collapses as orientational/spatial disorder weakens the bright coupling.
 #[wasm_bindgen]
 pub fn cavity_power_spectrum_gi(w_c: f64, w_a: f64, sigma: f64, seed: f64, gi: &[f64], n_fft: usize, dt: f64, gamma: f64) -> Vec<f64> {
@@ -323,7 +323,7 @@ pub fn htc_spectrum(w_c: f64, w_x: f64, w_v: f64, lambda: f64, g: f64, n_vib: us
     out
 }
 
-/// EXPLICIT N-molecule HTC absorption (exact, no 1/N shortcut) — flat [eigs (d), photon_frac (d),
+/// EXPLICIT N-molecule HTC absorption (exact, no 1/N shortcut), flat [eigs (d), photon_frac (d),
 /// absorption (d)] with d = (n_mol+1)·n_vib^n_mol. Tractable for small n_mol only. See `htc::htc_multi`.
 #[wasm_bindgen]
 pub fn htc_spectrum_multi(w_c: f64, w_x: f64, w_v: f64, lambda: f64, g: f64, n_mol: usize, n_vib: usize) -> Vec<f64> {

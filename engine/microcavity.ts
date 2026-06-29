@@ -16,7 +16,7 @@ export function cavityDispersion(kPar: number[], p: { Ecav0: number; mcav: numbe
 }
 
 /**
- * Lower/upper polariton branches — eigenvalues of the 2×2 coupled-oscillator
+ * Lower/upper polariton branches, eigenvalues of the 2×2 coupled-oscillator
  * Hamiltonian (§A.4). E = ½[E_cav+E_exc ± √((E_cav−E_exc)²+(2V)²)].
  * At resonance the gap E_UP−E_LP = 2V and the branches anticross (never cross).
  */

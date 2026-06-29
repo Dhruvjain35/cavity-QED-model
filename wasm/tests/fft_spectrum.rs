@@ -27,5 +27,5 @@ fn power_spectrum_shows_rabi_doublet() {
 
     assert!((split - expect).abs() < 3.0 * res, "doublet split {split:.4} != 2g√M {expect:.4}");
     assert!((center - w0).abs() < 3.0 * res, "doublet not centered on ω_a (center {center:.4})");
-    assert!(power[p2] > 0.3, "second polariton peak too weak ({:.3}) — not a clean doublet", power[p2]);
+    assert!(power[p2] > 0.3, "second polariton peak too weak ({:.3}), not a clean doublet", power[p2]);
 }

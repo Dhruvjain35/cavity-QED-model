@@ -1,4 +1,4 @@
-// Polariton cavity-QED physics engine — the validated "oracle".
+// Polariton cavity-QED physics engine, the validated "oracle".
 // Pure TypeScript, zero rendering dependencies. See docs/PHYSICS-SPEC.md.
 
 export * from "./constants";

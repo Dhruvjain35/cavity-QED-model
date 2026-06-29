@@ -1,4 +1,4 @@
-//! Husimi Q-function and von Neumann entropy — validated against exact analytic closed forms
+//! Husimi Q-function and von Neumann entropy, validated against exact analytic closed forms
 //! (no golden needed): Q of a coherent state is a known Gaussian; S of diag(p,1−p) is −Σ p ln p.
 
 use cqed_core::entropy::von_neumann_entropy;
@@ -48,7 +48,7 @@ fn husimi_matches_analytic_coherent_gaussian() {
     }
     println!("Husimi Q vs analytic coherent: max err = {max_err:.3e}   min Q = {min_q:.3e}");
     assert!(max_err < 1e-6, "Husimi deviates from analytic coherent Gaussian: {max_err:.3e}");
-    assert!(min_q >= -1e-12, "Husimi Q went negative ({min_q:.3e}) — it must be ≥ 0");
+    assert!(min_q >= -1e-12, "Husimi Q went negative ({min_q:.3e}), it must be ≥ 0");
 }
 
 #[test]

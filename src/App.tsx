@@ -178,7 +178,7 @@ type Preset = {
 const PRESETS: Preset[] = [
   { group: "Single emitter · open Jaynes–Cummings", title: "Vacuum-Rabi oscillation", blurb: "One quantum sloshing photon ↔ atom at the rate 2g (the textbook strong-coupling oscillation), lightly damped. Watch Panel C and the Wigner map.", regime: "single", params: { g: 0.3, kappa: 0.01, gamma: 0.01 } },
   { group: "Single emitter · open Jaynes–Cummings", title: "Weak / Purcell regime", blurb: "Cavity loss beats the coupling (2g < κ): no oscillation, the excitation just leaks away. Contrast with the strong-coupling preset.", regime: "single", params: { g: 0.05, kappa: 0.4, gamma: 0.05 } },
-  { group: "Single emitter · open Jaynes–Cummings", title: "Decoherence in action", blurb: "Turn κ,γ up: watch the purity collapse and the Wigner function lose its non-classical negativity (red core fades).", regime: "single", params: { g: 0.3, kappa: 0.14, gamma: 0.14 } },
+  { group: "Single emitter · open Jaynes–Cummings", title: "Onset of decoherence", blurb: "Turn κ,γ up: watch the purity collapse and the Wigner function lose its non-classical negativity (red core fades).", regime: "single", params: { g: 0.3, kappa: 0.14, gamma: 0.14 } },
   { group: "Collective · Tavis–Cummings", title: "Polariton avoided crossing", blurb: "Tune the cavity through the emitters: the two bright polaritons (LP/UP) repel and never cross, split by 2g√N.", regime: "collective", sp: { m: 20, g: 0.1, sigma: 0 } },
   { group: "Collective · Tavis–Cummings", title: "Dark-state reservoir", blurb: "40 emitters → only 2 bright polaritons carry photon weight; the other 39 are dark/subradiant and invisible to light.", regime: "collective", sp: { m: 40, g: 0.08, sigma: 0 } },
   { group: "Collective · Tavis–Cummings", title: "Disorder washes out polaritons", blurb: "Add static energy disorder (σ ≳ Ω_R): the bright doublet broadens and the dark band spreads, strong coupling degrades.", regime: "collective", sp: { m: 20, g: 0.06, sigma: 0.12 } },
@@ -1467,7 +1467,7 @@ export function App() {
       if (fill) { path(); ctx.lineTo(PP_ML + PP_PW, yOf(0)); ctx.lineTo(PP_ML, yOf(0)); ctx.closePath(); ctx.fillStyle = color + "22"; ctx.fill(); }
       path(); ctx.strokeStyle = color; ctx.lineWidth = 1.6; ctx.stroke();
     };
-    trace(2, DARKC, true);   // dark / subradiant manifold (fills via unitary bright→dark transfer at σ>0; it carries no photon weight, so it does NOT leak — the reservoir stays long-lived)
+    trace(2, DARKC, true);   // dark / subradiant manifold (fills via unitary bright→dark transfer at σ>0; it carries no photon weight, so it does NOT leak; the reservoir stays long-lived)
     trace(0, COBALT, false); // photon
     trace(1, RED, false);    // bright / superradiant matter
     if (dyn.gamma > 0) {     // leaked-out fraction = 1 − (photon+bright+dark): the quantum that left the cavity
@@ -1582,8 +1582,8 @@ export function App() {
         <span className="brand">POLARITON CAVITY-QED LAB</span>
         <span className="topbar-right">
           <span className="status"><span className="live">●</span> {ready ? "WASM CORE LIVE" : "LOADING…"} · QuTiP-GOLDEN CORE + ANALYTIC-VALIDATED OPTICS/VIBRONICS</span>
-          <button className="tour-btn" onClick={() => goTour(0)} title="guided tour of all six views: build a polariton from scratch">▸ TOUR</button>
-          <button className="examples-btn" onClick={() => setGallery(true)} title="load a configured example experiment to get started">▸ EXAMPLES</button>
+          <button className="tour-btn" onClick={() => goTour(0)} title="guided tour of all six views: build a polariton from scratch">TOUR</button>
+          <button className="examples-btn" onClick={() => setGallery(true)} title="load a configured example experiment to get started">EXAMPLES</button>
           <button className="copy-link" onClick={copyLink} title="copy a shareable link to this exact configuration">{copied ? "COPIED" : "COPY LINK"}</button>
           <button className="about-btn" onClick={() => setAbout(true)} title="about">?</button>
         </span>
@@ -1641,12 +1641,12 @@ export function App() {
         <div className="about-overlay">
           <button className="about-x" onClick={() => setAbout(false)} aria-label="close">×</button>
           <div className="about-title">POLARITON CAVITY-QED LAB</div>
-          <p>A research-grade cavity-QED instrument. Physics engine: Rust→WebAssembly. Model: single-excitation Tavis–Cummings (collective spectrum) + open Jaynes–Cummings (single-emitter Lindblad dynamics) + Holstein–Tavis–Cummings vibronic coupling, with a transfer-matrix optical cavity.</p>
+          <p>A cavity-QED instrument that runs entirely in the browser. Physics engine: Rust→WebAssembly. Model: single-excitation Tavis–Cummings (collective spectrum) + open Jaynes–Cummings (single-emitter Lindblad dynamics) + Holstein–Tavis–Cummings vibronic coupling, with a transfer-matrix optical cavity.</p>
           <div className="about-val">
-            <div className="about-val-head">VALIDATION SCOPE, every module states its arbiter, nothing is asserted from memory</div>
+            <div className="about-val-head">VALIDATION SCOPE: every module names its reference, and no expected value is hardcoded</div>
             <div className="about-val-row"><span>JC Lindblad · TC arrowhead spectrum · Wigner · partial trace</span><span className="ok">QuTiP 5.3 / NumPy golden (≤ 1e-9)</span></div>
             <div className="about-val-row"><span>DBR transfer-matrix optics · HTC vibronics · FFT transmission</span><span className="an">closed-form analytic benchmark</span></div>
-            <div className="about-val-note">Full receipts: <a className="about-link" href="https://github.com/Dhruvjain35/cavity-QED-model/blob/main/docs/VALIDATION.md" target="_blank" rel="noopener">docs/VALIDATION.md</a> · 22 cargo tests (11 QuTiP/NumPy-golden + 11 analytic) + the Node WASM-boundary recheck.</div>
+            <div className="about-val-note">Full validation log: <a className="about-link" href="https://github.com/Dhruvjain35/cavity-QED-model/blob/main/docs/VALIDATION.md" target="_blank" rel="noopener">docs/VALIDATION.md</a> · 22 cargo tests (11 QuTiP/NumPy-golden + 11 analytic) + the Node WASM-boundary recheck.</div>
           </div>
           <p>Model references: Sharma &amp; Chen, <i>J. Chem. Phys.</i> <b>161</b>, 104102 (2024); Mandal et al., <i>Chem. Rev.</i> <b>123</b>, 9786 (2023, HTC).</p>
           <p>Developed in collaboration with Shravan Kumar Sharma (PhD candidate, Hsing-Ta Chen group, Dept. of Chemistry, University of Notre Dame), polariton chemistry + machine learning.</p>
@@ -1733,7 +1733,7 @@ export function App() {
                 <button onClick={() => setDyn((s) => ({ ...s, seed: s.seed + 1 }))}>RE-ROLL σ</button>
               </div>
               <div className="btn-row">
-                <button className={dynSweep ? "on" : ""} onClick={() => { if (!dynSweep) setDynView("dynamics"); setDynSweep((v) => !v); }}>{dynSweep ? "● SWEEP g vs Ω_R" : "SWEEP g vs Ω_R"}</button>
+                <button className={dynSweep ? "on" : ""} onClick={() => { if (!dynSweep) setDynView("dynamics"); setDynSweep((v) => !v); }}>SWEEP g vs Ω_R</button>
               </div>
             </Group>
           ) : (
@@ -1888,7 +1888,7 @@ export function App() {
           ) : (
             <>
               <div className="dyn-viewtabs">
-                <button className={dynView === "formation" ? "on" : ""} onClick={() => setDynView("formation")}>⚛ Polariton formation</button>
+                <button className={dynView === "formation" ? "on" : ""} onClick={() => setDynView("formation")}>Polariton formation</button>
                 <button className={dynView === "dynamics" ? "on" : ""} onClick={() => setDynView("dynamics")}>▶ Live dynamics</button>
               </div>
               {dynView === "formation" ? (
@@ -1899,7 +1899,7 @@ export function App() {
                     <PolaritonFormation g={dyn.g} n={dyn.m} delta={dyn.detuning ?? 0} onDelta={(d) => setDyn((s) => ({ ...s, detuning: d }))} onG={(Gv) => setDyn((s) => ({ ...s, g: Gv / Math.sqrt(Math.max(1, s.m)) }))} selected={pfSel} onSelect={setPfSel} />
                   </div>
                   <div className="pf-right">
-                    <div className="pane-head">{pfSel ? <>▸ <i style={{ color: "#fff", fontStyle: "normal" }}>{pfSel} polariton</i>, the STABLE hybrid: the standing-wave field <b>and</b> the excited molecules are lit at once, and stay that way</> : <>Live oscillation, the Rabi beat between LP &amp; UP. A polariton is the <i style={{ color: "#fff", fontStyle: "normal" }}>stable</i> mix; this sloshing is what happens when you're not sitting in one. Freeze one →</>}</div>
+                    <div className="pane-head">{pfSel ? <><i style={{ color: "#fff", fontStyle: "normal" }}>{pfSel} polariton</i>, the stable hybrid: the standing-wave field <b>and</b> the excited molecules are lit at once, and stay that way</> : <>Live oscillation, the Rabi beat between LP &amp; UP. A polariton is the <i style={{ color: "#fff", fontStyle: "normal" }}>stable</i> mix; this sloshing is what you see when the state is not pinned to one branch. Freeze one →</>}</div>
                     <div className="live3d"><SceneBoundary><Suspense fallback={<div className="cv-loading">loading 3D…</div>}><LiveCavityScene stateRef={dynState} tRef={simT} m={dyn.m} inspectRef={inspectRef} ensemble={ensemble} waist={MODE_WAIST} polTheta={dyn.theta * Math.PI / 180} controls={scene3d} loss={dyn.gamma} /></Suspense></SceneBoundary>
                       <ScenePanel open={scenePanelOpen} onToggle={() => setScenePanelOpen((o) => !o)} v={scene3d} set={setScene} />
                     </div>
@@ -1988,8 +1988,8 @@ export function App() {
                   <Row label={<>purity Tr<i>ρ</i>²</>} k="pur" r={read} tip="state purity Tr(ρ²) ∈ [0,1]: 1 = pure, <1 = mixed (decohered)" />
                   <Row label={<>entropy <i>S</i></>} k="ent" r={read} unit="nats" tip="von Neumann entropy S = −Tr(ρ ln ρ), in nats; rises as the state decoheres (max ln2≈0.69)" />
                   <Row label={<>cooperativity <i>C</i></>} k="coop" r={read} tip="single-atom cooperativity C = g²/κγ (dimensionless); C≫1 ⇒ strong light–matter coupling" />
-                  <Row label={<>Tr <i>ρ</i> <span className="rb-chk">✓1</span></>} k="tr" r={read} tip="trace of ρ, must stay 1 (probability conservation); numerical-health check" />
-                  <Row label={<>min eig(<i>ρ</i>) <span className="rb-chk">✓≈0</span></>} k="eig" r={read} tip="smallest eigenvalue of ρ, ≈0 confirms a physically valid (positive-semidefinite) density matrix" />
+                  <Row label={<>Tr <i>ρ</i> <span className="rb-chk">= 1</span></>} k="tr" r={read} tip="trace of ρ, must stay 1 (probability conservation); numerical-health check" />
+                  <Row label={<>min eig(<i>ρ</i>) <span className="rb-chk">≈ 0</span></>} k="eig" r={read} tip="smallest eigenvalue of ρ, ≈0 confirms a physically valid (positive-semidefinite) density matrix" />
                 </tbody></table>
               </div>
               {Hud}

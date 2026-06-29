@@ -42,5 +42,5 @@ console.log("        live ∫∫W (≈1) =", integ.toFixed(6));
 const ok =
   maxN < 1e-6 && maxPe < 1e-6 && maxW < 1e-4 &&
   Math.abs(traceEnd - 1) < 1e-10 && minEig > -1e-8 && Math.abs(integ - 1) < 1e-2;
-console.log(ok ? "PASS ✓ — validated physics survives the WASM boundary" : "FAIL ✗");
+console.log(ok ? "PASS: validated physics survives the WASM boundary" : "FAIL");
 process.exit(ok ? 0 : 1);

@@ -1,6 +1,6 @@
 //! Wigner Clenshaw port validation against the QuTiP `wigner` golden.
 //!   - element-wise match to QuTiP for a coherent state AND a Schrödinger-cat state, ≤ 1e-4
-//!   - the cat-state interference fringes reproduce the negativity (≈ −0.233) — this is the
+//!   - the cat-state interference fringes reproduce the negativity (≈ −0.233), this is the
 //!     case that catches the off-diagonal ×2 scale bug (fringes halve if dropped)
 //!   - ∫∫ W dx dy = 1 for both (catches a broken g=√2 / normalization factor)
 

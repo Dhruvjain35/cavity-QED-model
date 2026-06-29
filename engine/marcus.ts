@@ -8,7 +8,7 @@ import { HBAR_EV_S } from "./constants";
  * K = sqrt(π/(E_r·kT)) · |V|²/(2ħ) · exp(−E_a²/(4·kT·E_r))   [s⁻¹]
  * The rate is MAXIMAL (barrier-less) when E_a = 0.
  *
- * NORMALIZATION: this is Sharma & Chen Eq. 35 verbatim, which carries |V|²/(2ħ) — i.e.
+ * NORMALIZATION: this is Sharma & Chen Eq. 35 verbatim, which carries |V|²/(2ħ), i.e.
  * exactly HALF the textbook classical Marcus rate (|V|²/ħ, Semenov–Nitzan / Tokmakoff).
  * We keep the paper's normalization so output matches the paper's Fig. 2; the factor of 2
  * is an overall prefactor that cancels in every rate RATIO (quantum yields, branching) and

@@ -94,7 +94,7 @@ export function PolaritonFormation({ g, n, delta, onDelta, onG, selected, onSele
         <div className="pf-row"><span>coupling <i>g√N</i></span><input type="range" min={0} max={GMAX} step={GMAX / 200} value={Math.min(GMAX, G)} onChange={(e) => onG(Number(e.target.value))} /><b style={{ color: G > 0.02 ? CY : DIMC }}>{G.toFixed(3)}</b></div>
         <div className="pf-row"><span>detuning <i>Δ</i></span><input type="range" min={-DX} max={DX} step={DX / 100} value={Math.max(-DX, Math.min(DX, delta))} onChange={(e) => onDelta(Number(e.target.value))} /><b>{delta >= 0 ? "+" : ""}{delta.toFixed(2)}</b></div>
         <div className="pf-hint">{G < 0.012 ? "g√N ≈ 0 → no polaritons: the bare photon and molecule just cross." : "the bare modes repel into LP/UP, that splitting Ω_R is the polariton. Click a branch to freeze it in 3D →"}</div>
-        {G >= 0.1 ? <div className="pf-warn">⚠ ultrastrong (η = g√N/ω_c = {G.toFixed(2)} ≥ 0.1): this RWA picture is qualitative here, the full quantum Rabi model (counter-rotating terms) would shift the numbers.</div> : null}
+        {G >= 0.1 ? <div className="pf-warn">ultrastrong (η = g√N/ω_c = {G.toFixed(2)} ≥ 0.1): this RWA picture is qualitative here, the full quantum Rabi model (counter-rotating terms) would shift the numbers.</div> : null}
         <div className="pf-comps">
           <Comp name="UP" pf={here.pfUP} />
           <Comp name="LP" pf={here.pfLP} />

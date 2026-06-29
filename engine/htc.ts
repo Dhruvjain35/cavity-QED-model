@@ -1,4 +1,4 @@
-// System C: Holstein–Tavis–Cummings cavity-modified electron transfer — THE CORE.
+// System C: Holstein–Tavis–Cummings cavity-modified electron transfer, THE CORE.
 // docs/PHYSICS-SPEC.md §C and §6 (Sharma & Chen, J. Chem. Phys. 161, 104102, 2024).
 
 import { marcusRateEa } from "./marcus";
@@ -79,7 +79,7 @@ export interface ETPoint {
 }
 
 /**
- * Cavity-modified ET rate vs molecule number N — the turnover curve (§C.9).
+ * Cavity-modified ET rate vs molecule number N, the turnover curve (§C.9).
  *
  * The photon-coupled ET path P± → {A₁}1 [Eq. 36] becomes barrier-less when the
  * collective polariton energy Ω± reaches ħω_c, i.e. its activation energy

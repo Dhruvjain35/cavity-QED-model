@@ -18,8 +18,8 @@ npm install
 npm run dev          # local dev server
 
 # rebuild the WASM core (only if you change wasm/src/*.rs, needs the Rust toolchain + wasm-pack)
-wasm-pack build wasm --target web    --out-dir pkg-web
-wasm-pack build wasm --target nodejs --out-dir pkg-node
+wasm-pack build wasm --target web    --out-dir pkg-web --out-name cqed_core
+wasm-pack build wasm --target nodejs --out-dir pkg     --out-name cqed_core
 ```
 
 The compiled `wasm/pkg-web/` is committed, so a plain `npm install && npm run build` works with no Rust toolchain.

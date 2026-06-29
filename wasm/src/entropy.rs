@@ -4,7 +4,7 @@ use crate::operators::CMat;
 use nalgebra::DMatrix;
 
 /// von Neumann entropy S = −Tr(ρ ln ρ) = −Σ_i λ_i ln λ_i (natural log), over the eigenvalues of
-/// the Hermitian ρ. S = 0 for a pure state, > 0 for a mixed one — the complement of purity Tr(ρ²).
+/// the Hermitian ρ. S = 0 for a pure state, > 0 for a mixed one, the complement of purity Tr(ρ²).
 ///
 /// Eigenvalues come from the real-symmetric embedding M = [[Re ρ, −Im ρ], [Im ρ, Re ρ]] (the same
 /// trick used for `min_eigenvalue`); each eigenvalue of ρ appears twice in M's 2n-spectrum, so

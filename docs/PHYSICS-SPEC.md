@@ -1,4 +1,4 @@
-# Polariton Cavity-QED Simulation — Physics Specification (Source of Truth)
+# Polariton Cavity-QED Simulation: Physics Specification
 
 > This document is the single physics reference the simulation code is built against.
 > Every equation carries a citation: `[paper, Eq./page]` for the local PDFs, or `[author, venue]` for
@@ -7,7 +7,7 @@
 > re-derived by hand** (see §6). Where a printed form is dimensionally inconsistent, the corrected
 > form is given and flagged.
 >
-> **Golden rule for the build:** never render a quantity that is not computed from an equation in
+> **Build constraint:** never render a quantity that is not computed from an equation in
 > this file. No invented parameters, no decorative sliders that change nothing.
 
 ---
@@ -16,9 +16,9 @@
 
 | # | System | What it shows | Why it's here |
 |---|--------|---------------|---------------|
-| **A** | Microcavity exciton-polaritons | Dispersion E(k‖), avoided crossing, Rabi splitting, Hopfield fractions | The *iconic* polariton picture; the visually unmistakable "two branches anticrossing" |
+| **A** | Microcavity exciton-polaritons | Dispersion E(k‖), avoided crossing, Rabi splitting, Hopfield fractions | The standard polariton dispersion: two branches anticrossing |
 | **B** | Cavity-QED collective coupling (Jaynes→Tavis→Dicke) | Energy-level ladder, √N Rabi scaling, bright vs N−1 dark states | The conceptual core of light–matter coupling; explains *why* N matters |
-| **C** | Holstein–Tavis–Cummings (HTC) cavity-modified electron transfer | Marcus surfaces, polariton-PES, ET-rate vs N **turnover at N_max** | **This project's money shot** — Sharma & Chen 2024, the paper the whole collaboration is about |
+| **C** | Holstein–Tavis–Cummings (HTC) cavity-modified electron transfer | Marcus surfaces, polariton-PES, ET-rate vs N **turnover at N_max** | The central result of the collaboration (Sharma & Chen 2024) |
 
 Systems A and B are the *established, textbook* physics (give the website credibility + history).
 System C is the *frontier* physics (the actual research). They share one engine: a 2×2 coupled-oscillator
@@ -32,10 +32,10 @@ eigensolver and a Marcus/FGR rate kernel.
 $$E_{\mathrm{cav}}(k_\parallel) = \frac{\hbar c}{n}\sqrt{k_z^2 + k_\parallel^2}, \qquad k_z = \frac{\pi M}{L_z}$$
 [Carusotto & Ciuti, *Rev. Mod. Phys.* **85**, 299 (2013), Eq. 1; Deng, Haug & Yamamoto, *RMP* **82**, 1489 (2010)]
 
-Near k‖≈0 this is parabolic — the photon acts as a 2-D massive particle:
+Near k‖≈0 this is parabolic; the photon acts as a 2-D massive particle:
 $$E_{\mathrm{cav}}(k_\parallel) \simeq E_{\mathrm{cav}}^{0} + \frac{\hbar^2 k_\parallel^2}{2 m_{\mathrm{cav}}}, \qquad m_{\mathrm{cav}} = \frac{\hbar n k_z}{c} = \frac{n^2 E_{\mathrm{cav}}^{0}}{c^2}$$
 [Carusotto & Ciuti 2013, Eqs. 1–2; Deng & Yamamoto, *PNAS* **100**, 15318 (2003)]
-Typical `m_cav ≈ 10⁻⁵–10⁻⁴ mₑ` (measured 3.6×10⁻⁵ m₀ in CdTe) — ~4 orders lighter than the exciton.
+Typical `m_cav ≈ 10⁻⁵–10⁻⁴ mₑ` (measured 3.6×10⁻⁵ m₀ in CdTe), ~4 orders lighter than the exciton.
 
 ### A.2 Exciton dispersion (≈ flat on this scale)
 `E_exc(k‖) ≈ E_exc⁰` (exciton mass ~10⁴–10⁵× heavier than photon, so flat over the plotted k-range).
@@ -59,7 +59,7 @@ $$|X_k|^2 = \tfrac{1}{2}\!\left(1 + \frac{\delta}{\sqrt{\delta^2 + (2V)^2}}\righ
 
 ### A.7 Angle ⇄ momentum (why angle-resolved PL maps work)
 $$k_\parallel = \frac{E}{\hbar c}\sin\theta, \qquad E_C(\theta) = \frac{E_C(0)}{\sqrt{1 - (\sin\theta/n_c)^2}}$$
-[Houdré et al., *C. R. Physique* **3** (2002) 15]. Each external emission angle maps 1-to-1 to an in-plane k — the twin x-axes of every dispersion figure.
+[Houdré et al., *C. R. Physique* **3** (2002) 15]. Each external emission angle maps 1-to-1 to an in-plane k, the twin x-axes of every dispersion figure.
 
 **Typical numbers (System A):** Rabi splitting 2V = 4–16 meV (GaAs/III-V), 10–26 meV (CdTe), tens→>100 meV (organic/perovskite); n ≈ 3.5 (GaAs); δ tuned over −10…+10 meV.
 
@@ -77,19 +77,19 @@ $$\omega_{n,+}-\omega_{n,-} = 2\Omega_R\sqrt{n} \;\Rightarrow\; \text{(n=1)}\; 2
 
 ### B.3 Single-emitter coupling vs mode volume (the honest "cavity geometry" knob)
 $$\hbar g = \boldsymbol{\mu}\cdot\mathbf{E}_{\mathrm{vac}}, \qquad g = \frac{\mu}{\hbar}\sqrt{\frac{\hbar\omega_c}{2\varepsilon_0 V}}$$
-[Rider et al., arXiv:2402.09885, Eqs. 3–4]. **g ∝ 1/√V** — shrinking mode volume (plasmonic picocavities) is the route to single-molecule strong coupling.
+[Rider et al., arXiv:2402.09885, Eqs. 3–4]. **g ∝ 1/√V**: shrinking mode volume (plasmonic picocavities) is the route to single-molecule strong coupling.
 
 ### B.4 Tavis–Cummings (N emitters)
 $$\hat{H}_{\mathrm{TC}} = \omega_r a^{\dagger}a + \sum_{j=1}^{N}\Big[\tfrac{\omega_j}{2}\sigma_{z,j} + \Gamma_j(a^{\dagger}\sigma_{-,j} + \sigma_{+,j}a)\Big]$$
 [Dong et al., arXiv:2110.14174, Eq. 5]
 
-### B.5 Collective bright state and √N enhancement — **the key scaling**
+### B.5 Collective bright state and √N enhancement: **the key scaling**
 $$|\mathrm{B},0\rangle = \frac{1}{\sqrt{N}}\sum_{J}|e_J\rangle, \qquad g_N = g\sqrt{N}, \qquad \Omega_R = 2g\sqrt{N}$$
 [Mandal et al., *Chem. Rev.* **123**, 9786 (2023), Eq. 13]. Only the symmetric combination couples; collective Rabi splitting ∝ √N (∝ √density).
 
 ### B.6 The N−1 dark states
 $$|\mathrm{D}_\alpha,0\rangle = \sum_J c_{J\alpha}|e_J\rangle,\quad \sum_J c_{J\alpha}=0,\quad \langle\mathrm{D}_\alpha|\hat{\boldsymbol{\mu}}|\mathrm{G}\rangle=0,\quad \alpha=1\dots N-1$$
-[Mandal et al. 2023, Eq. 18]. N−1 states with zero net dipole — dark to the cavity. Their fate (disorder/dephasing) is *the* central theme of polariton chemistry, and the reason "large N" is subtle.
+[Mandal et al. 2023, Eq. 18]. N−1 states with zero net dipole, dark to the cavity. Their fate (disorder/dephasing) is *the* central theme of polariton chemistry, and the reason "large N" is subtle.
 
 **Typical numbers (System B):** single-emitter g ~ 1–380 meV; collective g_N ~ 25–310 meV for molecular ensembles; molecular N ~ 10⁶–10¹².
 
@@ -120,9 +120,9 @@ $$\hat{H}_I = \sum_j \vec{\mu}_j\cdot\vec{E}(\vec{r}_j) + \sum_j \frac{(\vec{\mu
 
 ### C.5 Dimensionless couplings
 $$g_D,\,g_A,\,t_{AD} = i\sqrt{\tfrac{1}{2\hbar\omega_c\mathcal{V}\varepsilon_0}}\;\vec{\xi}\cdot\vec{d}_{\{DD,AA,AD\}}$$
-[Eqs. 8–10, p.4]. `d_AD` = transition dipole; `t_AD ∝ d_AD/√V` — this is the microscopic link from cavity/molecule geometry to the coupling.
+[Eqs. 8–10, p.4]. `d_AD` = transition dipole; `t_AD ∝ d_AD/√V`: this is the microscopic link from cavity/molecule geometry to the coupling.
 
-### C.6 Effective (polaron-transformed) ET couplings — **how the cavity rewires ET**
+### C.6 Effective (polaron-transformed) ET couplings: **how the cavity rewires ET**
 $$\mathcal{T}_{lm} = (H_{AD} + \hbar\omega_c\, t_{AD} g_{AD})F_{lm} + \hbar\omega_c\, t_{AD}\big(\sqrt{m}\,F_{l,m-1} - \sqrt{m+1}\,F_{l,m+1}\big)$$
 [Eq. 20, p.5]. In the `g_AD=0` limit (`F_{l,m}=δ_{l,m}`):
 $$T_{00}=T_{11}=H_{AD}, \qquad T_{01}=\hbar\omega_c\,t_{AD}, \qquad T_{10}=-\hbar\omega_c\,t_{AD}$$
@@ -130,7 +130,7 @@ $$T_{00}=T_{11}=H_{AD}, \qquad T_{01}=\hbar\omega_c\,t_{AD}, \qquad T_{10}=-\hba
 
 ### C.7 Collective polariton energies (RWA-I, absorption)
 $$\Omega_\pm^{(\mathrm{I})} = \frac{\Delta}{2} \pm \sqrt{\Big(\frac{\Delta}{2}\Big)^2 + (N-1)|T_{01}|^2}, \qquad \Delta = \hbar\omega_c - E_{AD}$$
-[Eq. 26, p.6]. **Splitting ∝ √(N−1)** — Tavis–Cummings collective enhancement. The factor is `N−1` (not N) because the one *reacting* molecule is excluded from the collective manifold (leaving N−2 dark states). RWA-II (emission) is the mirror with `−Δ/2` and `T_10` [Eq. 32, p.7].
+[Eq. 26, p.6]. **Splitting ∝ √(N−1)**: Tavis–Cummings collective enhancement. The factor is `N−1` (not N) because the one *reacting* molecule is excluded from the collective manifold (leaving N−2 dark states). RWA-II (emission) is the mirror with `−Δ/2` and `T_10` [Eq. 32, p.7].
 
 At resonance (Δ=0):
 $$\Omega_\pm^{(\mathrm{I})}(N) = \pm\sqrt{(N-1)|T_{01}|^2}, \qquad \Omega_\pm^{(\mathrm{II})}(N) = \pm\sqrt{(N-1)|T_{10}|^2}$$
@@ -154,46 +154,46 @@ $$QY_b^{(\mathrm{I})} = \frac{k_{P_+\to\{A_1\}0}}{K_+^{(\mathrm{I})}} + \frac{k_
 
 ---
 
-## 6. THE CENTRAL RESULT — N_max turnover (verified by hand)
+## 6. THE CENTRAL RESULT: N_max turnover (verified by hand)
 
 ### 6.1 Printed form (paper Eq. 44a–b, p.9)
 $$N_{\max}^{(\mathrm{I})} = 1 + \frac{\hbar\omega_c}{|T_{01}|^2}, \qquad N_{\max}^{(\mathrm{II})} = 1 + \frac{\hbar\omega_c}{|T_{10}|^2}$$
 
-### 6.2 Hand derivation (do NOT trust the printed form blindly)
+### 6.2 Hand derivation (independent of the printed form)
 Barrier-less condition at resonance: set `Ω₊⁽ᴵ⁾ = ℏω_c` using Eq. 42 `Ω₊⁽ᴵ⁾ = √((N−1)|T₀₁|²)`:
 $$\sqrt{(N-1)|T_{01}|^2} = \hbar\omega_c \;\Rightarrow\; (N-1)|T_{01}|^2 = (\hbar\omega_c)^2 \;\Rightarrow\; \boxed{N_{\max}^{(\mathrm{I})} = 1 + \frac{(\hbar\omega_c)^2}{|T_{01}|^2}}$$
 
 ### 6.3 Dimensional check & the correction
-- Printed `ℏω_c/|T₀₁|²` has units eV/eV² = **1/eV — dimensionally inconsistent.**
-- Derived `(ℏω_c)²/|T₀₁|²` has units eV²/eV² = **dimensionless ✓.**
+- Printed `ℏω_c/|T₀₁|²` has units eV/eV² = **1/eV, dimensionally inconsistent.**
+- Derived `(ℏω_c)²/|T₀₁|²` has units eV²/eV² = **dimensionless.**
 - They agree numerically **only because** the paper always works at resonance, where `ℏω_c = E_AD = 1 eV`, so the missing factor of `E_AD = 1 eV` is invisible.
-- **Honest general form** (exposes the hidden gap) — ⚠️ **THIS is the form the engine implements**, NOT the resonance-only `(ℏω_c)²/|T₀₁|²` box above:
+- **Honest general form** (exposes the hidden gap). **THIS is the form the engine implements**, NOT the resonance-only `(ℏω_c)²/|T₀₁|²` box above:
 $$\boxed{N_{\max} = 1 + \frac{\hbar\omega_c\, E_{AD}}{|T_{01}|^2}} \;\xrightarrow{\ \hbar\omega_c = E_{AD}\ }\; 1 + \frac{(\hbar\omega_c)^2}{|T_{01}|^2}$$
 
-> **ENGINE NOTE (do not "fix"):** `htc.ts::nMax` returns `1 + (ħω_c·E_AD)/|T|²` (the general form). The `(ħω_c)²` box in §6.2 is only its resonance special case. A regression test (`hbar_wc:2.0, E_AD:0.5` → 1636) fails if anyone collapses the engine to the resonance-only or printed form. The paper was verified verbatim (arXiv:2406.17101) to literally print the dimensionally-inconsistent `1 + ħω_c/|T₀₁|²`; the project's own Pilot Plan PDF (Eq. 10) inherited the same slip.
+> **Implementation note.** `htc.ts::nMax` returns `1 + (ħω_c·E_AD)/|T|²` (the general form). The `(ħω_c)²` box in §6.2 is only its resonance special case. A regression test (`hbar_wc:2.0, E_AD:0.5` → 1636) fails if anyone collapses the engine to the resonance-only or printed form. The paper was verified verbatim (arXiv:2406.17101) to literally print the dimensionally-inconsistent `1 + ħω_c/|T₀₁|²`; the project's own Pilot Plan PDF (Eq. 10) inherited the same slip.
 
 ### 6.4 Numerical confirmation (these are the unit-test golden values)
 | Channel | coupling | N_max | check |
 |---|---|---|---|
-| Absorption (I) | \|T₀₁\| = 0.024731 eV | **1636** | `1 + 1/(0.024731²) = 1 + 1634.7 ≈ 1636` ✓ |
-| Emission (II) | \|T₁₀\| = 0.0096297 eV | **10785** | `1 + 1/(0.0096297²) = 1 + 10784.9 ≈ 10785` ✓ |
+| Absorption (I) | \|T₀₁\| = 0.024731 eV | **1636** | `1 + 1/(0.024731²) = 1 + 1634.7 ≈ 1636` |
+| Emission (II) | \|T₁₀\| = 0.0096297 eV | **10785** | `1 + 1/(0.0096297²) = 1 + 10784.9 ≈ 10785` |
 (ℏω_c = E_AD = 1.0 eV throughout; equivalently N_max = 1 + 1/t_AD² with t_AD = T/ℏω_c.)
 
-### 6.5 Framing (per project guidance — NOT an erratum)
+### 6.5 Status: units/normalization note, not an erratum
 This is a **units/normalization note, not an error in the science.** The paper's results are all at resonance,
 where the printed and corrected forms coincide, so **zero published numbers change.** The general form is
-already implicit in the repo code (`New_main_code.py`). Present to Shravan as diligence / a clarifying
+already implicit in the repo code (`New_main_code.py`). Best raised with the Notre Dame group as a clarifying
 question ("should Eq. 44 carry an explicit E_AD to be dimensionally general?"), never as "I found a mistake."
 
 ---
 
-## 7. Master parameter table — the REAL knobs (≈11, not 50)
+## 7. Master parameter table: the REAL knobs (≈11, not 50)
 
 > Every slider below changes a quantity that appears in an equation above. Physical cavity geometry
-> is mapped to model parameters honestly (right column). **No standalone "mirror thickness" slider** —
+> is mapped to model parameters honestly (right column). **No standalone "mirror thickness" slider**:
 > thickness acts *through* ω_c and mode volume, shown explicitly.
 
-### System C (HTC — primary)
+### System C (HTC, primary)
 | Symbol | Meaning | Units | Default | Range | Effect |
 |---|---|---|---|---|---|
 | `N` | molecule number | – | 100 | 1 … 10⁵ (log) | x-axis of the turnover; Rabi ∝ √(N−1) |
@@ -240,12 +240,12 @@ Reproduce against the paper's **Fig. 2** (rate vs N) and **Fig. 4** (slow/fast b
 
 ---
 
-## 9. Limitations & deferred physics (state these in the UI — physicists trust honesty)
+## 9. Limitations & deferred physics (state these in the UI: physicists trust honesty)
 
-- **Single cavity mode only.** Multimode (the realistic case Shravan is moving toward) is *not* in this model. This is the honest frontier the project points at, not something the sim fakes.
+- **Single cavity mode only.** Multimode (the realistic case the Notre Dame group is moving toward) is *not* in this model. This is the honest frontier the project points at, not something the sim fakes.
 - **Cavity loss / photon lifetime (κ) deferred.** No Lindblad dissipation of the photon; mirrors are treated as ideal. The "mirror reflectivity" knob is therefore shown as *roadmap*, not active.
 - **Marcus/FGR (nonadiabatic, semiclassical) regime.** Classical nuclei (Langevin), high-T Marcus limit; no nuclear tunneling beyond the MLJ note, no strong-coupling (polaron) breakdown.
-- **N−1 dark states treated as ideal/degenerate.** Disorder and dephasing — the crux of the real-world VSC controversy (§ HISTORY) — are not modeled.
+- **N−1 dark states treated as ideal/degenerate.** Disorder and dephasing, the crux of the real-world VSC controversy (§ HISTORY), are not modeled.
 - **RWA** used for the polariton energies (counter-rotating terms dropped); valid in the strong-but-not-ultrastrong regime.
 - **Resonance-centric.** The cleanest results (and the N_max golden values) are at Δ=0; off-resonance is supported but less validated against the paper.
 

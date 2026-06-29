@@ -22,7 +22,7 @@ import {
 } from "../index";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// THE central result — N_max turnover and the units correction (PHYSICS-SPEC §6)
+// THE central result, N_max turnover and the units correction (PHYSICS-SPEC §6)
 // ─────────────────────────────────────────────────────────────────────────────
 describe("N_max turnover (central result)", () => {
   test("absorption channel → 1636 (golden)", () => {
@@ -108,7 +108,7 @@ describe("Marcus / FGR kernel", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Microcavity (System A) — anticrossing & Hopfield (PHYSICS-SPEC §A)
+// Microcavity (System A), anticrossing & Hopfield (PHYSICS-SPEC §A)
 // ─────────────────────────────────────────────────────────────────────────────
 describe("microcavity polaritons", () => {
   test("anticrossing: LP/UP gap = 2V at resonance, branches never cross", () => {
@@ -145,7 +145,7 @@ describe("microcavity polaritons", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Collective coupling (System B) — √N scaling (PHYSICS-SPEC §B)
+// Collective coupling (System B), √N scaling (PHYSICS-SPEC §B)
 // ─────────────────────────────────────────────────────────────────────────────
 describe("Tavis–Cummings collective coupling", () => {
   test("g_N = g√N and Rabi = 2g√N", () => {

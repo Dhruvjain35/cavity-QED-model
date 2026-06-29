@@ -1,4 +1,4 @@
-//! Transfer-matrix optics — validated against exact analytic closed forms (no golden needed).
+//! Transfer-matrix optics, validated against exact analytic closed forms (no golden needed).
 
 use cqed_core::optics::{dbr_cavity, field_profile, reflectance, Layer};
 

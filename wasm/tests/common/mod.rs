@@ -90,7 +90,7 @@ pub struct Golden {
 pub fn load() -> Golden {
     let path = concat!(env!("CARGO_MANIFEST_DIR"), "/golden/golden.json");
     let txt = std::fs::read_to_string(path)
-        .unwrap_or_else(|_| panic!("golden not found at {path} — run golden/gen_golden.py"));
+        .unwrap_or_else(|_| panic!("golden not found at {path}, run golden/gen_golden.py"));
     serde_json::from_str(&txt).expect("golden JSON parse")
 }
 

@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
 """
-AUTHORITATIVE QuTiP golden generator — the single source of truth for the
+AUTHORITATIVE QuTiP golden generator, the single source of truth for the
 Rust→WASM open-quantum solver's bit-level validation. (QuTiP 5.x)
 
 LOCKED CONVENTIONS (confirm with Shravan before trusting downstream tests):
   1. Tensor order: CAVITY-FIRST.  a = tensor(destroy(N), qeye(2)),  sm = tensor(qeye(N), sigmam()).
      State layout is |n> ⊗ |sigma>.
   2. Atom energy term: NUMBER OPERATOR  H_atom = w_a * sp*sm  (= w_a |e><e|), NOT (1/2) w_a sigma_z.
-     (They differ by a constant (1/2)w_a·I shift, which changes what <sigma_z> means — we avoid that.)
+     (They differ by a constant (1/2)w_a·I shift, which changes what <sigma_z> means, we avoid that.)
   3. Jaynes–Cummings (RWA):  H = w_c a†a + w_a sp sm + g (a† sm + a sp).
   4. Dissipator: rate-in-operator.  Collapse ops C = sqrt(rate)·A:
         sqrt(kappa) a   (cavity loss),  sqrt(gamma) sm   (emitter decay),  sqrt(gamma_phi/2) sigma_z (dephasing).
      QuTiP's mesolve applies  D[C]rho = C rho C† − ½{C†C, rho}.
   5. Wigner: QuTiP default g = sqrt(2), alpha = x + i y  (so x,y are the dimensionless quadratures with hbar=1).
 
-NOTE on the 2-level basis (resolved by DUMPING QuTiP's own matrices — Rust matches the dump, not a textbook):
+NOTE on the 2-level basis (resolved by DUMPING QuTiP's own matrices, Rust matches the dump, not a textbook):
   QuTiP sigma_z = diag(1, -1), so basis(2,0) has <sigma_z>=+1 → EXCITED |e>; basis(2,1) → GROUND |g>.
   sm = sigmam() = |g><e| lowers the atom.  Excited projector P_e = sp*sm = |e><e| = proj(basis(2,0)).
 """
@@ -75,7 +75,7 @@ def ket(q):
     return {"dim": int(v.shape[0]), "re": v.real.tolist(), "im": v.imag.tolist()}
 
 golden = {
-    "_meta": "QuTiP %s golden — locked conventions (see gen_golden.py header)" % qt.__version__,
+    "_meta": "QuTiP %s golden, locked conventions (see gen_golden.py header)" % qt.__version__,
     "conventions": {
         "tensor_order": "cavity_first: tensor(cavity, atom), |n>⊗|sigma>",
         "atom_energy": "number_operator w_a*sp*sm",

@@ -355,7 +355,7 @@ tr[title] { cursor: help; }
 /* rail, system-constraints deck */
 .rail-head { font-family: var(--sans); font-size: 9px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--faint); padding: 7px 8px 6px; border-bottom: 1px solid var(--rule-2); }
 /* deterministic 2-column grid so the five tabs never wrap into uneven rows. Reading order (left to right,
-   top to bottom) is Single, Cavity, Collective, Dynamics, Vibronic — the physics build-up and tour order.
+   top to bottom) is Single, Cavity, Collective, Dynamics, Vibronic, the physics build-up and tour order.
    The container colour shows through the 1px gaps as clean gridlines. */
 .regime-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; margin: 6px 8px; border: 1px solid var(--rule-2); background: var(--rule-2); }
 .regime-toggle button { font-family: var(--sans); font-size: 9px; font-weight: 600; letter-spacing: 0.02em; padding: 7px 4px; border: none; background: var(--bg); color: var(--faint); cursor: pointer; }

@@ -1,4 +1,4 @@
-//! Wigner quasiprobability distribution — a faithful port of QuTiP's `_wigner_clenshaw`
+//! Wigner quasiprobability distribution, a faithful port of QuTiP's `_wigner_clenshaw`
 //! (dense path, offset = 0, g = √2, α = x + iy). See QuTiP `qutip/wigner.py`.
 //!
 //!   W = e^(−B/2) · (g²/2π) · Re( Σ_L c_L (A2)^L / √(L!) )   via Horner/Clenshaw,
@@ -124,7 +124,7 @@ impl WignerGrid {
     }
 }
 
-/// ∫∫ W dx dy via a rectangle sum — the quasiprobability normalizes to 1.
+/// ∫∫ W dx dy via a rectangle sum, the quasiprobability normalizes to 1.
 pub fn integrate_grid(w: &[f64], dx: f64, dy: f64) -> f64 {
     w.iter().sum::<f64>() * dx * dy
 }
@@ -132,7 +132,7 @@ pub fn integrate_grid(w: &[f64], dx: f64, dy: f64) -> f64 {
 // ── Colour mapping (done in Rust so only RGBA crosses the WASM boundary) ──────
 // The true matplotlib / ColorBrewer "RdBu" 11-class anchors (red end → blue end), verified
 // byte-for-byte against matplotlib `lib/matplotlib/_cm.py` (_RdBu_data) AND colorbrewer2.org.
-// The neutral midpoint (W=0) is light gray #F7F7F7 = (247,247,247) — NOT pure white; the ramp
+// The neutral midpoint (W=0) is light gray #F7F7F7 = (247,247,247), NOT pure white; the ramp
 // never reaches (255,255,255). This is exactly QuTiP `plot_wigner`'s default: `cm.RdBu` under a
 // symmetric norm `Normalize(-w_max, +w_max)`, so negative W → red (non-classical), positive → blue.
 // See docs/GROUNDING-RESEARCH.md §1.
@@ -186,7 +186,7 @@ pub fn wigner_to_rgba(w: &[f64], w_max: f64) -> Vec<u8> {
 }
 
 /// Husimi Q-function Q(x,y) = (1/π)·⟨α|ρ|α⟩ with α = ½·g·(x+iy) (QuTiP `qfunc` convention, g=√2).
-/// Always ≥ 0 — a genuine probability density complementing the (signed) Wigner. For a coherent
+/// Always ≥ 0, a genuine probability density complementing the (signed) Wigner. For a coherent
 /// state |β⟩ it is the Gaussian Q(α) = (1/π)·exp(−|α−β|²). Validated analytically in
 /// tests/husimi_entropy.rs.
 pub fn q_function(rho: &CMat, xvec: &[f64], yvec: &[f64], g: f64) -> Vec<f64> {

@@ -29,7 +29,7 @@ function waitForServer(timeoutMs = 20000): Promise<void> {
     const tryOnce = () =>
       http
         .get(URL, (res) => { res.resume(); resolve(); })
-        .on("error", () => (Date.now() - start > timeoutMs ? reject(new Error("vite preview did not come up — did you run `npm run build`?")) : setTimeout(tryOnce, 300)));
+        .on("error", () => (Date.now() - start > timeoutMs ? reject(new Error("vite preview did not come up, did you run `npm run build`?")) : setTimeout(tryOnce, 300)));
     tryOnce();
   });
 }
@@ -61,7 +61,7 @@ function waitForServer(timeoutMs = 20000): Promise<void> {
       await page.getByText(tab.text, { exact: true }).first().click().catch(() => { /* tab may already be active */ });
       await page.waitForTimeout(tab.settle);
       if (tab.tall) {
-        // The app scrolls inside .center, so grow the viewport to the actual bottom of the last panel —
+        // The app scrolls inside .center, so grow the viewport to the actual bottom of the last panel , 
         // this captures the below-fold panels (Bloch / disorder) with no trailing black void.
         const bottom = await page.evaluate(() => { const p = document.querySelectorAll(".center > .pane"); const last = p[p.length - 1]; return last ? Math.ceil(last.getBoundingClientRect().bottom) + 18 : 1320; });
         await page.setViewportSize({ width: 1512, height: Math.min(2200, Math.max(900, bottom)) });
@@ -73,7 +73,7 @@ function waitForServer(timeoutMs = 20000): Promise<void> {
     }
 
     await browser.close();
-    console.log(`\n✓ ${TABS.length} screenshots written to ${outDir}`);
+    console.log(`\n${TABS.length} screenshots written to ${outDir}`);
   } finally {
     cleanup();
   }

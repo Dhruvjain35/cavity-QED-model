@@ -1,6 +1,6 @@
 //! THE convention lock. Builds every JC operator in Rust and asserts element-wise
 //! agreement with the QuTiP golden (../golden/golden.json) to 1e-12. If this passes,
-//! the tensor order, signs, and dissipator form match QuTiP bit-for-bit — every
+//! the tensor order, signs, and dissipator form match QuTiP bit-for-bit, every
 //! downstream check (dynamics, Wigner, steady state) then rests on solid ground.
 
 use cqed_core::operators::{build, CMat, Params};
@@ -45,7 +45,7 @@ struct Golden {
 fn load() -> Golden {
     let path = concat!(env!("CARGO_MANIFEST_DIR"), "/golden/golden.json");
     let txt = std::fs::read_to_string(path)
-        .unwrap_or_else(|_| panic!("golden not found at {path} — run golden/gen_golden.py"));
+        .unwrap_or_else(|_| panic!("golden not found at {path}, run golden/gen_golden.py"));
     serde_json::from_str(&txt).expect("golden JSON parse")
 }
 
@@ -72,7 +72,7 @@ fn assert_match(name: &str, rust: &CMat, gold: &Mat) {
             );
         }
     }
-    println!("  ✓ {name:<8} matches QuTiP (max element error {max_err:.2e})");
+    println!("  {name:<8} matches QuTiP (max element error {max_err:.2e})");
 }
 
 #[test]
@@ -90,7 +90,7 @@ fn operators_match_qutip_bit_for_bit() {
     let ops = build(&p);
     let g = &golden.operators;
 
-    println!("Convention lock — Rust vs QuTiP {}, dim {}:", "5.3.0", 2 * p.n_fock);
+    println!("Convention lock, Rust vs QuTiP {}, dim {}:", "5.3.0", 2 * p.n_fock);
     assert_match("a", &ops.a, &g.a);
     assert_match("a†a", &ops.num, &g.adag_a);
     assert_match("sm", &ops.sm, &g.sm);

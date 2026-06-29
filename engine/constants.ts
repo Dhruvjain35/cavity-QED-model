@@ -13,7 +13,7 @@ export const CM1_PER_EV = 8065.543937;
 export const cm1ToEv = (x: number): number => x / CM1_PER_EV;
 export const evToCm1 = (x: number): number => x * CM1_PER_EV;
 
-// Baseline HTC parameters (docs/PHYSICS-SPEC.md §7, §8 — paper Fig.2/4 anchors).
+// Baseline HTC parameters (docs/PHYSICS-SPEC.md §7, §8, paper Fig.2/4 anchors).
 export const DEFAULT_HTC = {
   hbar_wc: 1.0, // cavity photon energy [eV]
   E_AD: 1.0, // |donor–acceptor gap| [eV]

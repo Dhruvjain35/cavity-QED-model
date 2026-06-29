@@ -9,22 +9,22 @@ export class Sim {
      */
     advance(dt_advance: number, atol: number, rtol: number): void;
     /**
-     * Flattened |ρ_c[n,n′]| (row-major, n_fock²) of the current cavity-reduced state — a
+     * Flattened |ρ_c[n,n′]| (row-major, n_fock²) of the current cavity-reduced state, a
      * hinton-style density-matrix diagnostic. ρ_c = Tr_atom ρ (validated vs QuTiP ptrace(0)).
      */
     cavity_rho_abs(): Float64Array;
     /**
-     * Bloch vector of the single-excitation effective qubit {|0,e⟩, |1,g⟩} — the two states the vacuum
+     * Bloch vector of the single-excitation effective qubit {|0,e⟩, |1,g⟩}, the two states the vacuum
      * Rabi oscillation swaps the excitation between. Returns [x, y, z] = [2 Re ρ_01, 2 Im ρ_01, ρ_00 −
      * ρ_11] with 0 ≡ |0,e⟩ (basis index 2·0+0 = 0) and 1 ≡ |1,g⟩ (index 2·1+1 = 3). Tracing out the
      * cavity kills the BARE-atom g–e coherence (the photon-number entanglement is orthogonal), so this
      * manifold coherence ρ[|0,e⟩,|1,g⟩] is the honest one: its (x,z) projection spirals inward as κ,γ
-     * leak population to |0,g⟩ and damp the coherence — the geometric signature of decoherence.
+     * leak population to |0,g⟩ and damp the coherence, the geometric signature of decoherence.
      */
     emitter_bloch(): Float64Array;
     excited_pop(): number;
     /**
-     * Live Husimi Q-function grid (row-major n×n, r→y c→x) of the cavity-reduced state — a
+     * Live Husimi Q-function grid (row-major n×n, r→y c→x) of the cavity-reduced state, a
      * strictly non-negative phase-space density that complements the (signed) Wigner.
      */
     husimi(xmin: number, xmax: number, n: number): Float64Array;
@@ -45,7 +45,7 @@ export class Sim {
     /**
      * Flattened |ρ[i,j]| (row-major, (2·n_fock)²) of the FULL joint cavity⊗emitter state.
      * Unlike the cavity-reduced ρ_c (diagonal in vacuum-Rabi), the joint state carries the
-     * oscillating-and-decaying coherence ρ[|0,e⟩,|1,g⟩] — the honest picture of decoherence.
+     * oscillating-and-decaying coherence ρ[|0,e⟩,|1,g⟩], the honest picture of decoherence.
      */
     rho_abs(): Float64Array;
     /**
@@ -73,7 +73,7 @@ export class Sim {
      */
     wigner(xmin: number, xmax: number, n: number): Float64Array;
     /**
-     * Live cavity-reduced Wigner mapped to a flat RGBA buffer (n²·4 bytes) — ready for
+     * Live cavity-reduced Wigner mapped to a flat RGBA buffer (n²·4 bytes), ready for
      * `putImageData`. Colour mapping happens here so only RGBA crosses the boundary.
      * `w_max ≤ 0` auto-scales; otherwise fixed (use 1/π for the absolute physical scale).
      */
@@ -99,7 +99,7 @@ export function arrowhead_modes(w_c: number, w_a: number, g: number, m: number, 
  * w_i come from Gaussian energy disorder (w_a + σ·N(0,1)); the couplings g_i are passed in directly
  * (g_i = g_0·(μ̂_i·ε̂)·f(r_i), computed in the UI from the shared ensemble). Returns the same flat
  * [eigs(M+1), then (M+1)² eigenvectors] as `arrowhead_modes`. A perpendicular dipole (g_i=0) yields a
- * dark eigenstate localized on that molecule — the physics is identical to the validated arrowhead.
+ * dark eigenstate localized on that molecule, the physics is identical to the validated arrowhead.
  */
 export function arrowhead_modes_gi(w_c: number, w_a: number, sigma: number, seed: number, gi: Float64Array): Float64Array;
 
@@ -122,7 +122,7 @@ export function cavity_layers(lambda: number, n_hi: number, n_lo: number, pairs:
 export function cavity_power_spectrum(w_c: number, w_a: number, g: number, m: number, sigma: number, seed: number, n_fft: number, dt: number, gamma: number): Float64Array;
 
 /**
- * Cavity power spectrum for per-molecule couplings g_i — flat [ω (n/2), power (n/2)]. As above, w_i
+ * Cavity power spectrum for per-molecule couplings g_i, flat [ω (n/2), power (n/2)]. As above, w_i
  * from (σ, seed); the doublet collapses as orientational/spatial disorder weakens the bright coupling.
  */
 export function cavity_power_spectrum_gi(w_c: number, w_a: number, sigma: number, seed: number, gi: Float64Array, n_fft: number, dt: number, gamma: number): Float64Array;
@@ -163,7 +163,7 @@ export function htc_matrix_view(w_c: number, w_x: number, w_v: number, lambda: n
 export function htc_spectrum(w_c: number, w_x: number, w_v: number, lambda: number, g: number, n_vib: number): Float64Array;
 
 /**
- * EXPLICIT N-molecule HTC absorption (exact, no 1/N shortcut) — flat [eigs (d), photon_frac (d),
+ * EXPLICIT N-molecule HTC absorption (exact, no 1/N shortcut), flat [eigs (d), photon_frac (d),
  * absorption (d)] with d = (n_mol+1)·n_vib^n_mol. Tractable for small n_mol only. See `htc::htc_multi`.
  */
 export function htc_spectrum_multi(w_c: number, w_x: number, w_v: number, lambda: number, g: number, n_mol: number, n_vib: number): Float64Array;

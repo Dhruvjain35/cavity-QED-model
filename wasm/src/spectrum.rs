@@ -71,7 +71,7 @@ pub fn modes(w_c: f64, w: &[f64], g: &[f64]) -> Modes {
     Modes { eigs, vecs }
 }
 
-/// Deterministic standard normals from a u64 seed (splitmix64 + Box–Muller). Pure Rust — keeps the
+/// Deterministic standard normals from a u64 seed (splitmix64 + Box–Muller). Pure Rust, keeps the
 /// wasm build dependency-free; used only to draw the live disorder realization (not validation).
 pub fn gaussians(seed: u64, n: usize) -> Vec<f64> {
     let mut state = seed;
@@ -99,7 +99,7 @@ pub fn gaussians(seed: u64, n: usize) -> Vec<f64> {
 /// Sweep the coupling g over [g0, g1] in `steps` points (one fixed disorder realization), returning
 /// the full (M+1) eigen-energies at each step, flat and row-major by step. Plotting energy vs g gives
 /// the polariton dispersion fan: the two bright states split apart as 2g√M while the M−1 dark states
-/// stay pinned at the bare emitter energy — the canonical Rabi-splitting-vs-coupling phase map.
+/// stay pinned at the bare emitter energy, the canonical Rabi-splitting-vs-coupling phase map.
 pub fn coupling_sweep(w_c: f64, w_a: f64, m: usize, sigma: f64, seed: u64, g0: f64, g1: f64, steps: usize) -> Vec<f64> {
     let z = gaussians(seed, m);
     let w: Vec<f64> = z.iter().map(|zi| w_a + sigma * zi).collect();

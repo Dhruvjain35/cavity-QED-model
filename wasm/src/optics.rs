@@ -1,7 +1,7 @@
 //! Transfer-matrix method (TMM) for a 1D multilayer optical cavity at normal incidence.
 //!
 //! Computes the reflectance and the |E(z)|² field profile of a distributed-Bragg-reflector (DBR)
-//! cavity — the real physics behind the cavity cross-section visual: a standing-wave antinode in
+//! cavity, the real physics behind the cavity cross-section visual: a standing-wave antinode in
 //! the spacer that decays into the mirror stacks. Uses the standard interface + propagation 2×2
 //! matrices (forward/backward field amplitudes). Validated against exact analytic benchmarks
 //! (Fresnel single interface, quarter-wave anti-reflection / high-reflector) in `tests/optics.rs`.
