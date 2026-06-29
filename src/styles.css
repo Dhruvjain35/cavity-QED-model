@@ -1,23 +1,30 @@
-/* Cavity-QED computational workbench, high-density instrument console (Bruker OPUS / VMD / lab
-   hardware lineage). Scientific type system: IBM Plex Sans for all UI/labels/axes (matplotlib/QuTiP
-   convention), IBM Plex Mono for tabular data/numbers, KaTeX (Computer Modern) for equations. Zero
-   radii, single-pixel metallic-gray rules, no shadows/glows; spectroscopic colour system: cyan
-   photons / red excitons / amber phonons / purple dark / green calibration. */
+/* Cavity-QED computational workbench. Light, neutral application chrome in the COMSOL / MATLAB /
+   Origin / QuTiP-matplotlib lineage: the one dark surface is the 3D viewport; everything else is
+   achromatic gray with a single restrained selection-blue accent. Native system sans for all
+   UI/labels/axes, tabular mono for numbers, KaTeX for equations. Zero radii, single-pixel rules,
+   no glows. Colour (matplotlib tab10) is rationed to plotted physics only: blue photons / red
+   excitons / orange phonons / purple dark / green calibration. */
 :root {
-  --bg: #050708; --panel: #0c0f12; --rule: #21262d; --rule-2: #30363d; --rule-soft: #161a1f;
-  --ink: #ffffff; --dim: #8b949e; --faint: #6e7681; --axis: #484f58;
-  --cyan: #00ffff; --red: #ff3333; --amber: #ffcc00; --purple: #9e77ed; --green: #00ff66;
-  /* legacy aliases kept so existing class names resolve to the new industrial palette */
-  --cobalt: var(--cyan); --crimson: var(--red); --emerald: var(--green);
-  /* scientific-instrument type system: neutral sans for all UI/labels, tabular mono for data/numbers,
-     KaTeX (Computer Modern) for equations, matches matplotlib/QuTiP-style scientific software. */
-  --sans: "IBM Plex Sans", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
-  --mono: "IBM Plex Mono", "SF Mono", "SFMono-Regular", ui-monospace, monospace;
+  /* light, neutral application chrome (COMSOL / MATLAB / Origin convention); colour is rationed to the
+     plotted physics only. Surfaces achromatic; a single restrained selection-blue is the only accent. */
+  --app-bg: #f0f0f0; --bg: #f0f0f0; --panel: #f6f6f6; --panel-2: #ececec; --surface: #ffffff;
+  --rule: #d0d0d0; --rule-2: #c0c0c0; --rule-soft: #e4e4e4;
+  --ink: #1a1a1a; --dim: #555555; --faint: #8a8a8a; --axis: #000000;
+  --accent: #0078d4; --accent-fill: #cde2f5; --accent-edge: #3399ff;
+  --viewport: #1e1e1e; --viewport-2: #252526;
+  /* labels/overlays that sit ON the dark 3D viewport: muted, legible, no neon glow */
+  --vp-panel: rgba(37, 37, 38, 0.95); --vp-ink: #d6d6d6; --vp-dim: #9aa4b0; --vp-field: #5aa9dd; --vp-matter: #e8915a;
+  /* data colours = matplotlib tab10; used ONLY in plot series / legends / composition bars, never as chrome */
+  --cyan: #1f77b4; --red: #d62728; --amber: #ff7f0e; --purple: #9467bd; --green: #2ca02c;
+  --cobalt: #1f77b4; --crimson: #d62728; --emerald: #2ca02c;
+  /* native system sans (matches matplotlib/Arial axis output); tabular mono for numbers; KaTeX for math */
+  --sans: Arial, "Helvetica Neue", "Segoe UI", system-ui, -apple-system, "Liberation Sans", sans-serif;
+  --mono: Consolas, "SF Mono", Menlo, "DejaVu Sans Mono", ui-monospace, monospace;
   --serif: var(--sans);
 }
 * { box-sizing: border-box; border-radius: 0 !important; }
 html, body, #root { margin: 0; height: 100%; }
-body { background: var(--bg); color: var(--ink); font-family: var(--sans); font-weight: 500; font-size: 12px; -webkit-font-smoothing: antialiased; }
+body { background: var(--bg); color: var(--ink); font-family: var(--sans); font-weight: 400; font-size: 12px; -webkit-font-smoothing: antialiased; }
 /* DATA / NUMBERS → tabular mono (readout values, inputs, ratios, units align like a real instrument);
    all prose/labels/headers stay sans. */
 .metrics td.v, .knob-input, .knob-readout, .reg-console, .cr-k b, .cr-leg b,
@@ -25,29 +32,24 @@ body { background: var(--bg); color: var(--ink); font-family: var(--sans); font-
 
 .ws-root { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
 
-/* top status bar */
-.topbar { flex: 0 0 26px; display: flex; align-items: center; justify-content: space-between; padding: 0 8px; border-bottom: 1px solid var(--rule-2); font-family: var(--sans); font-size: 10px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; }
-.topbar .brand { color: var(--ink); font-weight: 700; }
-.topbar .status { color: var(--faint); }
-.topbar .live { color: var(--green); font-size: 12px; vertical-align: middle; }
-/* 3.F / 3.G · top-bar actions: shareable link + about */
-.topbar-right { display: flex; align-items: center; gap: 10px; }
-.copy-link { font-family: var(--sans); font-size: 12px; background: #444; color: #00ff66; border: none; padding: 2px 8px; cursor: pointer; letter-spacing: 0.04em; text-transform: none; }
-.copy-link:hover { background: #555; }
-.examples-btn { font-family: var(--sans); font-size: 11px; font-weight: 700; letter-spacing: 0.04em; background: var(--cyan); color: #001014; border: none; padding: 3px 11px; cursor: pointer; text-transform: none; }
-.examples-btn:hover { background: #66ffff; }
-.tour-btn { font-family: var(--sans); font-size: 11px; font-weight: 700; letter-spacing: 0.04em; background: transparent; color: var(--cyan); border: 1px solid var(--cyan); padding: 2px 10px; cursor: pointer; text-transform: none; }
-.tour-btn:hover { background: #0c2630; }
+/* application title bar (light chrome) */
+.topbar { flex: 0 0 28px; display: flex; align-items: center; justify-content: space-between; padding: 0 8px; background: var(--panel); border-bottom: 1px solid var(--rule); font-family: var(--sans); font-size: 11px; }
+.topbar .brand { color: var(--ink); font-weight: 700; letter-spacing: 0.01em; }
+.topbar .status { color: var(--dim); font-size: 10.5px; }
+/* top-bar actions: flat gray toolbar buttons */
+.topbar-right { display: flex; align-items: center; gap: 6px; }
+.copy-link, .examples-btn, .tour-btn { font-family: var(--sans); font-size: 11px; font-weight: 400; background: var(--surface); color: var(--ink); border: 1px solid var(--rule); padding: 2px 9px; cursor: pointer; text-transform: none; }
+.copy-link:hover, .examples-btn:hover, .tour-btn:hover { background: var(--panel-2); border-color: var(--rule-2); }
 /* guided tour, a non-blocking card pinned to the bottom so the instrument is visible BEHIND it as each
-   step drives the real app state. Instrument-styled: hairlines, IBM Plex, cyan accents, zero radius. */
+   step drives the real app state. Instrument-styled: hairlines, native sans, restrained accent, zero radius. */
 .tour-overlay { position: fixed; left: 0; right: 0; bottom: 0; z-index: 1200; display: flex; justify-content: center; padding: 0 12px 14px; pointer-events: none; }
 /* the welcome step is a prominent centred panel over a dimmed app (the first thing a new user sees); every
    later step is the non-blocking bottom strip so the tab it switched to stays fully visible behind it. */
-.tour-overlay.tour-intro { top: 0; align-items: center; padding: 16px; background: rgba(3, 5, 8, 0.62); pointer-events: auto; }
-.tour-card { pointer-events: auto; width: min(540px, calc(100vw - 24px)); background: rgba(8, 11, 17, 0.97); border: 1px solid var(--cyan); box-shadow: 0 0 0 1px #00ffff22, 0 -6px 30px rgba(0, 0, 0, 0.6); padding: 12px 15px 11px; font-family: var(--sans); }
-.tour-intro .tour-card { width: min(580px, calc(100vw - 28px)); padding: 18px 20px 15px; box-shadow: 0 0 0 1px #00ffff33, 0 12px 56px rgba(0, 0, 0, 0.7); }
+.tour-overlay.tour-intro { top: 0; align-items: center; padding: 16px; background: rgba(0, 0, 0, 0.35); pointer-events: auto; }
+.tour-card { pointer-events: auto; width: min(540px, calc(100vw - 24px)); background: var(--surface); border: 1px solid var(--rule-2); box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18); padding: 12px 15px 11px; font-family: var(--sans); }
+.tour-intro .tour-card { width: min(580px, calc(100vw - 28px)); padding: 18px 20px 15px; box-shadow: 0 4px 24px rgba(0, 0, 0, 0.22); }
 .tour-intro .tour-title { font-size: 17px; }
-.tour-tag { font-size: 8.5px; font-weight: 700; letter-spacing: 0.12em; color: var(--cyan); text-transform: uppercase; margin-bottom: 5px; }
+.tour-tag { font-size: 8.5px; font-weight: 700; letter-spacing: 0.08em; color: var(--accent); text-transform: uppercase; margin-bottom: 5px; }
 .tour-title { font-size: 14px; font-weight: 700; color: var(--ink); margin-bottom: 5px; letter-spacing: 0.01em; }
 .tour-body { font-size: 11.5px; line-height: 1.55; color: var(--dim); }
 .tour-body b { font-weight: 700; }
@@ -55,31 +57,31 @@ body { background: var(--bg); color: var(--ink); font-family: var(--sans); font-
 .tour-nav { display: flex; align-items: center; gap: 7px; margin-top: 11px; }
 .tour-nav button { font-family: var(--sans); font-size: 11px; font-weight: 600; padding: 5px 13px; border: 1px solid var(--rule-2); background: transparent; color: var(--dim); cursor: pointer; }
 .tour-nav button:hover { background: var(--rule); color: var(--ink); }
-.tour-nav .tour-next { background: var(--cyan); color: #001014; border-color: var(--cyan); font-weight: 700; }
-.tour-nav .tour-next:hover { background: #66ffff; }
+.tour-nav .tour-next { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; }
+.tour-nav .tour-next:hover { background: #1a86e0; }
 .tour-nav .tour-skip { border: none; color: var(--faint); padding-left: 0; }
 .tour-nav .tour-skip:hover { background: transparent; color: var(--dim); }
 .tour-dots { display: flex; gap: 5px; margin-top: 9px; }
 .tour-dot { width: 6px; height: 6px; background: var(--rule-2); }
-.tour-dot.on { background: var(--cyan); }
+.tour-dot.on { background: var(--accent); }
 /* examples / preset gallery overlay */
-.gallery-overlay { position: fixed; inset: 0; background: rgba(3, 5, 8, 0.74); z-index: 1000; display: flex; align-items: center; justify-content: center; }
-.gallery-panel { position: relative; width: min(660px, calc(100vw - 32px)); max-height: 88vh; overflow-y: auto; background: #0c0f12; border: 1px solid var(--rule-2); padding: 16px 18px 14px; font-family: var(--sans); }
-.gallery-head { font-size: 13px; font-weight: 700; letter-spacing: 0.05em; color: var(--cyan); margin-bottom: 5px; }
+.gallery-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.35); z-index: 1000; display: flex; align-items: center; justify-content: center; }
+.gallery-panel { position: relative; width: min(660px, calc(100vw - 32px)); max-height: 88vh; overflow-y: auto; background: var(--surface); border: 1px solid var(--rule-2); box-shadow: 0 4px 24px rgba(0,0,0,0.22); padding: 16px 18px 14px; font-family: var(--sans); }
+.gallery-head { font-size: 13px; font-weight: 700; letter-spacing: 0.01em; color: var(--ink); margin-bottom: 5px; }
 .gallery-sub { font-size: 10px; color: var(--dim); margin-bottom: 14px; line-height: 1.55; }
 .gallery-sub b { color: var(--ink); }
 .gallery-group { margin-bottom: 13px; }
 .gg-head { font-size: 9px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint); padding-bottom: 4px; border-bottom: 1px solid var(--rule); margin-bottom: 3px; }
 .gg-item { display: block; width: 100%; text-align: left; background: transparent; border: 1px solid transparent; border-bottom: 1px solid var(--rule-soft); padding: 7px 9px; cursor: pointer; transition: background 0.08s; }
 .gg-item:last-child { border-bottom: none; }
-.gg-item:hover { background: #11161d; border-color: var(--rule-2); }
+.gg-item:hover { background: var(--panel-2); border-color: var(--rule-2); }
 .gg-title { display: block; font-size: 11.5px; font-weight: 600; color: var(--ink); margin-bottom: 2px; }
-.gg-item:hover .gg-title { color: var(--cyan); }
+.gg-item:hover .gg-title { color: var(--accent); }
 .gg-blurb { display: block; font-size: 9.5px; color: var(--dim); line-height: 1.45; max-width: 60ch; }
-.about-btn { width: 18px; height: 18px; background: #21262d; color: #888; border: 1px solid #30363d; cursor: pointer; font-size: 11px; line-height: 1; display: inline-flex; align-items: center; justify-content: center; padding: 0; }
-.about-btn:hover { color: #fff; }
-.about-overlay { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(440px, calc(100vw - 24px)); max-height: 90vh; overflow-y: auto; background: #0c0f12; border: 1px solid #30363d; padding: 16px; z-index: 1000; font-family: var(--sans); text-transform: none; }
-.about-overlay .about-title { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; color: var(--cyan); margin-bottom: 10px; }
+.about-btn { width: 18px; height: 18px; background: var(--surface); color: var(--dim); border: 1px solid var(--rule); cursor: pointer; font-size: 11px; line-height: 1; display: inline-flex; align-items: center; justify-content: center; padding: 0; }
+.about-btn:hover { color: var(--ink); background: var(--panel-2); }
+.about-overlay { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(440px, calc(100vw - 24px)); max-height: 90vh; overflow-y: auto; background: var(--surface); border: 1px solid var(--rule-2); box-shadow: 0 4px 24px rgba(0,0,0,0.22); padding: 16px; z-index: 1000; font-family: var(--sans); text-transform: none; }
+.about-overlay .about-title { font-size: 12px; font-weight: 700; letter-spacing: 0.02em; color: var(--ink); margin-bottom: 10px; }
 .about-overlay p { font-size: 10.5px; line-height: 1.55; color: var(--dim); margin: 0 0 9px; }
 .about-overlay p:last-child { margin-bottom: 0; }
 .about-link { color: var(--green); cursor: pointer; text-decoration: none; }
@@ -94,7 +96,7 @@ body { background: var(--bg); color: var(--ink); font-family: var(--sans); font-
 .about-val-row .an { color: var(--amber); font-weight: 600; white-space: nowrap; }
 .about-val-note { font-size: 9px; color: var(--faint); padding: 5px 7px; border-top: 1px solid var(--rule); }
 .about-x { position: absolute; top: 8px; right: 10px; background: transparent; border: none; color: var(--dim); font-size: 16px; cursor: pointer; line-height: 1; padding: 0; }
-.about-x:hover { color: #fff; }
+.about-x:hover { color: var(--ink); }
 
 /* 3-column console grid */
 /* fluid 3-pane grid: rail + dock shrink with the window so the center keeps usable room; collapse to a
@@ -123,13 +125,13 @@ body { background: var(--bg); color: var(--ink); font-family: var(--sans); font-
 .cav-row > .pane:last-child { border-right: none; }
 .cav-row > .pane > .cv { margin: auto; }
 /* 3.E · panel-header hierarchy, cyan hairline above every panel title */
-.pane-head { font-family: var(--sans); font-size: 9px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: #888; margin-bottom: 3px; line-height: 1.35; border-top: 1px solid #00ffff22; padding-top: 4px; }
+.pane-head { font-family: var(--sans); font-size: 9px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--faint); margin-bottom: 3px; line-height: 1.35; border-top: 1px solid var(--rule-soft); padding-top: 4px; }
 .pane-head i { font-style: normal; }
 /* plain-language one-liner under a technical pane title (Standard 4) */
 .pane-sub { font-family: var(--sans); font-size: 9px; font-weight: 400; line-height: 1.35; color: var(--faint); text-transform: none; letter-spacing: 0.01em; margin: 0 0 4px; }
 .pane-sub b { color: var(--dim); font-weight: 600; }
 /* governing-equation strip, the exact formula each panel computes (Standard: show the math) */
-.panel-eqn { display: flex; align-items: center; gap: 10px; padding: 5px 9px; margin: 0 0 5px; background: #0b1018; border-top: 1px solid #00ffff1f; border-bottom: 1px solid var(--rule-soft); overflow: hidden; }
+.panel-eqn { display: flex; align-items: center; gap: 10px; padding: 5px 9px; margin: 0 0 5px; background: var(--panel); border-top: 1px solid var(--rule-soft); border-bottom: 1px solid var(--rule-soft); overflow: hidden; }
 .panel-eqn .pe-fitzone { flex: 1 1 0; min-width: 0; overflow: hidden; display: flex; align-items: center; }
 .panel-eqn .pe-scale { display: inline-flex; align-items: center; gap: 10px; width: max-content; transform-origin: left center; }
 /* in the narrow live-dynamics bento, drop the supplementary "where" annotation so the equation renders
@@ -145,7 +147,7 @@ body { background: var(--bg); color: var(--ink); font-family: var(--sans); font-
    horizontally as a unit. Never let flex shrink the box below the formula, which made the math paint
    over the annotation that follows it. */
 .panel-eqn .pe-tex { flex: 0 0 auto; }
-.panel-eqn .pe-tex .katex { font-size: 1.12em; color: #e3ecf5; }
+.panel-eqn .pe-tex .katex { font-size: 1.12em; color: var(--ink); }
 .panel-eqn .pe-tex .katex-display { margin: 1px 0; text-align: left; }
 .panel-eqn .pe-where { flex: 0 0 auto; font-size: 8.5px; color: var(--dim); line-height: 1.3; padding-left: 2px; border-left: 1px solid var(--rule); }
 .panel-eqn::-webkit-scrollbar { height: 5px; } .panel-eqn::-webkit-scrollbar-thumb { background: var(--rule-2); }
@@ -159,12 +161,12 @@ tr[title] { cursor: help; }
 .regime-badge .rb-label { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; }
 .regime-badge .rb-ratios { display: flex; gap: 12px; font-size: 9.5px; color: var(--dim); margin-top: 4px; font-variant-numeric: tabular-nums; }
 .regime-badge .rb-note { font-size: 8.5px; color: var(--faint); margin-top: 3px; line-height: 1.3; text-transform: none; }
-.regime-badge.rb-wk { border-color: #1e6b3a; } .rb-wk .rb-dot, .rb-wk .rb-label { background: none; color: var(--green); } .rb-wk .rb-dot { background: var(--green); }
-.regime-badge.rb-st { border-color: #1e6b7a; } .rb-st .rb-dot, .rb-st .rb-label { color: var(--cyan); } .rb-st .rb-dot { background: var(--cyan); }
-.regime-badge.rb-us { border-color: #8a6a13; } .rb-us .rb-dot, .rb-us .rb-label { color: var(--amber); } .rb-us .rb-dot { background: var(--amber); }
+.regime-badge.rb-wk { border-color: var(--rule-2); border-top: 2px solid var(--green); } .rb-wk .rb-dot, .rb-wk .rb-label { background: none; color: var(--green); } .rb-wk .rb-dot { background: var(--green); }
+.regime-badge.rb-st { border-color: var(--rule-2); border-top: 2px solid var(--cyan); } .rb-st .rb-dot, .rb-st .rb-label { color: var(--cyan); } .rb-st .rb-dot { background: var(--cyan); }
+.regime-badge.rb-us { border-color: var(--rule-2); border-top: 2px solid var(--amber); } .rb-us .rb-dot, .rb-us .rb-label { color: var(--amber); } .rb-us .rb-dot { background: var(--amber); }
 .rb-chk { font-size: 8px; color: var(--green); font-weight: 600; margin-left: 3px; vertical-align: middle; }
 /* tab subtitle, the one-line "what is this tab" entry point (Standard 8) */
-.tab-sub { font-family: var(--sans); font-size: 9.5px; line-height: 1.4; color: var(--dim); padding: 5px 8px 6px; border-bottom: 1px solid var(--rule); background: #0a0d12; }
+.tab-sub { font-family: var(--sans); font-size: 9.5px; line-height: 1.4; color: var(--dim); padding: 5px 8px 6px; border-bottom: 1px solid var(--rule); background: var(--panel); }
 .tab-sub b { color: var(--ink); font-weight: 700; }
 .tab-sub .ts-watch { color: var(--cyan); }
 .cv { display: block; max-width: 100%; }
@@ -177,17 +179,17 @@ tr[title] { cursor: help; }
 /* 3.C · hover crosshair overlay, sits exactly over a plot canvas, never intercepts its clicks */
 .plotwrap { position: relative; display: inline-block; max-width: 100%; line-height: 0; }
 .plot-ov { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; }
-.cavity3d { width: 100%; height: 460px; min-height: 360px; overflow: hidden; background: #050708; }
+.cavity3d { width: 100%; height: 460px; min-height: 360px; overflow: hidden; background: var(--viewport); }
 .cav-stage { position: relative; width: 100%; height: 100%; }
 .cav-stage canvas { width: 100% !important; height: 100% !important; display: block; }
 .cv-loading { display: flex; align-items: center; justify-content: center; height: 100%; font-family: var(--sans); font-size: 11px; color: var(--dim); }
 /* shown only if the lazy 3D chunk fails to load or WebGL cannot start, the rest of the instrument is unaffected */
-.scene-fallback { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; height: 100%; padding: 18px; text-align: center; font-family: var(--sans); background: #050708; }
+.scene-fallback { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; height: 100%; padding: 18px; text-align: center; font-family: var(--sans); background: var(--viewport); }
 .scene-fallback-t { font-size: 12px; font-weight: 600; letter-spacing: 0.04em; color: var(--ink); }
 .scene-fallback-s { font-size: 10.5px; line-height: 1.5; color: var(--dim); max-width: 320px; }
 /* non-blocking "computing" state over the vibronic plot during the heavy exact diagonalization */
-.cv-computing { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 8px; font-family: var(--sans); font-size: 11px; color: var(--cyan); background: rgba(5, 7, 8, 0.55); backdrop-filter: blur(1px); z-index: 5; pointer-events: none; }
-.cv-spin { width: 11px; height: 11px; border: 1.5px solid rgba(0, 255, 255, 0.25); border-top-color: var(--cyan); border-radius: 50%; animation: cv-spin 0.7s linear infinite; }
+.cv-computing { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 8px; font-family: var(--sans); font-size: 11px; color: var(--vp-dim); background: rgba(30, 30, 30, 0.55); z-index: 5; pointer-events: none; }
+.cv-spin { width: 11px; height: 11px; border: 1.5px solid rgba(255, 255, 255, 0.22); border-top-color: var(--vp-ink); border-radius: 50% !important; animation: cv-spin 0.7s linear infinite; }
 @keyframes cv-spin { to { transform: rotate(360deg); } }
 .phase-row { display: flex; gap: 8px; flex-wrap: wrap; }
 
@@ -195,7 +197,7 @@ tr[title] { cursor: help; }
 .dyn-viewtabs { display: flex; gap: 0; border-bottom: 1px solid var(--rule-2); flex: 0 0 auto; }
 .dyn-viewtabs button { font-family: var(--sans); font-size: 10px; font-weight: 600; letter-spacing: 0.03em; padding: 7px 14px; border: none; border-right: 1px solid var(--rule); background: transparent; color: var(--faint); cursor: pointer; }
 .dyn-viewtabs button:hover { color: var(--ink); background: var(--rule-soft); }
-.dyn-viewtabs button.on { color: var(--cyan); border-bottom: 2px solid var(--cyan); background: #0b1016; }
+.dyn-viewtabs button.on { color: var(--accent); border-bottom: 2px solid var(--accent); background: var(--surface); }
 /* polariton FORMATION, 2-panel fit-to-screen: avoided crossing (left) + the selected polariton in 3D (right).
    Fills the center column height with no scroll; stacks to one column when the center gets narrow. */
 .pf-grid { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1.06fr) minmax(272px, 0.94fr); }
@@ -216,20 +218,20 @@ tr[title] { cursor: help; }
 .pf-warn { font-size: 9px; color: var(--amber); line-height: 1.4; border: 1px solid #8a6a13; padding: 4px 6px; background: #1a1505; }
 .pf-comps { display: flex; gap: 8px; }
 .pf-comp { flex: 1; min-width: 0; text-align: left; background: transparent; border: 1px solid var(--rule-2); padding: 6px 8px; cursor: pointer; }
-.pf-comp:hover { background: #11161d; border-color: var(--axis); }
-.pf-comp.on { background: #11202a; border-color: var(--cyan); }
+.pf-comp:hover { background: var(--panel-2); border-color: var(--rule-2); }
+.pf-comp.on { background: var(--accent-fill); border-color: var(--accent-edge); }
 .pf-comp-name { font-size: 11px; font-weight: 700; color: var(--ink); }
-.pf-comp.on .pf-comp-name { color: var(--cyan); }
-.pf-bar { display: flex; height: 9px; margin: 5px 0 4px; border: 1px solid #000; overflow: hidden; }
-.pf-seg { height: 100%; } .pf-seg.pf-ph { background: var(--cyan); } .pf-seg.pf-mt { background: #ff3a3a; }
+.pf-comp.on .pf-comp-name { color: var(--accent); }
+.pf-bar { display: flex; height: 9px; margin: 5px 0 4px; border: 1px solid var(--rule-2); overflow: hidden; }
+.pf-seg { height: 100%; } .pf-seg.pf-ph { background: var(--cyan); } .pf-seg.pf-mt { background: var(--red); }
 .pf-comp-val { font-size: 8.5px; color: var(--dim); } .pf-comp-val b { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 /* right: the selected polariton as a stable hybrid in 3D + a freeze/oscillate toggle */
-.pf-right .live3d { flex: 1 1 0; position: relative; min-height: 200px; width: 100%; overflow: hidden; background: #050708; }
+.pf-right .live3d { flex: 1 1 0; position: relative; min-height: 200px; width: 100%; overflow: hidden; background: var(--viewport); }
 .pf-3dctrls { flex: 0 0 auto; display: flex; gap: 0; border: 1px solid var(--rule-2); margin-top: 7px; width: fit-content; }
 .pf-3dctrls button { font-family: var(--sans); font-size: 10px; font-weight: 600; padding: 6px 12px; border: none; border-right: 1px solid var(--rule); background: transparent; color: var(--dim); cursor: pointer; }
 .pf-3dctrls button:last-child { border-right: none; }
 .pf-3dctrls button:hover { background: var(--rule); color: var(--ink); }
-.pf-3dctrls button.on { background: var(--cyan); color: #001014; font-weight: 700; }
+.pf-3dctrls button.on { background: var(--accent-fill); border-color: var(--accent-edge); color: var(--accent); font-weight: 600; }
 @container center (max-width: 620px) { .pf-grid { grid-template-columns: 1fr; grid-auto-rows: auto; overflow-y: auto; } .pf-grid > .pf-left { border-right: none; border-bottom: 1px solid var(--rule-2); } .pf-right .live3d { min-height: 260px; } }
 @supports not (container-type: inline-size) { @media (max-width: 1180px) { .pf-grid { grid-template-columns: 1fr; overflow-y: auto; } .pf-grid > .pf-left { border-right: none; border-bottom: 1px solid var(--rule-2); } } }
 
@@ -249,24 +251,24 @@ tr[title] { cursor: help; }
 .pw-fit > .cv { display: block; max-width: 100%; max-height: 100%; width: auto !important; height: auto !important; margin: 0; }
 .pw-fit > .plot-ov { position: absolute; inset: auto; top: 50%; left: 50%; transform: translate(-50%, -50%); width: auto !important; height: auto !important; max-width: 100%; max-height: 100%; }
 .bento-3d { padding-bottom: 0; position: relative; }
-.live3d { position: relative; flex: 1 1 0; width: 100%; min-height: 150px; overflow: hidden; background: #050708; }
+.live3d { position: relative; flex: 1 1 0; width: 100%; min-height: 150px; overflow: hidden; background: var(--viewport); }
 /* DYNAMICS transport bar, thin industrial controls, zero radius, cyan accents */
 .transport { flex-shrink: 0; display: flex; align-items: center; gap: 6px; padding: 5px 8px; border-top: 1px solid var(--rule-2); background: var(--panel); }
 .transport .tp-btn { font-family: var(--sans); font-size: 10px; line-height: 1; width: 26px; height: 22px; padding: 0; border: 1px solid var(--rule); border-radius: 0; background: transparent; color: var(--dim); cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .transport .tp-btn:hover { background: var(--rule); color: var(--ink); }
 .transport .tp-scrub { flex: 1; height: 3px; min-width: 60px; -webkit-appearance: none; appearance: none; background: var(--rule-2); border-radius: 0; cursor: pointer; }
-.transport .tp-scrub::-webkit-slider-thumb { -webkit-appearance: none; width: 9px; height: 15px; border-radius: 0; background: var(--cyan); cursor: pointer; }
-.transport .tp-scrub::-moz-range-thumb { width: 9px; height: 15px; border: none; border-radius: 0; background: var(--cyan); cursor: pointer; }
-.transport .tp-time { font-family: var(--sans); font-size: 9px; letter-spacing: 0.03em; color: var(--cyan); min-width: 58px; text-align: right; }
+.transport .tp-scrub::-webkit-slider-thumb { -webkit-appearance: none; width: 9px; height: 15px; border-radius: 0; background: var(--accent); cursor: pointer; }
+.transport .tp-scrub::-moz-range-thumb { width: 9px; height: 15px; border: none; border-radius: 0; background: var(--accent); cursor: pointer; }
+.transport .tp-time { font-family: var(--mono); font-size: 9px; letter-spacing: 0.03em; color: var(--dim); min-width: 58px; text-align: right; }
 .transport .tp-speed { font-family: var(--sans); font-size: 9px; padding: 3px 4px; border: 1px solid var(--rule); border-radius: 0; background: var(--panel); color: var(--dim); cursor: pointer; }
 /* 3D-scene controls, a plain instrument panel docked in the 3D viewport's top-right corner. Absolute +
    z-index:50 so it paints ABOVE the WebGL canvas and every control is genuinely clickable (the old Leva
    panel sat under the canvas and swallowed clicks). Collapsed = just the header button; open = controls. */
-.scene-ctrl { position: absolute; top: 6px; right: 6px; z-index: 50; width: max-content; background: rgba(8, 11, 17, 0.92); border: 1px solid var(--rule-2); font-family: var(--sans); }
+.scene-ctrl { position: absolute; top: 6px; right: 6px; z-index: 50; width: max-content; background: var(--vp-panel); border: 1px solid rgba(255,255,255,0.12); font-family: var(--sans); }
 .scene-ctrl.open { width: min(214px, 72%); }
-.sc-head { display: flex; align-items: center; gap: 6px; width: 100%; background: transparent; border: none; color: var(--cyan); font-family: var(--sans); font-size: 8.5px; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; padding: 5px 8px; cursor: pointer; text-align: left; }
-.scene-ctrl.open .sc-head { border-bottom: 1px solid var(--rule); }
-.sc-head:hover { color: #66ffff; }
+.sc-head { display: flex; align-items: center; gap: 6px; width: 100%; background: transparent; border: none; color: var(--vp-dim); font-family: var(--sans); font-size: 8.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 5px 8px; cursor: pointer; text-align: left; }
+.scene-ctrl.open .sc-head { border-bottom: 1px solid rgba(255,255,255,0.12); }
+.sc-head:hover { color: var(--vp-ink); }
 .sc-caret { font-size: 9px; line-height: 1; }
 .sc-body { padding: 6px 8px 7px; display: flex; flex-direction: column; gap: 6px; }
 .sc-note { font-size: 8px; line-height: 1.35; color: var(--faint); padding-bottom: 4px; margin-bottom: 1px; border-bottom: 1px solid var(--rule-soft); }
@@ -275,30 +277,30 @@ tr[title] { cursor: help; }
 .sc-row > span:first-child { white-space: nowrap; }
 .sc-slide { display: inline-flex; align-items: center; gap: 7px; }
 .sc-slide input[type="range"] { width: 72px; }
-.sc-slide b { font-family: var(--mono); font-size: 8.5px; font-weight: 700; color: var(--cyan); font-variant-numeric: tabular-nums; min-width: 26px; text-align: right; }
-.sc-check input[type="checkbox"] { accent-color: var(--cyan); width: 12px; height: 12px; cursor: pointer; }
+.sc-slide b { font-family: var(--mono); font-size: 8.5px; font-weight: 700; color: var(--vp-ink); font-variant-numeric: tabular-nums; min-width: 26px; text-align: right; }
+.sc-check input[type="checkbox"] { accent-color: var(--vp-field); width: 12px; height: 12px; cursor: pointer; }
 .cav-tag { position: absolute; z-index: 28; font-family: var(--sans); font-size: 9px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--dim); pointer-events: none; text-shadow: 1px 1px 0 #000; }
 .cav-tag sub { font-size: 0.74em; }
 .cav-tag-l { top: 50%; left: 10px; transform: translateY(-50%); }
 .cav-tag-r { top: 50%; right: 10px; transform: translateY(-50%); }
-.cav-tag-mode { top: 10px; left: 50%; transform: translateX(-50%); color: var(--cyan); }
+.cav-tag-mode { top: 10px; left: 50%; transform: translateX(-50%); color: var(--vp-field); }
 /* in-scene callouts anchored to real 3D points via drei <Html>: they project to screen each frame, so a
    label stays pinned to the element it names (cyan = light field / photon, orange = molecules / matter,
    grey = the mirrors) no matter how the camera is orbited, zoomed, or the scene reconfigured. */
 .scene-lab-wrap { pointer-events: none; }
 .scene-lab { font-family: var(--sans); pointer-events: none; line-height: 1.2; text-align: center; white-space: nowrap; user-select: none; transform: translateZ(0); }
-.scene-lab .l-t { display: block; font-size: 10.5px; font-weight: 700; letter-spacing: 0.03em; text-shadow: 0 1px 3px #000, 0 0 4px #000; }
+.scene-lab .l-t { display: block; font-size: 10.5px; font-weight: 700; letter-spacing: 0.03em; text-shadow: 0 1px 2px rgba(0,0,0,0.9); }
 .scene-lab .l-s { display: block; font-size: 8px; font-weight: 500; color: #aeb6bf; text-shadow: 0 1px 3px #000; }
-.scene-lab.field { color: #3df2ff; }
-.scene-lab.matter { color: #ff8a4d; }
+.scene-lab.field { color: var(--vp-field); }
+.scene-lab.matter { color: var(--vp-matter); }
 .scene-lab.mirror .l-t { font-size: 8.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #9aa4b0; }
 @container center (max-width: 560px) { .scene-lab .l-s { display: none; } .scene-lab .l-t { font-size: 9px; } }
 /* docked live readout, the on-scene vacuum-Rabi energy partition (instrument CSS only: mono, tabular-nums,
    hairlines, zero radius, no glassmorphism) */
 /* live energy-partition readout, a compact strip pinned to the BOTTOM edge of the viewport (where there's
    only empty space), so it never covers the photon core or the molecules in the centre of the scene. */
-.cav-readout { position: absolute; left: 8px; right: 8px; bottom: 8px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 4px 9px; background: rgba(5, 8, 13, 0.78); border: 1px solid var(--rule-2); font-family: var(--sans); pointer-events: none; z-index: 30; }
-.cr-title { font-size: 8px; font-weight: 700; letter-spacing: 0.06em; color: var(--cyan); text-transform: uppercase; white-space: nowrap; }
+.cav-readout { position: absolute; left: 8px; right: 8px; bottom: 8px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 4px 9px; background: var(--vp-panel); border: 1px solid rgba(255,255,255,0.12); font-family: var(--sans); pointer-events: none; z-index: 30; }
+.cr-title { font-size: 8px; font-weight: 700; letter-spacing: 0.06em; color: var(--vp-dim); text-transform: uppercase; white-space: nowrap; }
 .cr-k { font-size: 9px; color: var(--dim); white-space: nowrap; }
 .cr-k sub { font-size: 0.74em; }
 .cr-k b, .cr-leg b { color: var(--ink); font-variant-numeric: tabular-nums; font-weight: 700; }
@@ -360,44 +362,44 @@ tr[title] { cursor: help; }
 .regime-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; margin: 6px 8px; border: 1px solid var(--rule-2); background: var(--rule-2); }
 .regime-toggle button { font-family: var(--sans); font-size: 9px; font-weight: 600; letter-spacing: 0.02em; padding: 7px 4px; border: none; background: var(--bg); color: var(--faint); cursor: pointer; }
 .regime-toggle button:hover { color: var(--ink); background: var(--rule-soft); }
-.regime-toggle button.on { background: var(--cyan); color: #000; font-weight: 700; }
+.regime-toggle button.on { background: var(--accent-fill); border-color: var(--accent-edge); color: var(--accent); font-weight: 600; }
 .tree-group { border-bottom: 1px solid var(--rule); }
 .tree-head { width: 100%; text-align: left; font-family: var(--sans); font-size: 9px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--dim); background: transparent; border: none; padding: 7px 8px; cursor: pointer; }
 .tree-head:hover { color: var(--ink); }
-.tree-caret { color: var(--cyan); margin-right: 7px; font-weight: 700; }
+.tree-caret { color: var(--dim); margin-right: 7px; font-weight: 700; }
 .tree-body { padding: 3px 8px 8px; }
 
 /* controls, active terminal command decks */
 .knob { margin-bottom: 9px; }
 .knob-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; gap: 6px; }
 .knob-name { font-size: 10.5px; font-weight: 500; color: var(--ink); letter-spacing: 0.01em; }
-.knob-name i { font-style: normal; color: var(--cyan); margin-right: 3px; }
+.knob-name i { font-style: normal; color: var(--accent); margin-right: 3px; }
 .knob-sym { color: var(--dim); margin-left: 3px; }
 .knob-sym .katex { font-size: 0.9em; }
 .knob-entry { display: inline-flex; align-items: baseline; gap: 3px; }
 .knob.num-only { display: flex; align-items: center; justify-content: space-between; }
-.knob-input { width: 60px; font-family: var(--sans); font-size: 11.5px; font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; color: #ffffff; background: #000000; border: 1px solid var(--rule-2); padding: 3px 6px; transition: border-color 0.1s; }
+.knob-input { width: 60px; font-family: var(--mono); font-size: 11.5px; font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; color: var(--ink); background: var(--surface); border: 1px solid var(--rule-2); padding: 3px 6px; transition: border-color 0.1s; }
 .knob-input.wide { width: 86px; }
 .knob-input:hover { border-color: var(--axis); }
-.knob-input:focus { outline: none; border-color: var(--cyan); background: #000000; }
+.knob-input:focus { outline: none; border-color: var(--accent); background: var(--surface); }
 .knob-input::-webkit-outer-spin-button, .knob-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .knob-input[type="number"] { -moz-appearance: textfield; }
 .knob-entry .u, .u { font-family: var(--sans); font-size: 9.5px; color: var(--faint); }
 .knob-sub { font-size: 8px; color: var(--faint); font-weight: 400; }
-.knob-readout { display: inline-block; min-width: 60px; font-family: var(--sans); font-size: 11.5px; font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; color: var(--cyan); background: #000; border: 1px solid var(--rule-2); padding: 3px 6px; }
+.knob-readout { display: inline-block; min-width: 60px; font-family: var(--mono); font-size: 11.5px; font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; color: var(--ink); background: var(--panel-2); border: 1px solid var(--rule-2); padding: 3px 6px; }
 /* 3.D · slider overhaul, 2px rule track, 3px cyan blade thumb, flashes white while dragging */
 input[type="range"] { width: 100%; height: 2px; -webkit-appearance: none; appearance: none; background: var(--rule); cursor: col-resize; }
-input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 3px; height: 14px; background: var(--cyan); border: none; cursor: col-resize; transition: background 0.1s; }
-input[type="range"]::-moz-range-thumb { width: 3px; height: 14px; background: var(--cyan); border: none; cursor: col-resize; transition: background 0.1s; }
-input[type="range"]:active::-webkit-slider-thumb { background: #ffffff; }
-input[type="range"]:active::-moz-range-thumb { background: #ffffff; }
+input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 3px; height: 14px; background: var(--accent); border: none; cursor: col-resize; transition: background 0.1s; }
+input[type="range"]::-moz-range-thumb { width: 3px; height: 14px; background: var(--accent); border: none; cursor: col-resize; transition: background 0.1s; }
+input[type="range"]:active::-webkit-slider-thumb { background: var(--accent-edge); }
+input[type="range"]:active::-moz-range-thumb { background: var(--accent-edge); }
 
 /* buttons, sharp command nodes */
 .btn-row { display: flex; margin-top: 7px; border: 1px solid var(--rule-2); width: fit-content; flex-wrap: wrap; }
 .btn-row button { font-family: var(--sans); font-size: 9px; font-weight: 600; letter-spacing: 0.03em; text-transform: uppercase; padding: 6px 9px; border: none; border-right: 1px solid var(--rule); background: transparent; color: var(--dim); cursor: pointer; }
 .btn-row button:last-child { border-right: none; }
 .btn-row button:hover { background: var(--rule); color: var(--ink); }
-.btn-row button.on { background: var(--cyan); color: #000; font-weight: 700; }
+.btn-row button.on { background: var(--accent-fill); border-color: var(--accent-edge); color: var(--accent); font-weight: 600; }
 .btn-row button:disabled { opacity: 0.35; cursor: not-allowed; }
 
 /* tables / live diagnostics */
@@ -414,7 +416,7 @@ table.metrics { width: 100%; border-collapse: collapse; }
 
 /* validation / regression console */
 .hud .hud-pass { font-family: var(--sans); font-size: 10px; color: var(--green); margin-top: 6px; }
-.reg-console { font-family: var(--sans); font-size: 9px; line-height: 1.5; background: #000000; border: 1px solid var(--rule-2); padding: 5px 6px; margin: 6px 0; max-height: 132px; overflow-y: auto; white-space: pre; }
+.reg-console { font-family: var(--mono); font-size: 9px; line-height: 1.5; color: var(--ink); background: var(--surface); border: 1px solid var(--rule-2); padding: 5px 6px; margin: 6px 0; max-height: 132px; overflow-y: auto; white-space: pre; }
 .reg-console .reg-head { color: var(--ink); font-weight: 700; margin-bottom: 2px; }
 .reg-console .reg-pass { color: var(--green); }
 .reg-console .reg-fail { color: var(--red); }

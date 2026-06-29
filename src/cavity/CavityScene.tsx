@@ -15,7 +15,7 @@ function Emitter({ g }: { g: number }) {
     <group>
       <mesh renderOrder={10}>
         <icosahedronGeometry args={[13, 1]} />
-        <meshStandardMaterial color="#3d1a52" emissive="#ff2222" emissiveIntensity={glow} roughness={0.4} metalness={0.1} toneMapped={false} transparent depthTest={false} depthWrite={false} />
+        <meshStandardMaterial color="#3d1a52" emissive="#d6483a" emissiveIntensity={glow} roughness={0.4} metalness={0.1} toneMapped={false} transparent depthTest={false} depthWrite={false} />
       </mesh>
       <group position={[0, 0, 0]}>
         <mesh position={[0, 9, 0]}><cylinderGeometry args={[0.8, 0.8, 18, 12]} /><meshBasicMaterial color="#ffcc00" toneMapped={false} /></mesh>
@@ -46,7 +46,7 @@ export function CavityScene({ g }: { g: number }) {
       <div className="cav-tag cav-tag-mode">ω<sub>c</sub> TEM₀₀ field · ∝ g</div>
       <div className="cav-tag cav-tag-mol">molecular emitter</div>
       <Canvas dpr={[1, 2]} gl={{ antialias: true, alpha: true }} camera={{ position: [0, 40, 300], fov: 54 }}>
-        <color attach="background" args={["#05070e"]} />
+        <color attach="background" args={["#1e1e1e"]} />
         <PerspectiveCamera makeDefault fov={54} position={[0, 40, 300]} />
         <LightRig />
         <FieldBreath ampRef={fieldAmpRef} g={g} />

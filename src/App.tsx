@@ -118,9 +118,9 @@ const HTC_GRID = 760; // absorption-spectrum sampling points
 const MX_S = 196; // live Hamiltonian heatmap size (px)
 
 // industrial spectroscopic palette: cyan photons · red excitons · amber phonons · purple dark · green calib.
-const PANEL = "#0c0f12", INK = "#ffffff", DIM = "#8b949e", AXIS = "#484f58";
-const CYAN = "#00ffff", RED = "#ff3333", AMBER = "#ffcc00", PURPLE = "#9e77ed", GREEN = "#00ff66";
-const COBALT = CYAN, CRIMSON = RED, EMERALD = GREEN, SLATE = "#484f58"; // legacy aliases → new palette
+const PANEL = "#ffffff", INK = "#1a1a1a", DIM = "#555555", AXIS = "#000000";
+const CYAN = "#1f77b4", RED = "#d62728", AMBER = "#ff7f0e", PURPLE = "#9467bd", GREEN = "#2ca02c";
+const COBALT = CYAN, CRIMSON = RED, EMERALD = GREEN, SLATE = "#888888"; // legacy aliases -> tab10 data palette
 // the two bright polaritons = the eigenstates of largest PHOTON weight |⟨0|φ_k⟩|² = vecs[k]² (row 0);
 // lower energy = LP, higher = UP. Robust under disorder (which spreads the dark band past the extremes).
 function brightPolaritonIdx(vecs: Float64Array, eigs: Float64Array, n: number) {
@@ -129,7 +129,7 @@ function brightPolaritonIdx(vecs: Float64Array, eigs: Float64Array, n: number) {
   const kLP = eigs[pa]! <= eigs[pb]! ? pa : pb, kUP = kLP === pa ? pb : pa;
   return { kLP, kUP };
 }
-const GRIDLINE = "#1b2026", DASH = "#1f242c", CROSS = "rgba(120,130,145,0.4)";
+const GRIDLINE = "#e6e6e6", DASH = "#bbbbbb", CROSS = "rgba(40,40,40,0.45)";
 
 const minus = (s: string) => s.replace("-", "−");
 const fmt = (v: number, d: number) => minus(v.toFixed(d));
@@ -137,20 +137,19 @@ const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v
 const lin = (a: number, b: number, s: number) => Math.round(a + (b - a) * s);
 
 // dark diverging Wigner ramp (single source of truth for BOTH the field map and its colorbar):
-// t=0 → crimson (−W, non-classical), t=0.5 → deep slate, t=1 → cobalt (+W). t is the normalised
-// position in [−wmax,+wmax], i.e. t=(W+wmax)/2wmax.
+// White-faced diverging map (matplotlib RdBu sense): t=0 → red (−W, non-classical), t=0.5 → white
+// (W=0), t=1 → blue (+W). t is the normalised position in [−wmax,+wmax], i.e. t=(W+wmax)/2wmax.
 function wignerRGB(t: number): [number, number, number] {
   t = clamp(t, 0, 1);
-  if (t < 0.5) { const s = t / 0.5; return [lin(255, 16, s), lin(45, 23, s), lin(85, 38, s)]; }
-  const s = (t - 0.5) / 0.5; return [lin(16, 56, s), lin(23, 122, s), lin(38, 246, s)];
+  if (t < 0.5) { const s = t / 0.5; return [lin(214, 255, s), lin(39, 255, s), lin(40, 255, s)]; }
+  const s = (t - 0.5) / 0.5; return [lin(255, 31, s), lin(255, 119, s), lin(255, 180, s)];
 }
-// dark sequential Husimi ramp (Q ≥ 0): t=0 → panel slate, t=1 → pale cyan. t = Q/qmax.
+// White sequential Husimi ramp (Q ≥ 0): t=0 → white (vacuum of the panel), t=1 → blue peak. t = Q/qmax.
 function husimiRGB(t: number): [number, number, number] {
   t = clamp(t, 0, 1);
-  if (t < 0.5) { const s = t / 0.5; return [lin(11, 34, s), lin(16, 211, s), lin(28, 238, s)]; }
-  const s = (t - 0.5) / 0.5; return [lin(34, 224, s), lin(211, 247, s), lin(238, 255, s)];
+  return [lin(255, 31, t), lin(255, 119, t), lin(255, 180, t)];
 }
-function darkWigner(w: Float64Array, n: number, wmax: number): ImageData {
+function wignerImage(w: Float64Array, n: number, wmax: number): ImageData {
   const px = new Uint8ClampedArray(n * n * 4);
   for (let i = 0; i < w.length; i++) {
     const [r, g, b] = wignerRGB((w[i]! + wmax) / (2 * wmax));
@@ -335,7 +334,7 @@ export function App() {
     window.addEventListener("resize", onResize);
     const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(onResize) : null;
     const center = document.querySelector(".center"); if (ro && center) ro.observe(center);
-    // redraw once the web fonts (IBM Plex) finish loading so canvas axis labels aren't stuck on a fallback
+    // redraw once system fonts are resolved so canvas axis labels aren't stuck on a metric-fallback frame
     document.fonts?.ready?.then(() => redrawCurrent.current()).catch(() => { });
     return () => { window.removeEventListener("resize", onResize); ro?.disconnect(); cancelAnimationFrame(raf); };
   }, []);
@@ -373,7 +372,7 @@ export function App() {
       const c = new Float64Array(n);
       for (let k = 0; k < n; k++) c[k] = vecs[dyn.init * n + k]!; // ⟨φ_k|ψ0⟩ for the chosen initial site
       const bright = brightWeights(ensemble.factors); // per-molecule b_i = g_i/‖g‖, drives the live glow
-      console.log(`%c[brightWeights]%c N=${ensemble.m} η=${dyn.order} θ=${dyn.theta}°  →  ${Array.from(bright).map((x) => x.toFixed(3)).join(", ")}`, "color:#00ffff;font-weight:600", "color:#8b949e");
+      console.log(`%c[brightWeights]%c N=${ensemble.m} η=${dyn.order} θ=${dyn.theta}°  →  ${Array.from(bright).map((x) => x.toFixed(3)).join(", ")}`, "color:#1f77b4;font-weight:600", "color:#8b949e");
       dynState.current = { eigs, vecs, n, c, bright, modeAmp: ensemble.modeAmp, hist: [] };
       // FIX 3 · precompute photon/bright/dark populations over 6 vacuum-Rabi cycles (analytic, from the
       // eigenmodes) so the panel shows the full oscillation + dephasing envelope at once, not frame-by-frame.
@@ -578,9 +577,9 @@ export function App() {
   function colorbar(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, ramp: (t: number) => [number, number, number], ticks: { f: number; label: string }[], caption: string) {
     for (let py = 0; py < h; py++) { const [r, g, b] = ramp(1 - py / (h - 1)); ctx.fillStyle = `rgb(${r},${g},${b})`; ctx.fillRect(x, y + py, w, 1); }
     ctx.strokeStyle = AXIS; ctx.lineWidth = 0.75; ctx.strokeRect(x, y, w, h);
-    ctx.fillStyle = DIM; ctx.font = "500 8px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+    ctx.fillStyle = DIM; ctx.font = "500 8px Helvetica,Arial,sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
     for (const tk of ticks) { const py = y + (1 - tk.f) * h; seg(ctx, x + w, py, x + w + 3, py); ctx.fillText(tk.label, x + w + 5, py); }
-    ctx.fillStyle = INK; ctx.font = "600 10px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = INK; ctx.font = "600 10px Helvetica,Arial,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
     ctx.fillText(caption, x + w / 2, y - 3);
   }
 
@@ -591,7 +590,7 @@ export function App() {
     ctx.fillStyle = PANEL; ctx.fillRect(0, 0, W_CW, W_CH);
     const w = q.wignerRaw(N_GRID);
     const wmax = scaleRef.current ? INV_PI : w.reduce((m, v) => Math.max(m, Math.abs(v)), 1e-9);
-    off.getContext("2d")!.putImageData(darkWigner(w, N_GRID, wmax), 0, 0);
+    off.getContext("2d")!.putImageData(wignerImage(w, N_GRID, wmax), 0, 0);
     ctx.imageSmoothingEnabled = true;
     ctx.save(); ctx.translate(W_ML, W_MT + W_S); ctx.scale(W_S / N_GRID, -W_S / N_GRID); ctx.drawImage(off, 0, 0); ctx.restore();
     colorbar(ctx, W_ML + W_S + 16, W_MT, 11, W_S, wignerRGB,
@@ -604,11 +603,11 @@ export function App() {
     ctx.save(); ctx.setLineDash([3, 3]); ctx.lineWidth = 0.75; ctx.strokeStyle = CROSS;
     seg(ctx, xPx(0), W_MT, xPx(0), W_MT + W_S); seg(ctx, W_ML, pPx(0), W_ML + W_S, pPx(0)); ctx.restore();
     ctx.lineWidth = 0.75; ctx.strokeStyle = AXIS; ctx.strokeRect(W_ML, W_MT, W_S, W_S);
-    ctx.fillStyle = DIM; ctx.font = "500 10px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top";
+    ctx.fillStyle = DIM; ctx.font = "500 10px Helvetica,Arial,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top";
     for (const t of W_TICKS) { seg(ctx, xPx(t), W_MT + W_S, xPx(t), W_MT + W_S + 3); ctx.fillText(minus(`${t}`), xPx(t), W_MT + W_S + 6); }
     ctx.textAlign = "right"; ctx.textBaseline = "middle";
     for (const t of W_TICKS) { seg(ctx, W_ML, pPx(t), W_ML - 3, pPx(t)); ctx.fillText(minus(`${t}`), W_ML - 6, pPx(t)); }
-    ctx.fillStyle = INK; ctx.font = "600 14px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = INK; ctx.font = "600 14px Helvetica,Arial,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
     ctx.fillText("x", W_ML + W_S / 2, W_CH - 6);
     ctx.save(); ctx.translate(12, W_MT + W_S / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top"; ctx.fillText("p", 0, 0); ctx.restore();
   }
@@ -631,11 +630,11 @@ export function App() {
     ctx.save(); ctx.setLineDash([3, 3]); ctx.lineWidth = 0.75; ctx.strokeStyle = CROSS;
     seg(ctx, xPx(0), W_MT, xPx(0), W_MT + W_S); seg(ctx, W_ML, pPx(0), W_ML + W_S, pPx(0)); ctx.restore();
     ctx.lineWidth = 0.75; ctx.strokeStyle = AXIS; ctx.strokeRect(W_ML, W_MT, W_S, W_S);
-    ctx.fillStyle = DIM; ctx.font = "500 10px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top";
+    ctx.fillStyle = DIM; ctx.font = "500 10px Helvetica,Arial,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top";
     for (const t of W_TICKS) { seg(ctx, xPx(t), W_MT + W_S, xPx(t), W_MT + W_S + 3); ctx.fillText(minus(`${t}`), xPx(t), W_MT + W_S + 6); }
     ctx.textAlign = "right"; ctx.textBaseline = "middle";
     for (const t of W_TICKS) { seg(ctx, W_ML, pPx(t), W_ML - 3, pPx(t)); ctx.fillText(minus(`${t}`), W_ML - 6, pPx(t)); }
-    ctx.fillStyle = INK; ctx.font = "600 14px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = INK; ctx.font = "600 14px Helvetica,Arial,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
     ctx.fillText("x", W_ML + W_S / 2, W_CH - 6);
     ctx.save(); ctx.translate(12, W_MT + W_S / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top"; ctx.fillText("p", 0, 0); ctx.restore();
   }
@@ -646,7 +645,7 @@ export function App() {
     ctx.fillStyle = PANEL; ctx.fillRect(0, 0, S_CW, S_CH);
     const ps = popSeries.current, T = ps ? ps.T : T_LOOP;
     const yOf = (v: number) => S_MT + (1 - v) * S_PH, xOf = (t: number) => S_ML + (t / T) * S_PW;
-    ctx.font = "500 9px 'IBM Plex Sans',system-ui,sans-serif"; ctx.fillStyle = DIM;
+    ctx.font = "500 9px Helvetica,Arial,sans-serif"; ctx.fillStyle = DIM;
     for (const v of [0, 0.5, 1]) {
       ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5;
       seg(ctx, S_ML, yOf(v), S_ML + S_PW, yOf(v)); seg(ctx, S_ML - 3, yOf(v), S_ML, yOf(v));
@@ -669,9 +668,9 @@ export function App() {
       for (const t of [0, T / 3, (2 * T) / 3, T]) ctx.fillText(t.toFixed(0), xOf(t), S_MT + S_PH + 5);
     }
     ctx.lineWidth = 0.75; ctx.strokeStyle = AXIS; ctx.strokeRect(S_ML, S_MT, S_PW, S_PH);
-    ctx.fillStyle = INK; ctx.font = "600 12px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = INK; ctx.font = "600 12px Helvetica,Arial,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
     ctx.fillText("time  t   (units of ω_c⁻¹, dimensionless)", S_ML + S_PW / 2, S_CH - 4);
-    ctx.save(); ctx.translate(12, S_MT + S_PH / 2); ctx.rotate(-Math.PI / 2); ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.font = "600 11px 'IBM Plex Sans',system-ui,sans-serif"; ctx.fillText("population / probability  (dimensionless)", 0, 0); ctx.restore();
+    ctx.save(); ctx.translate(12, S_MT + S_PH / 2); ctx.rotate(-Math.PI / 2); ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.font = "600 11px Helvetica,Arial,sans-serif"; ctx.fillText("population / probability  (dimensionless)", 0, 0); ctx.restore();
   }
 
   // FIX 4 (SINGLE) · decoherence panel: purity Tr(ρ²) and von Neumann entropy S(t) together, the
@@ -682,7 +681,7 @@ export function App() {
     ctx.fillStyle = PANEL; ctx.fillRect(0, 0, DC_CW, DC_CH);
     const ps = popSeries.current, T = ps ? ps.T : T_LOOP;
     const yOf = (v: number) => DC_MT + (1 - v) * DC_PH, xOf = (t: number) => DC_ML + (t / T) * DC_PW;
-    ctx.font = "500 9px 'IBM Plex Sans',system-ui,sans-serif";
+    ctx.font = "500 9px Helvetica,Arial,sans-serif";
     for (const v of [0, 0.5, 1]) { ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5; seg(ctx, DC_ML, yOf(v), DC_ML + DC_PW, yOf(v)); ctx.fillStyle = DIM; ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(v.toFixed(1), DC_ML - 6, yOf(v)); }
     if (ps) {
       let smax = 0.1; for (let i = 0; i < ps.n; i++) if (ps.data[i * 4 + 3]! > smax) smax = ps.data[i * 4 + 3]!;
@@ -697,7 +696,7 @@ export function App() {
       ctx.fillStyle = AMBER; ctx.textAlign = "left"; ctx.textBaseline = "top"; ctx.fillText(`S (nats, ÷${smax.toFixed(2)} max=ln2)   ·   purity ∈ [0,1]`, DC_ML + 5, DC_MT + 4);
     }
     ctx.strokeStyle = AXIS; ctx.lineWidth = 0.75; ctx.strokeRect(DC_ML, DC_MT, DC_PW, DC_PH);
-    ctx.fillStyle = INK; ctx.font = "600 11px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic"; ctx.fillText("time  t  (ω_c⁻¹)", DC_ML + DC_PW / 2, DC_CH - 5);
+    ctx.fillStyle = INK; ctx.font = "600 11px Helvetica,Arial,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic"; ctx.fillText("time  t  (ω_c⁻¹)", DC_ML + DC_PW / 2, DC_CH - 5);
   }
 
   // 4.A (SINGLE) · Bloch-vector projection of the single-excitation effective qubit {|0,e⟩,|1,g⟩}.
@@ -710,24 +709,24 @@ export function App() {
     ctx.fillStyle = PANEL; ctx.fillRect(0, 0, BL_CW, BL_CH);
     const cx = BL_ML + BL_S / 2, cy = BL_MT + BL_S / 2, R = (BL_S / 2) / 1.12;
     const xPx = (v: number) => cx + v * R, yPx = (v: number) => cy - v * R;
-    ctx.strokeStyle = "#21262d"; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(cx, cy, R, 0, 2 * Math.PI); ctx.stroke(); // unit circle
+    ctx.strokeStyle = "#b4b4b4"; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(cx, cy, R, 0, 2 * Math.PI); ctx.stroke(); // unit circle
     ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5; ctx.beginPath(); ctx.arc(cx, cy, R * 0.5, 0, 2 * Math.PI); ctx.stroke();
-    ctx.strokeStyle = "#21262d"; ctx.lineWidth = 0.6; seg(ctx, xPx(-1.12), cy, xPx(1.12), cy); seg(ctx, cx, yPx(-1.12), cx, yPx(1.12));
-    ctx.fillStyle = DIM; ctx.font = "500 8px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top";
+    ctx.strokeStyle = "#cccccc"; ctx.lineWidth = 0.6; seg(ctx, xPx(-1.12), cy, xPx(1.12), cy); seg(ctx, cx, yPx(-1.12), cx, yPx(1.12));
+    ctx.fillStyle = DIM; ctx.font = "500 8px Helvetica,Arial,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top";
     for (const t of [-1, 1]) ctx.fillText(minus(`${t}`), xPx(t), cy + 4);
     ctx.textAlign = "right"; ctx.textBaseline = "middle";
     for (const t of [-1, 1]) ctx.fillText(minus(`${t}`), cx - 5, yPx(t));
     const bc = blochCurve.current; // analytic spiral: oldest at opacity 0.08, newest at 1.0
     if (bc && bc.n >= 2) {
       for (let i = 1; i < bc.n; i++) {
-        ctx.strokeStyle = `rgba(0,255,255,${(0.08 + 0.92 * (i / (bc.n - 1))).toFixed(3)})`; ctx.lineWidth = 1.4;
+        ctx.strokeStyle = `rgba(31,119,180,${(0.10 + 0.90 * (i / (bc.n - 1))).toFixed(3)})`; ctx.lineWidth = 1.4;
         ctx.beginPath(); ctx.moveTo(xPx(bc.data[(i - 1) * 2]!), yPx(bc.data[(i - 1) * 2 + 1]!)); ctx.lineTo(xPx(bc.data[i * 2]!), yPx(bc.data[i * 2 + 1]!)); ctx.stroke();
       }
     }
     const q = quantum.current; // live cursor, where the running open system currently sits on the spiral
-    if (q) { const b = q.emitterBloch(); ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(xPx(b[1]!), yPx(b[2]!), 3.5, 0, 2 * Math.PI); ctx.fill(); }
+    if (q) { const b = q.emitterBloch(); ctx.fillStyle = AMBER; ctx.beginPath(); ctx.arc(xPx(b[1]!), yPx(b[2]!), 3.5, 0, 2 * Math.PI); ctx.fill(); ctx.strokeStyle = "#fff"; ctx.lineWidth = 1; ctx.stroke(); }
     ctx.strokeStyle = AXIS; ctx.lineWidth = 0.75; ctx.strokeRect(BL_ML, BL_MT, BL_S, BL_S);
-    ctx.fillStyle = INK; ctx.font = "600 11px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = INK; ctx.font = "600 11px Helvetica,Arial,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
     ctx.fillText("2 Im ρ₀₁  (coherence)", BL_ML + BL_S / 2, BL_CH - 6);
     ctx.save(); ctx.translate(12, BL_MT + BL_S / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top"; ctx.fillText("ρ₀₀ − ρ₁₁  (inversion)", 0, 0); ctx.restore();
   }
@@ -736,19 +735,19 @@ export function App() {
   // manifold (|0,g⟩,|0,e⟩,|1,g⟩,…), so the full 32×32 is ~0 outside the top-left corner, we crop to
   // that populated block (cavity-first index 2n+atom) and render it as an explicit grid. Intensity is on
   // a FAITHFUL global |ρ| scale, normalized to the largest |ρ_ij| in-frame (a population), so the
-  // diagonal reads brightest and the off-diagonal vacuum-Rabi coherence is the dimmer pair that pulses
-  // cyan↔red and fades as κ,γ damp it. (A faithful magnitude scale, not a per-element auto-stretch.)
+  // diagonal reads most saturated and the off-diagonal vacuum-Rabi coherence is the fainter pair that
+  // flips blue↔red and fades as κ,γ damp it. (A faithful magnitude scale, not a per-element stretch.)
   const RHO_BLOCK = 8;
   function drawRho(q: Quantum) {
     const cv = rhoCanvas.current; if (!cv) return;
     const ctx = sized(cv, R_CW, R_CH);
-    ctx.fillStyle = "#050708"; ctx.fillRect(0, 0, R_CW, R_CH);
-    // Diverging colour map over the COMPLEX joint ρ. Intensity = |ρ_ij| (so populations AND the purely-
-    // imaginary vacuum-Rabi coherence ρ[|0,e⟩,|1,g⟩] both show, a literal Re ρ map would render that
-    // coherence black). Colour = SIGN of the dominant (real-or-imaginary) component: + → cyan, − → red.
-    // In this JC manifold every element is purely real (populations, diagonal) or purely imaginary
-    // (the coherence), so the coherence appears as an antisymmetric cyan/red conjugate pair off-diagonal,
-    // flipping cyan↔red as the excitation sloshes atom↔cavity. No gray, no white at any value.
+    ctx.fillStyle = PANEL; ctx.fillRect(0, 0, R_CW, R_CH);
+    // Diverging colour map (white→blue / white→red, matplotlib RdBu sense) over the COMPLEX joint ρ.
+    // Saturation = |ρ_ij| (so populations AND the purely-imaginary vacuum-Rabi coherence ρ[|0,e⟩,|1,g⟩]
+    // both show; a literal Re ρ map would render that coherence white). Hue = SIGN of the dominant
+    // (real-or-imaginary) component: + → blue, − → red. In this JC manifold every element is purely real
+    // (populations, diagonal) or purely imaginary (the coherence), so the coherence appears as an
+    // antisymmetric blue/red conjugate pair off-diagonal, flipping as the excitation sloshes atom↔cavity.
     const re = q.rhoReal(), im = q.rhoImag(), B = RHO_BLOCK, cell = R_S / B;
     let maxAbs = 1e-6;
     for (let i = 0; i < B; i++) for (let j = 0; j < B; j++) { const m = Math.hypot(re[i * DFULL + j]!, im[i * DFULL + j]!); if (m > maxAbs) maxAbs = m; }
@@ -756,15 +755,15 @@ export function App() {
       const r = re[i * DFULL + j]!, m = im[i * DFULL + j]!, mag = Math.hypot(r, m);
       const v = Math.min(1, mag / maxAbs);                  // normalised to the largest |ρ_ij| this frame
       const signed = Math.abs(r) >= Math.abs(m) ? r : m;    // the non-zero (dominant) component carries the sign
-      ctx.fillStyle = signed >= 0 ? lerpHex("#050708", "#00ffff", v) : lerpHex("#050708", "#ff3333", v);
+      ctx.fillStyle = signed >= 0 ? lerpHex("#ffffff", "#1f77b4", v) : lerpHex("#ffffff", "#d62728", v);
       ctx.fillRect(R_ML + j * cell, R_MT + i * cell, cell, cell);
     }
-    ctx.strokeStyle = "#000"; ctx.lineWidth = 1; // explicit 1px matrix grid
+    ctx.strokeStyle = "#d2d2d2"; ctx.lineWidth = 1; // explicit 1px matrix grid
     for (let k = 0; k <= B; k++) { const p = k * cell; seg(ctx, R_ML + p, R_MT, R_ML + p, R_MT + R_S); seg(ctx, R_ML, R_MT + p, R_ML + R_S, R_MT + p); }
     ctx.strokeStyle = AXIS; ctx.lineWidth = 0.75; ctx.strokeRect(R_ML, R_MT, R_S, R_S);
-    ctx.fillStyle = DIM; ctx.font = "500 8px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top";
+    ctx.fillStyle = DIM; ctx.font = "500 8px Helvetica,Arial,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top";
     ctx.fillText("0", R_ML + cell / 2, R_MT + R_S + 4); ctx.fillText(String(B - 1), R_ML + R_S - cell / 2, R_MT + R_S + 4);
-    ctx.fillStyle = INK; ctx.font = "600 10px 'IBM Plex Sans',system-ui,sans-serif";
+    ctx.fillStyle = INK; ctx.font = "600 10px Helvetica,Arial,sans-serif";
     ctx.fillText("|j⟩  (Fock n⊗{g,e})", R_ML + R_S / 2, R_CH - 4);
     ctx.save(); ctx.translate(9, R_MT + R_S / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top"; ctx.fillText("⟨i|", 0, 0); ctx.restore();
   }
@@ -789,23 +788,23 @@ export function App() {
     const col = sweep.current[v.j]!, phot = col.photon, n = phot.length, pk = Math.min(v.k, n - 1), pf = phot[pk]!, mf = Math.max(0, 1 - pf);
     // LEFT, selected eigenstate composition (two horizontal bars)
     const lx = HB_ML + 6, lw = HB_PW * 0.30, by = HB_MT + 12, bh = 28, gap = 18;
-    ctx.fillStyle = INK; ctx.font = "600 10px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "bottom";
+    ctx.fillStyle = INK; ctx.font = "600 10px Helvetica,Arial,sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "bottom";
     ctx.fillText(`SELECTED |ψ_k⟩  k=${pk}`, lx, by - 6);
     const hbar = (y: number, frac: number, c2: string, lab: string) => {
-      ctx.fillStyle = "#0c0f12"; ctx.fillRect(lx, y, lw, bh);
+      ctx.fillStyle = "#ececec"; ctx.fillRect(lx, y, lw, bh);
       ctx.fillStyle = c2; ctx.fillRect(lx, y, lw * Math.max(0, Math.min(1, frac)), bh);
       ctx.strokeStyle = AXIS; ctx.lineWidth = 0.75; ctx.strokeRect(lx, y, lw, bh);
-      ctx.fillStyle = "#fff"; ctx.font = "600 10px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.fillText(lab, lx + 5, y + bh / 2);
+      ctx.fillStyle = INK; ctx.font = "600 10px Helvetica,Arial,sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.fillText(lab, lx + 5, y + bh / 2);
       ctx.textAlign = "right"; ctx.fillText(frac.toFixed(3), lx + lw - 5, y + bh / 2);
     };
     hbar(by, pf, CYAN, "photon  |⟨a|ψ⟩|²");
     hbar(by + bh + gap, mf, RED, "matter  |⟨σ|ψ⟩|²");
     // RIGHT, photon-weight distribution across all eigenstates
     const rx = HB_ML + HB_PW * 0.40, rw = HB_PW * 0.60, ry = HB_MT, rh = HB_PH, bw = rw / n;
-    ctx.fillStyle = INK; ctx.textAlign = "left"; ctx.textBaseline = "bottom"; ctx.font = "600 9.5px 'IBM Plex Sans',system-ui,sans-serif";
+    ctx.fillStyle = INK; ctx.textAlign = "left"; ctx.textBaseline = "bottom"; ctx.font = "600 9.5px Helvetica,Arial,sans-serif";
     ctx.fillText("PHOTON WEIGHT |⟨a|ψ_k⟩|² PER EIGENSTATE  ·  2 bright polaritons + N−1 dark", rx, ry - 6);
     const yb = (p: number) => ry + rh - p * rh;
-    for (const p of [0, 0.5, 1]) { ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5; seg(ctx, rx, yb(p), rx + rw, yb(p)); ctx.fillStyle = DIM; ctx.font = "500 8px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(p.toFixed(1), rx - 4, yb(p)); }
+    for (const p of [0, 0.5, 1]) { ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5; seg(ctx, rx, yb(p), rx + rw, yb(p)); ctx.fillStyle = DIM; ctx.font = "500 8px Helvetica,Arial,sans-serif"; ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(p.toFixed(1), rx - 4, yb(p)); }
     for (let k = 0; k < n; k++) {
       const p = phot[k]!, x = rx + k * bw, dark = p < 0.05, bwid = Math.max(1, bw - 2);
       ctx.fillStyle = dark ? PURPLE : CYAN; // photon-bright polaritons cyan, dark/subradiant states purple (no amber)
@@ -814,7 +813,7 @@ export function App() {
       if (k === pk) { ctx.strokeStyle = "#fff"; ctx.lineWidth = 1; ctx.strokeRect(x + 0.5, by2 - 1, bwid + 1, bh2 + 1); } // selected eigenstate → white outline
     }
     ctx.strokeStyle = AXIS; ctx.lineWidth = 0.75; ctx.strokeRect(rx, ry, rw, rh);
-    ctx.fillStyle = DIM; ctx.font = "600 9px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText("eigenstate index k", rx + rw / 2, ry + rh + 5);
+    ctx.fillStyle = DIM; ctx.font = "600 9px Helvetica,Arial,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText("eigenstate index k", rx + rw / 2, ry + rh + 5);
   }
 
   function drawSpectrum() {
@@ -858,15 +857,15 @@ export function App() {
       const rc = sweep.current[sweep.current.length - 1]!;
       let lo = Infinity, hi = -Infinity;
       for (let k = 0; k < rc.eigs.length; k++) { if (rc.photon[k]! < 0.02) continue; const e = rc.eigs[k]!; if (e < lo) lo = e; if (e > hi) hi = e; }
-      ctx.font = "700 11px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "right"; ctx.textBaseline = "middle";
+      ctx.font = "700 11px Helvetica,Arial,sans-serif"; ctx.textAlign = "right"; ctx.textBaseline = "middle";
       ctx.fillStyle = CYAN; ctx.fillText("UP", xOf(R) - 5, yOf(hi) - 9);
       ctx.fillStyle = "#ff7a5c"; ctx.fillText("LP", xOf(R) - 5, yOf(lo) + 9);
-      ctx.font = "500 8px 'IBM Plex Sans',system-ui,sans-serif"; ctx.fillStyle = "rgba(148,163,184,0.75)"; ctx.textAlign = "left"; ctx.textBaseline = "bottom";
+      ctx.font = "500 8px Helvetica,Arial,sans-serif"; ctx.fillStyle = "rgba(148,163,184,0.75)"; ctx.textAlign = "left"; ctx.textBaseline = "bottom";
       ctx.fillText("bare cavity ω_c", xOf(R * 0.55) + 2, yOf(WA + R * 0.55 * sp.g) - 2);
     }
     if (ndark > 0) {
       const txt = `${ndark} dark / subradiant reservoir`, yLab = yOf(WA) - 3;
-      ctx.font = "600 8.5px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "right"; ctx.textBaseline = "bottom";
+      ctx.font = "600 8.5px Helvetica,Arial,sans-serif"; ctx.textAlign = "right"; ctx.textBaseline = "bottom";
       const tw = ctx.measureText(txt).width;
       ctx.fillStyle = PANEL; ctx.fillRect(P_ML + P_W - 4 - tw - 3, yLab - 10, tw + 6, 12);
       ctx.fillStyle = PURPLE; ctx.fillText(txt, P_ML + P_W - 4, yLab);
@@ -878,16 +877,16 @@ export function App() {
       ctx.beginPath(); ctx.arc(xOf(col.x), yOf(col.eigs[k]!), 5.5, 0, 2 * Math.PI); ctx.stroke();
     }
     ctx.lineWidth = 0.75; ctx.strokeStyle = AXIS; ctx.strokeRect(P_ML, P_MT, P_W, P_H);
-    ctx.fillStyle = DIM; ctx.font = "500 10px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top";
+    ctx.fillStyle = DIM; ctx.font = "500 10px Helvetica,Arial,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top";
     for (const t of xticks) { seg(ctx, xOf(t), P_MT + P_H, xOf(t), P_MT + P_H + 3); ctx.fillText(minus(`${Math.round(t)}`), xOf(t), P_MT + P_H + 6); }
     ctx.textAlign = "right"; ctx.textBaseline = "middle";
     for (const e of yticks) { seg(ctx, P_ML, yOf(e), P_ML - 3, yOf(e)); ctx.fillText(fmt(e, 2), P_ML - 6, yOf(e)); }
     ctx.fillStyle = INK; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
-    ctx.font = "13px 'IBM Plex Sans',system-ui,sans-serif"; ctx.fillText("cavity–emitter detuning  (ω_c − ω_a) / g   (dimensionless)", P_ML + P_W / 2, P_CH - 7);
+    ctx.font = "13px Helvetica,Arial,sans-serif"; ctx.fillText("cavity–emitter detuning  (ω_c − ω_a) / g   (dimensionless)", P_ML + P_W / 2, P_CH - 7);
     ctx.save(); ctx.translate(15, P_MT + P_H / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top"; ctx.textAlign = "center";
-    ctx.font = "600 13px 'IBM Plex Sans',system-ui,sans-serif"; ctx.fillText("energy  E / ω_a   (dimensionless)", 0, 0); ctx.restore();
+    ctx.font = "600 13px Helvetica,Arial,sans-serif"; ctx.fillText("energy  E / ω_a   (dimensionless)", 0, 0); ctx.restore();
     // approximations footnote
-    ctx.fillStyle = DIM; ctx.font = "500 8px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = DIM; ctx.font = "500 8px Helvetica,Arial,sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
     ctx.fillText("single-excitation Tavis–Cummings · RWA · ideal degenerate dark states", P_ML + 2, P_CH - 7);
   }
 
@@ -897,7 +896,7 @@ export function App() {
     const col = sweep.current[v.j]!, k = Math.min(v.k, col.eigs.length - 1), c2 = col.photon[k]!;
     const re = new Float64Array(N_FOCK * N_FOCK), im = new Float64Array(N_FOCK * N_FOCK);
     re[0] = 1 - c2; re[N_FOCK + 1] = c2;
-    off.getContext("2d")!.putImageData(darkWigner(wignerRawOfRho(re, im, N_FOCK, NB), NB, INV_PI), 0, 0);
+    off.getContext("2d")!.putImageData(wignerImage(wignerRawOfRho(re, im, N_FOCK, NB), NB, INV_PI), 0, 0);
     const ctx = sized(cv, B_CW, B_CH);
     ctx.fillStyle = PANEL; ctx.fillRect(0, 0, B_CW, B_CH);
     ctx.imageSmoothingEnabled = true;
@@ -906,7 +905,7 @@ export function App() {
     ctx.save(); ctx.setLineDash([3, 3]); ctx.lineWidth = 0.6; ctx.strokeStyle = CROSS;
     seg(ctx, cx, B_MT, cx, B_MT + B_S); seg(ctx, B_ML, cy, B_ML + B_S, cy); ctx.restore();
     ctx.lineWidth = 0.75; ctx.strokeStyle = AXIS; ctx.strokeRect(B_ML, B_MT, B_S, B_S);
-    ctx.fillStyle = INK; ctx.font = "600 11px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = INK; ctx.font = "600 11px Helvetica,Arial,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
     ctx.fillText("x", B_ML + B_S / 2, B_CH - 6);
     ctx.save(); ctx.translate(10, B_MT + B_S / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top"; ctx.fillText("p", 0, 0); ctx.restore();
     const set = (key: string, t: string) => { const el = read.current[key]; if (el) el.textContent = t; };
@@ -994,7 +993,7 @@ export function App() {
     let started = false;
     for (const bnd of bands) { const x0 = xOf(bnd.z0), x1 = xOf(bnd.z0 + bnd.d), yn = ynOf(bnd.n); if (!started) { ctx.moveTo(x0, yn); started = true; } else ctx.lineTo(x0, yn); ctx.lineTo(x1, yn); }
     ctx.stroke();
-    ctx.fillStyle = "rgba(140,160,190,0.8)"; ctx.font = "500 8.5px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+    ctx.fillStyle = "rgba(140,160,190,0.8)"; ctx.font = "500 8.5px Helvetica,Arial,sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
     for (const n of [cav.nLo, cav.nCav, cav.nHi]) { const yn = ynOf(n); seg(ctx, CV_ML + CV_W, yn, CV_ML + CV_W + 3, yn); ctx.fillText(n.toFixed(2), CV_ML + CV_W + 5, yn); }
     // ── |E(z)|² standing wave (left axis), antinode pinned in the spacer, exponential tails INTO the mirrors ──
     const fieldPath = () => { ctx.beginPath(); for (let k = 0; k < z.length; k++) { const x = xOf(z[k]!), y = yOf(intensity[k]!); k === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); } };
@@ -1005,11 +1004,11 @@ export function App() {
     const zAnti = z[iAt]!, xAnti = xOf(zAnti);
     ctx.strokeStyle = "rgba(226,232,240,0.5)"; ctx.setLineDash([2, 3]); ctx.lineWidth = 1; seg(ctx, xAnti, CV_MT, xAnti, CV_MT + CV_H); ctx.setLineDash([]);
     ctx.fillStyle = "#e2e8f0"; ctx.beginPath(); ctx.arc(xAnti, yOf(imax), 3.2, 0, 2 * Math.PI); ctx.fill();
-    ctx.fillStyle = "#e2e8f0"; ctx.font = "600 8.5px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+    ctx.fillStyle = "#e2e8f0"; ctx.font = "600 8.5px Helvetica,Arial,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "bottom";
     ctx.fillText("emitter @ antinode ⇒ g max", xAnti, CV_MT + 10);
     // ── penetration L_DBR over each mirror tail + L_eff bracket across the field region ─────────────────────
     const innerHalf = (ph.LcavNm) / 2, zL = cs.z0 + cs.d / 2 - innerHalf - ph.LdbrNm, zR = cs.z0 + cs.d / 2 + innerHalf + ph.LdbrNm;
-    ctx.strokeStyle = CYAN; ctx.fillStyle = CYAN; ctx.lineWidth = 1; ctx.font = "500 8px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top";
+    ctx.strokeStyle = CYAN; ctx.fillStyle = CYAN; ctx.lineWidth = 1; ctx.font = "500 8px Helvetica,Arial,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top";
     const yb = CV_MT + CV_H - 8;
     seg(ctx, xOf(Math.max(0, zL)), yb, xOf(cs.z0), yb); ctx.fillText(`L_DBR ${ph.LdbrNm.toFixed(0)}nm`, xOf((Math.max(0, zL) + cs.z0) / 2), yb + 2);
     ctx.strokeStyle = "rgba(0,229,255,0.5)"; ctx.setLineDash([3, 2]);
@@ -1017,11 +1016,11 @@ export function App() {
     ctx.fillStyle = CYAN; ctx.textBaseline = "top"; ctx.fillText(`L_eff = ${ph.LeffNm.toFixed(0)} nm`, (xOf(Math.max(0, zL)) + xOf(Math.min(total, zR))) / 2, CV_MT + 16);
     // axes
     ctx.lineWidth = 0.75; ctx.strokeStyle = AXIS; ctx.strokeRect(CV_ML, CV_MT, CV_W, CV_H);
-    ctx.fillStyle = DIM; ctx.font = "500 10px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top";
+    ctx.fillStyle = DIM; ctx.font = "500 10px Helvetica,Arial,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top";
     for (const t of niceTicks(0, total, 6)) { const x = xOf(t); seg(ctx, x, CV_MT + CV_H, x, CV_MT + CV_H + 3); ctx.fillText(`${Math.round(t)}`, x, CV_MT + CV_H + 6); }
-    ctx.fillStyle = AMBER; ctx.font = "600 9px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "right"; ctx.textBaseline = "top";
+    ctx.fillStyle = AMBER; ctx.font = "600 9px Helvetica,Arial,sans-serif"; ctx.textAlign = "right"; ctx.textBaseline = "top";
     ctx.fillText(`peak |E|²/inc = ${imax.toFixed(2)}×`, CV_ML + CV_W - 4, CV_MT + 3); // field enhancement
-    ctx.fillStyle = INK; ctx.font = "600 13px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textBaseline = "alphabetic"; ctx.textAlign = "center";
+    ctx.fillStyle = INK; ctx.font = "600 13px Helvetica,Arial,sans-serif"; ctx.textBaseline = "alphabetic"; ctx.textAlign = "center";
     ctx.fillText("z  (nm)", CV_ML + CV_W / 2, CV_CH - 7);
     ctx.save(); ctx.translate(14, CV_MT + CV_H / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top"; ctx.fillStyle = AMBER; ctx.fillText("|E(z)|²  (E₀⁺=1)", 0, 0); ctx.restore();
     ctx.save(); ctx.translate(CV_CW - 2, CV_MT + CV_H / 2); ctx.rotate(Math.PI / 2); ctx.fillStyle = "rgba(140,160,190,0.8)"; ctx.textBaseline = "top"; ctx.fillText("refractive index n", 0, 0); ctx.restore();
@@ -1065,19 +1064,19 @@ export function App() {
     const yOf = (R: number) => RB_MT + (1 - R) * RB_PH;
     const flat = cavityLayers(cav.lambda, cav.nHi, cav.nLo, cav.pairs, cav.nCav); // FIXED stack designed at λ₀
     const Rs: number[] = []; for (let s = 0; s <= M; s++) { const l = lmin + (lmax - lmin) * s / M; Rs.push(tmmReflectance(flat, l, N0, NS)); }
-    ctx.font = "500 9px 'IBM Plex Sans',system-ui,sans-serif";
+    ctx.font = "500 9px Helvetica,Arial,sans-serif";
     for (const v of [0, 0.5, 1]) { ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5; seg(ctx, RB_ML, yOf(v), RB_ML + RB_PW, yOf(v)); ctx.fillStyle = DIM; ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(v.toFixed(1), RB_ML - 5, yOf(v)); }
     ctx.fillStyle = "rgba(56,84,150,0.18)"; for (let s = 0; s < M; s++) { if (Rs[s]! > 0.5) { const l = lmin + (lmax - lmin) * s / M; ctx.fillRect(xOf(l), RB_MT, Math.max(0.6, RB_PW / M + 0.6), RB_PH); } } // stopband shading
     ctx.strokeStyle = CYAN; ctx.lineWidth = 1.7; ctx.beginPath();
     for (let s = 0; s <= M; s++) { const l = lmin + (lmax - lmin) * s / M; const x = xOf(l), y = yOf(Rs[s]!); s === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); } ctx.stroke();
     ctx.save(); ctx.setLineDash([2, 3]); ctx.strokeStyle = AMBER; ctx.lineWidth = 1; seg(ctx, xOf(lam0), RB_MT, xOf(lam0), RB_MT + RB_PH); ctx.restore();
     const ph = cavPhys();
-    ctx.fillStyle = AMBER; ctx.font = "600 8.5px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText("resonance dip λ₀", xOf(lam0), RB_MT + 2);
+    ctx.fillStyle = AMBER; ctx.font = "600 8.5px Helvetica,Arial,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText("resonance dip λ₀", xOf(lam0), RB_MT + 2);
     ctx.fillStyle = "rgba(120,150,210,0.95)"; ctx.textBaseline = "bottom"; ctx.fillText(`stopband Δf/f₀ = ${ph.dffPct.toFixed(0)}% (${ph.dLamNm.toFixed(0)}nm) · contrast-set`, RB_ML + RB_PW / 2, RB_MT + RB_PH - 3);
     ctx.lineWidth = 0.75; ctx.strokeStyle = AXIS; ctx.strokeRect(RB_ML, RB_MT, RB_PW, RB_PH);
-    ctx.fillStyle = DIM; ctx.font = "500 9px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top";
+    ctx.fillStyle = DIM; ctx.font = "500 9px Helvetica,Arial,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top";
     for (const l of [lmin, lam0, lmax]) { const x = xOf(l); seg(ctx, x, RB_MT + RB_PH, x, RB_MT + RB_PH + 3); ctx.fillText(`${Math.round(l)}`, x, RB_MT + RB_PH + 6); }
-    ctx.fillStyle = INK; ctx.font = "600 12px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textBaseline = "alphabetic"; ctx.fillText("wavelength λ (nm)", RB_ML + RB_PW / 2, RB_CH - 6);
+    ctx.fillStyle = INK; ctx.font = "600 12px Helvetica,Arial,sans-serif"; ctx.textBaseline = "alphabetic"; ctx.fillText("wavelength λ (nm)", RB_ML + RB_PW / 2, RB_CH - 6);
     ctx.save(); ctx.translate(11, RB_MT + RB_PH / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top"; ctx.fillText("Reflectance R", 0, 0); ctx.restore();
   }
 
@@ -1097,7 +1096,7 @@ export function App() {
     const Nstar = ph.Nstar, logNstar = Math.log10(Math.max(1, Nstar));
     // strong-coupling region shading (N > N*)
     ctx.fillStyle = "rgba(0,229,255,0.07)"; ctx.fillRect(xOf(Math.min(Nx, logNstar)), RB_MT, RB_PW - (xOf(Math.min(Nx, logNstar)) - RB_ML), RB_PH);
-    ctx.font = "500 8px 'IBM Plex Sans',system-ui,sans-serif"; ctx.fillStyle = DIM; ctx.textAlign = "right"; ctx.textBaseline = "middle";
+    ctx.font = "500 8px Helvetica,Arial,sans-serif"; ctx.fillStyle = DIM; ctx.textAlign = "right"; ctx.textBaseline = "middle";
     for (const e of [1, 10, 100, 1000]) { const le = Math.log10(e); if (le < ymin || le > ymax) continue; ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5; seg(ctx, RB_ML, yOf(le), RB_ML + RB_PW, yOf(le)); ctx.fillText(`${e}`, RB_ML - 4, yOf(le)); }
     // κ horizontal line
     ctx.strokeStyle = "#ff7080"; ctx.setLineDash([4, 3]); ctx.lineWidth = 1.4; seg(ctx, RB_ML, yOf(Math.log10(kap)), RB_ML + RB_PW, yOf(Math.log10(kap))); ctx.setLineDash([]);
@@ -1106,17 +1105,17 @@ export function App() {
     ctx.strokeStyle = CYAN; ctx.lineWidth = 1.8; ctx.beginPath();
     for (let s = 0; s <= 120; s++) { const logN = Nx * s / 120, E = g2 * Math.pow(10, logN / 2); ctx.lineTo(xOf(logN), yOf(Math.log10(E))); } ctx.stroke();
     // crossover marker
-    if (logNstar >= 0 && logNstar <= Nx) { ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(xOf(logNstar), yOf(Math.log10(kap)), 2.6, 0, 2 * Math.PI); ctx.fill(); ctx.fillStyle = DIM; ctx.font = "600 8px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText(`N* ≈ ${Nstar < 1e4 ? Math.round(Nstar) : Nstar.toExponential(0)}`, xOf(logNstar), yOf(Math.log10(kap)) + 4); }
+    if (logNstar >= 0 && logNstar <= Nx) { ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(xOf(logNstar), yOf(Math.log10(kap)), 2.6, 0, 2 * Math.PI); ctx.fill(); ctx.fillStyle = DIM; ctx.font = "600 8px Helvetica,Arial,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText(`N* ≈ ${Nstar < 1e4 ? Math.round(Nstar) : Nstar.toExponential(0)}`, xOf(logNstar), yOf(Math.log10(kap)) + 4); }
     // current N marker + regime
     const logNcur = Math.log10(Math.max(1, cavN)), Ecur = g2 * Math.sqrt(Math.max(1, cavN)), strong = Ecur > kap;
     ctx.strokeStyle = AMBER; ctx.setLineDash([1, 2]); ctx.lineWidth = 1; seg(ctx, xOf(Math.min(Nx, logNcur)), RB_MT, xOf(Math.min(Nx, logNcur)), RB_MT + RB_PH); ctx.setLineDash([]);
     ctx.fillStyle = strong ? CYAN : "#ff9b50"; ctx.beginPath(); ctx.arc(xOf(Math.min(Nx, logNcur)), yOf(Math.log10(Math.max(Math.pow(10, ymin), Ecur))), 3, 0, 2 * Math.PI); ctx.fill();
-    ctx.font = "600 9px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top";
+    ctx.font = "600 9px Helvetica,Arial,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top";
     ctx.fillText(`N=${cavN < 1e4 ? cavN : cavN.toExponential(0)} · 2g√N=${Ecur < 1 ? Ecur.toFixed(2) : Ecur.toFixed(0)} meV · ${strong ? "STRONG" : "weak"}`, RB_ML + RB_PW / 2, RB_MT + 2);
     ctx.lineWidth = 0.75; ctx.strokeStyle = AXIS; ctx.strokeRect(RB_ML, RB_MT, RB_PW, RB_PH);
-    ctx.fillStyle = DIM; ctx.font = "500 9px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top";
+    ctx.fillStyle = DIM; ctx.font = "500 9px Helvetica,Arial,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top";
     for (const p of [0, 2, 4, 6, 8]) { const x = xOf(p); seg(ctx, x, RB_MT + RB_PH, x, RB_MT + RB_PH + 3); ctx.fillText(`10${p === 0 ? "⁰" : p === 2 ? "²" : p === 4 ? "⁴" : p === 6 ? "⁶" : "⁸"}`, x, RB_MT + RB_PH + 6); }
-    ctx.fillStyle = INK; ctx.font = "600 12px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textBaseline = "alphabetic"; ctx.fillText("emitter number N", RB_ML + RB_PW / 2, RB_CH - 6);
+    ctx.fillStyle = INK; ctx.font = "600 12px Helvetica,Arial,sans-serif"; ctx.textBaseline = "alphabetic"; ctx.fillText("emitter number N", RB_ML + RB_PW / 2, RB_CH - 6);
     ctx.save(); ctx.translate(11, RB_MT + RB_PH / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top"; ctx.fillText("Ω_R = 2g√N (meV)", 0, 0); ctx.restore();
   }
 
@@ -1173,7 +1172,7 @@ export function App() {
     const { eigs, vecs, n, c } = ds;
     const emin = eigs[0]!, emax = eigs[n - 1]!, pad = (emax - emin) * 0.14 + 1e-4, elo = emin - pad, ehi = emax + pad;
     const xOf = (f: number) => HP_ML + f * HP_PW, yOf = (e: number) => HP_MT + (1 - (e - elo) / (ehi - elo)) * HP_PH;
-    ctx.font = "500 8.5px 'IBM Plex Sans',system-ui,sans-serif";
+    ctx.font = "500 8.5px Helvetica,Arial,sans-serif";
     for (const f of [0, 0.25, 0.5, 0.75, 1]) {
       ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5; seg(ctx, xOf(f), HP_MT, xOf(f), HP_MT + HP_PH);
       ctx.fillStyle = DIM; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText(f.toFixed(2), xOf(f), HP_MT + HP_PH + 5);
@@ -1187,8 +1186,8 @@ export function App() {
     // bare-energy calibration lines: emitter ω_a (where the dark band sits) and, when detuned, the cavity ω_c
     const yA = yOf(WA);
     ctx.strokeStyle = "rgba(139,148,158,0.45)"; ctx.setLineDash([1, 3]); ctx.lineWidth = 0.75; seg(ctx, HP_ML, yA, HP_ML + HP_PW, yA); ctx.setLineDash([]);
-    ctx.fillStyle = DIM; ctx.font = "9px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "right"; ctx.textBaseline = "bottom"; ctx.fillText("ω_a", HP_ML + HP_PW - 3, yA - 2);
-    if (Math.abs(dyn.detuning) > 1e-9) { const yC = yOf(WA + dyn.detuning); ctx.strokeStyle = "rgba(0,255,255,0.4)"; ctx.setLineDash([1, 3]); ctx.lineWidth = 0.75; seg(ctx, HP_ML, yC, HP_ML + HP_PW, yC); ctx.setLineDash([]); ctx.fillStyle = "rgba(0,255,255,0.7)"; ctx.fillText("ω_c", HP_ML + HP_PW - 3, yC - 2); }
+    ctx.fillStyle = DIM; ctx.font = "9px Helvetica,Arial,sans-serif"; ctx.textAlign = "right"; ctx.textBaseline = "bottom"; ctx.fillText("ω_a", HP_ML + HP_PW - 3, yA - 2);
+    if (Math.abs(dyn.detuning) > 1e-9) { const yC = yOf(WA + dyn.detuning); ctx.strokeStyle = "rgba(31,119,180,0.55)"; ctx.setLineDash([1, 3]); ctx.lineWidth = 0.75; seg(ctx, HP_ML, yC, HP_ML + HP_PW, yC); ctx.setLineDash([]); ctx.fillStyle = "rgba(31,119,180,0.9)"; ctx.fillText("ω_c", HP_ML + HP_PW - 3, yC - 2); }
     if (dark.length) {
       let dlo = Infinity, dhi = -Infinity; for (const k of dark) { dlo = Math.min(dlo, eigs[k]!); dhi = Math.max(dhi, eigs[k]!); }
       const yb = yOf(dhi), yt = yOf(dlo), bw = xOf(0.05) - HP_ML, yc = (yb + yt) / 2;
@@ -1197,9 +1196,9 @@ export function App() {
       // label parked in the empty right region with a leader line, never on the data
       const lx = xOf(0.6);
       ctx.strokeStyle = "rgba(158,119,237,0.4)"; ctx.lineWidth = 0.6; seg(ctx, HP_ML + bw, yc, lx - 4, yc);
-      ctx.fillStyle = DARKC; ctx.font = "600 8.5px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+      ctx.fillStyle = DARKC; ctx.font = "600 8.5px Helvetica,Arial,sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
       ctx.fillText(`${dark.length} DARK / SUBRADIANT`, lx, yc - 5);
-      ctx.fillStyle = DIM; ctx.font = "500 8px 'IBM Plex Sans',system-ui,sans-serif"; ctx.fillText("reservoir · zero photon wt.", lx, yc + 5);
+      ctx.fillStyle = DIM; ctx.font = "500 8px Helvetica,Arial,sans-serif"; ctx.fillText("reservoir · zero photon wt.", lx, yc + 5);
     }
     // marker radius ∝ spatial mode-weight Σ|v_ik|²f(r_i) (Upgrade I): states on center molecules read
     // large, edge-localized states small, so shrinking the waist visibly shrinks edge dark states.
@@ -1212,16 +1211,16 @@ export function App() {
       marks.push({ x, y, k });
       ctx.beginPath(); ctx.arc(x, y, rad, 0, 2 * Math.PI);
       ctx.fillStyle = lerpHex(DARKC, COBALT, Math.min(1, phot * 2)); ctx.globalAlpha = 0.55 + 0.45 * Math.sqrt(Math.min(1, occ)); ctx.fill(); ctx.globalAlpha = 1;
-      if (k === inspK) { ctx.strokeStyle = "#fff"; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.arc(x, y, rad + 3.5, 0, 2 * Math.PI); ctx.stroke(); }
+      if (k === inspK) { ctx.strokeStyle = AMBER; ctx.lineWidth = 1.8; ctx.beginPath(); ctx.arc(x, y, rad + 3.5, 0, 2 * Math.PI); ctx.stroke(); }
     }
     hopMarks.current = marks;
-    ctx.fillStyle = INK; ctx.font = "600 9px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+    ctx.fillStyle = INK; ctx.font = "600 9px Helvetica,Arial,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "bottom";
     // LP/UP = the two largest-photon-weight eigenstates (see brightPolaritonIdx)
     const { kLP, kUP } = brightPolaritonIdx(vecs, eigs, n);
     ctx.fillText("LP", xOf(vecs[kLP]! * vecs[kLP]!), yOf(eigs[kLP]!) - 9);
     ctx.fillText("UP", xOf(vecs[kUP]! * vecs[kUP]!), yOf(eigs[kUP]!) - 9);
     ctx.strokeStyle = AXIS; ctx.lineWidth = 0.75; ctx.strokeRect(HP_ML, HP_MT, HP_PW, HP_PH);
-    ctx.fillStyle = DIM; ctx.font = "600 11px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top";
+    ctx.fillStyle = DIM; ctx.font = "600 11px Helvetica,Arial,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top";
     ctx.fillText("photon fraction  |⟨a|ψ_k⟩|²", HP_ML + HP_PW / 2, HP_MT + HP_PH + 16);
     ctx.save(); ctx.translate(15, HP_MT + HP_PH / 2); ctx.rotate(-Math.PI / 2); ctx.fillText("energy  E_k / ω_c", 0, 0); ctx.restore();
   }
@@ -1233,23 +1232,23 @@ export function App() {
   function drawMatrix() {
     const cvEl = matCanvas.current, m = matData.current; if (!cvEl || !m) return;
     const ctx = sized(cvEl, MX_S, MX_S);
-    ctx.fillStyle = "#000"; ctx.fillRect(0, 0, MX_S, MX_S);
+    ctx.fillStyle = PANEL; ctx.fillRect(0, 0, MX_S, MX_S);
     const ml = 18, mt = 14, mr = 6, mb = 16, n = m.n, h = m.h, cell = (MX_S - ml - mr) / n, gridOn = cell > 4.5;
     let maxAbs = 1e-9; for (let i = 0; i < h.length; i++) maxAbs = Math.max(maxAbs, Math.abs(h[i]!));
     for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
       const val = h[i * n + j]!, v = Math.sqrt(Math.min(1, Math.abs(val) / maxAbs));
-      ctx.fillStyle = val >= 0 ? lerpHex("#0c0f12", "#00ffff", v) : lerpHex("#0c0f12", "#ff3333", v);
+      ctx.fillStyle = val >= 0 ? lerpHex("#ffffff", "#1f77b4", v) : lerpHex("#ffffff", "#d62728", v);
       ctx.fillRect(ml + j * cell, mt + i * cell, cell + 0.7, cell + 0.7);
     }
     if (gridOn) { // razor-thin black dividers → explicit matrix grid, not a blurry image
-      ctx.strokeStyle = "#000"; ctx.lineWidth = 1;
+      ctx.strokeStyle = "#d2d2d2"; ctx.lineWidth = 1;
       for (let k = 0; k <= n; k++) { const x = ml + k * cell, y = mt + k * cell; seg(ctx, x, mt, x, mt + n * cell); seg(ctx, ml, y, ml + n * cell, y); }
     }
     ctx.strokeStyle = AXIS; ctx.lineWidth = 0.75; ctx.strokeRect(ml, mt, n * cell, n * cell);
-    ctx.fillStyle = DIM; ctx.font = "600 8px 'IBM Plex Sans',system-ui,sans-serif";
+    ctx.fillStyle = DIM; ctx.font = "600 8px Helvetica,Arial,sans-serif";
     ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText(`|j⟩  0…${n - 1}`, ml + n * cell / 2, mt + n * cell + 3);
     ctx.save(); ctx.translate(ml - 5, mt + n * cell / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "bottom"; ctx.fillText(`⟨i|  0…${n - 1}`, 0, 0); ctx.restore();
-    ctx.fillStyle = CYAN; ctx.textAlign = "left"; ctx.textBaseline = "bottom"; ctx.font = "600 7.5px 'IBM Plex Sans',system-ui,sans-serif"; ctx.fillText("⟨0|=photon", ml, mt - 2);
+    ctx.fillStyle = CYAN; ctx.textAlign = "left"; ctx.textBaseline = "bottom"; ctx.font = "600 7.5px Helvetica,Arial,sans-serif"; ctx.fillText("⟨0|=photon", ml, mt - 2);
   }
 
   function onHopClick(e: React.MouseEvent<HTMLCanvasElement>) {
@@ -1271,7 +1270,7 @@ export function App() {
     // X-axis centred on the eigenvalue midpoint (= (ω_c+ω_a)/2) so the doublet stays framed at ANY detuning.
     const lo = ds.eigs[0]!, hi = ds.eigs[ds.n - 1]!, hw = Math.max(0.5, (hi - lo) * 0.7 + 0.08), mid = (lo + hi) / 2, wlo = mid - hw, whi = mid + hw;
     const xOf = (w: number) => FF_ML + (w - wlo) / (whi - wlo) * FF_PW, yOf = (p: number) => FF_MT + (1 - p) * FF_PH;
-    ctx.font = "500 8.5px 'IBM Plex Sans',system-ui,sans-serif";
+    ctx.font = "500 8.5px Helvetica,Arial,sans-serif";
     for (const p of [0, 0.5, 1]) { ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5; seg(ctx, FF_ML, yOf(p), FF_ML + FF_PW, yOf(p)); ctx.fillStyle = DIM; ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(p.toFixed(1), FF_ML - 6, yOf(p)); }
     // uniform ω ticks every 0.5 with a fine dashed vertical grid for lineshape tracking
     ctx.textAlign = "center"; ctx.textBaseline = "top";
@@ -1282,15 +1281,15 @@ export function App() {
     // bare-mode markers: emitter ω_a (red) fixed at 1, cavity ω_c (cyan) at 1+detuning, they coincide at
     // resonance; off-resonance the polariton peaks sit asymmetrically between them.
     ctx.setLineDash([1, 3]); ctx.lineWidth = 0.75;
-    ctx.strokeStyle = "rgba(255,58,58,0.5)"; seg(ctx, xOf(WA), FF_MT, xOf(WA), FF_MT + FF_PH);
-    if (Math.abs(dyn.detuning) > 1e-9) { ctx.strokeStyle = "rgba(0,255,255,0.5)"; seg(ctx, xOf(WA + dyn.detuning), FF_MT, xOf(WA + dyn.detuning), FF_MT + FF_PH); }
+    ctx.strokeStyle = "rgba(214,39,40,0.6)"; seg(ctx, xOf(WA), FF_MT, xOf(WA), FF_MT + FF_PH);
+    if (Math.abs(dyn.detuning) > 1e-9) { ctx.strokeStyle = "rgba(31,119,180,0.6)"; seg(ctx, xOf(WA + dyn.detuning), FF_MT, xOf(WA + dyn.detuning), FF_MT + FF_PH); }
     ctx.setLineDash([]);
     const om = fd.omega, pw = fd.power;
     const path = (close: boolean) => { ctx.beginPath(); let st = false; for (let i = 0; i < om.length; i++) { const w = om[i]!; if (w < wlo) continue; if (w > whi) break; const x = xOf(w), y = yOf(Math.min(1, pw[i]!)); if (!st) { if (close) { ctx.moveTo(x, yOf(0)); ctx.lineTo(x, y); } else ctx.moveTo(x, y); st = true; } else ctx.lineTo(x, y); } if (close && st) { ctx.lineTo(xOf(Math.min(whi, om[om.length - 1]!)), yOf(0)); ctx.closePath(); } };
-    path(true); ctx.fillStyle = "rgba(0,255,255,0.12)"; ctx.fill();
+    path(true); ctx.fillStyle = "rgba(31,119,180,0.12)"; ctx.fill();
     path(false); ctx.strokeStyle = CYAN; ctx.lineWidth = 1.6; ctx.stroke();
     ctx.strokeStyle = AXIS; ctx.lineWidth = 0.75; ctx.strokeRect(FF_ML, FF_MT, FF_PW, FF_PH);
-    ctx.fillStyle = DIM; ctx.font = "10px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText("ω/ω_c", FF_ML + FF_PW / 2, FF_CH - 11);
+    ctx.fillStyle = DIM; ctx.font = "10px Helvetica,Arial,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText("ω/ω_c", FF_ML + FF_PW / 2, FF_CH - 11);
     ctx.save(); ctx.translate(13, FF_MT + FF_PH / 2); ctx.rotate(-Math.PI / 2); ctx.fillText("S(ω)", 0, 0); ctx.restore();
   }
 
@@ -1305,7 +1304,7 @@ export function App() {
     for (const e of sw.eigs) for (let i = 0; i < K; i++) { emin = Math.min(emin, e[i]!); emax = Math.max(emax, e[i]!); }
     const pad = (emax - emin) * 0.08 + 1e-3; emin -= pad; emax += pad;
     const xOf = (g: number) => SW_ML + (g / SWEEP_GMAX) * SW_PW, yOf = (e: number) => SW_MT + (1 - (e - emin) / (emax - emin)) * SW_PH;
-    ctx.font = "500 9px 'IBM Plex Sans',system-ui,sans-serif";
+    ctx.font = "500 9px Helvetica,Arial,sans-serif";
     for (let t = 0; t <= 4; t++) { const g = SWEEP_GMAX * t / 4; ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5; seg(ctx, xOf(g), SW_MT, xOf(g), SW_MT + SW_PH); ctx.fillStyle = DIM; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText(g.toFixed(2), xOf(g), SW_MT + SW_PH + 6); }
     for (let t = 0; t <= 4; t++) { const e = emin + (emax - emin) * t / 4; ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5; seg(ctx, SW_ML, yOf(e), SW_ML + SW_PW, yOf(e)); ctx.fillStyle = DIM; ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(fmt(e, 2), SW_ML - 7, yOf(e)); }
     for (let i = 0; i < K; i++) {
@@ -1316,11 +1315,11 @@ export function App() {
     }
     const gx = xOf(Math.min(SWEEP_GMAX, dynGRef.current));
     ctx.strokeStyle = "rgba(245,158,11,0.85)"; ctx.lineWidth = 1; ctx.setLineDash([4, 3]); seg(ctx, gx, SW_MT, gx, SW_MT + SW_PH); ctx.setLineDash([]);
-    ctx.fillStyle = AMBER; ctx.font = "600 9px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "bottom"; ctx.fillText("g = " + fmt(dynGRef.current, 3), gx, SW_MT - 3);
+    ctx.fillStyle = AMBER; ctx.font = "600 9px Helvetica,Arial,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "bottom"; ctx.fillText("g = " + fmt(dynGRef.current, 3), gx, SW_MT - 3);
     ctx.strokeStyle = AXIS; ctx.lineWidth = 0.75; ctx.strokeRect(SW_ML, SW_MT, SW_PW, SW_PH);
-    ctx.fillStyle = INK; ctx.font = "600 12px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText("coupling  g_0 / ω_c", SW_ML + SW_PW / 2, SW_MT + SW_PH + 18);
+    ctx.fillStyle = INK; ctx.font = "600 12px Helvetica,Arial,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText("coupling  g_0 / ω_c", SW_ML + SW_PW / 2, SW_MT + SW_PH + 18);
     ctx.save(); ctx.translate(16, SW_MT + SW_PH / 2); ctx.rotate(-Math.PI / 2); ctx.fillText("energy  E / ω_c", 0, 0); ctx.restore();
-    ctx.font = "600 10px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+    ctx.font = "600 10px Helvetica,Arial,sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
     ctx.fillStyle = COBALT; ctx.fillText("UP", SW_ML + SW_PW + 5, yOf(sw.eigs[steps - 1]![K - 1]!));
     ctx.fillText("LP", SW_ML + SW_PW + 5, yOf(sw.eigs[steps - 1]![0]!));
     ctx.fillStyle = DARKC; ctx.fillText("dark", SW_ML + SW_PW + 5, yOf(sw.eigs[steps - 1]![Math.floor(K / 2)]!));
@@ -1347,7 +1346,7 @@ export function App() {
     };
     const bare = curve(hd.fc.pos, hd.fc.weight), live = curve(hd.live.eigs, hd.live.absorption);
     let norm = 1e-9; for (let i = 0; i < HTC_GRID; i++) { if (bare[i]! > norm) norm = bare[i]!; if (live[i]! > norm) norm = live[i]!; }
-    ctx.font = "500 9px 'IBM Plex Sans',system-ui,sans-serif";
+    ctx.font = "500 9px Helvetica,Arial,sans-serif";
     for (const a of [0, 0.5, 1]) { ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5; seg(ctx, HT_ML, yOf(a), HT_ML + HT_PW, yOf(a)); ctx.fillStyle = DIM; ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(a.toFixed(1), HT_ML - 6, yOf(a)); }
     for (let t = 0; t <= 6; t++) { const w = wlo + (whi - wlo) * t / 6; ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5; seg(ctx, xOf(w), HT_MT, xOf(w), HT_MT + HT_PH); ctx.fillStyle = DIM; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText(fmt(w, 2), xOf(w), HT_MT + HT_PH + 5); }
     const drawArea = (ys: Float64Array, line: string, fill: string) => {
@@ -1359,9 +1358,9 @@ export function App() {
     drawArea(live, COBALT, "rgba(59,130,246,0.15)"); // in-cavity / collective
     // bare 0-0 origin marker (polaron-shifted)
     const x00 = xOf(WA - htc.S * htc.wv); ctx.strokeStyle = "rgba(245,158,11,0.5)"; ctx.setLineDash([3, 3]); ctx.lineWidth = 0.75; seg(ctx, x00, HT_MT, x00, HT_MT + HT_PH); ctx.setLineDash([]);
-    ctx.fillStyle = AMBER; ctx.font = "600 9px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "top"; ctx.fillText("0–0", x00 + 3, HT_MT + 2);
+    ctx.fillStyle = AMBER; ctx.font = "600 9px Helvetica,Arial,sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "top"; ctx.fillText("0–0", x00 + 3, HT_MT + 2);
     ctx.strokeStyle = AXIS; ctx.lineWidth = 0.75; ctx.strokeRect(HT_ML, HT_MT, HT_PW, HT_PH);
-    ctx.fillStyle = INK; ctx.font = "600 12px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText("frequency  ω / ω_c", HT_ML + HT_PW / 2, HT_MT + HT_PH + 18);
+    ctx.fillStyle = INK; ctx.font = "600 12px Helvetica,Arial,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText("frequency  ω / ω_c", HT_ML + HT_PW / 2, HT_MT + HT_PH + 18);
     ctx.save(); ctx.translate(15, HT_MT + HT_PH / 2); ctx.rotate(-Math.PI / 2); ctx.fillText("absorption  A(ω)", 0, 0); ctx.restore();
   }
 
@@ -1372,7 +1371,7 @@ export function App() {
     const cv = vibCompareCanvas.current, hd = htcData.current; if (!cv || !hd) return;
     const ctx = sized(cv, VB_CW, VB_CH);
     ctx.fillStyle = PANEL; ctx.fillRect(0, 0, VB_CW, VB_CH);
-    const F = "'IBM Plex Sans',system-ui,sans-serif", S = htc.S, wv = htc.wv;
+    const F = "Helvetica,Arial,sans-serif", S = htc.S, wv = htc.wv;
     // 1.D · LEFT, bare Franck–Condon progression (amber vertical bars, e^{−S}Sⁿ/n!) with the in-cavity
     // polariton absorption as a continuous Lorentzian-broadened cyan curve overlaid for direct comparison.
     const lx = VB_ML + 30, lw = VB_PW * 0.44, ly = VB_MT, lh = VB_PH;
@@ -1431,12 +1430,12 @@ export function App() {
     const bareW = (s: number) => gam + s;
     let ymax = 1e-6; for (let i = 0; i <= 100; i++) { const s = smax * i / 100; ymax = Math.max(ymax, GammaLP(s), bareW(s)); } ymax *= 1.08;
     const xOf = (s: number) => DI_ML + (s / smax) * DI_PW, yOf = (v: number) => DI_MT + (1 - v / ymax) * DI_PH;
-    ctx.font = "500 9px 'IBM Plex Sans',system-ui,sans-serif";
+    ctx.font = "500 9px Helvetica,Arial,sans-serif";
     for (let t = 0; t <= 4; t++) { const v = ymax * t / 4; ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5; seg(ctx, DI_ML, yOf(v), DI_ML + DI_PW, yOf(v)); ctx.fillStyle = DIM; ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(v.toFixed(2), DI_ML - 5, yOf(v)); }
     // crossover divider at σ = Ω_R
     if (OmR > 0 && OmR < smax) {
       const xd = xOf(OmR); ctx.strokeStyle = AMBER; ctx.setLineDash([4, 3]); ctx.lineWidth = 1; seg(ctx, xd, DI_MT, xd, DI_MT + DI_PH); ctx.setLineDash([]);
-      ctx.fillStyle = AMBER; ctx.font = "600 8.5px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText("σ = Ω_R", xd, DI_MT + 2);
+      ctx.fillStyle = AMBER; ctx.font = "600 8.5px Helvetica,Arial,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText("σ = Ω_R", xd, DI_MT + 2);
     }
     const plot = (fn: (s: number) => number, stroke: string, dash: boolean) => {
       ctx.strokeStyle = stroke; ctx.lineWidth = dash ? 1.3 : 2; ctx.setLineDash(dash ? [4, 3] : []); ctx.beginPath();
@@ -1446,15 +1445,15 @@ export function App() {
     plot(bareW, "rgba(148,163,184,0.7)", true); // bare γ + σ
     plot(GammaLP, CYAN, false);                  // motional-narrowed polariton
     // regime labels
-    ctx.font = "600 8.5px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textBaseline = "bottom";
+    ctx.font = "600 8.5px Helvetica,Arial,sans-serif"; ctx.textBaseline = "bottom";
     ctx.fillStyle = CYAN; ctx.textAlign = "left"; ctx.fillText("strong coupling · motional narrowing", DI_ML + 6, DI_MT + DI_PH - 6);
     ctx.fillStyle = "#8b949e"; ctx.textAlign = "right"; ctx.fillText("disorder-dominated", DI_ML + DI_PW - 6, DI_MT + 16);
     ctx.strokeStyle = AXIS; ctx.lineWidth = 0.75; ctx.strokeRect(DI_ML, DI_MT, DI_PW, DI_PH);
-    ctx.fillStyle = DIM; ctx.font = "500 9px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top";
+    ctx.fillStyle = DIM; ctx.font = "500 9px Helvetica,Arial,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top";
     for (let s = 0; s <= 0.5001; s += 0.1) { seg(ctx, xOf(s), DI_MT + DI_PH, xOf(s), DI_MT + DI_PH + 3); ctx.fillText(s.toFixed(1), xOf(s), DI_MT + DI_PH + 6); }
-    ctx.fillStyle = INK; ctx.font = "600 11px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textBaseline = "alphabetic"; ctx.fillText("inhomogeneous disorder  σ / ω_c", DI_ML + DI_PW / 2, DI_CH - 6);
+    ctx.fillStyle = INK; ctx.font = "600 11px Helvetica,Arial,sans-serif"; ctx.textBaseline = "alphabetic"; ctx.fillText("inhomogeneous disorder  σ / ω_c", DI_ML + DI_PW / 2, DI_CH - 6);
     ctx.save(); ctx.translate(13, DI_MT + DI_PH / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top"; ctx.fillText("Γ_LP / ω_c  (polariton linewidth, dimensionless)", 0, 0); ctx.restore();
-    ctx.font = "600 8.5px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "top";
+    ctx.font = "600 8.5px Helvetica,Arial,sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "top";
     ctx.fillStyle = CYAN; ctx.fillText("Γ_LP = γ + σ²/2Ω_R   (κ≈γ here)", DI_ML + 6, DI_MT + 4);
     ctx.fillStyle = "#8b949e"; ctx.fillText("bare  γ + σ", DI_ML + 6, DI_MT + 16);
   }
@@ -1473,26 +1472,26 @@ export function App() {
     // rises ABOVE the N-independent baseline and peaks at N_max, the cavity enhancement of electron transfer.
     const base = curve[0]!.baseline; let pk = base; for (const c of curve) pk = Math.max(pk, base + c.kTotal); pk = pk || 1; const xhi = 5;
     const xOf = (ln: number) => ET_ML + (ln / xhi) * ET_PW, yOf = (v: number) => ET_MT + (1 - (v / pk) / 1.06) * ET_PH;
-    ctx.font = "500 9px 'IBM Plex Sans',system-ui,sans-serif";
+    ctx.font = "500 9px Helvetica,Arial,sans-serif";
     for (const f of [0, 0.25, 0.5, 0.75, 1]) { const y = yOf(pk * f); ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5; seg(ctx, ET_ML, y, ET_ML + ET_PW, y); ctx.fillStyle = DIM; ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(f.toFixed(2), ET_ML - 6, y); }
     const sup = ["", "¹", "²", "³", "⁴", "⁵"];
     ctx.textAlign = "center"; ctx.textBaseline = "top";
     for (let d = 0; d <= 5; d++) { const x = xOf(d); ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5; seg(ctx, x, ET_MT, x, ET_MT + ET_PH); ctx.fillStyle = DIM; ctx.fillText(d === 0 ? "1" : "10" + sup[d], x, ET_MT + ET_PH + 6); }
     // ordinary (non-cavity) ET rate: flat, N-independent reference
     ctx.strokeStyle = "rgba(148,163,184,0.7)"; ctx.lineWidth = 1.3; ctx.setLineDash([5, 4]); seg(ctx, ET_ML, yOf(base), ET_ML + ET_PW, yOf(base)); ctx.setLineDash([]);
-    ctx.fillStyle = "#8b949e"; ctx.font = "600 8.5px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "bottom"; ctx.fillText("ordinary ET (no cavity), N-independent", ET_ML + 7, yOf(base) - 3);
+    ctx.fillStyle = "#8b949e"; ctx.font = "600 8.5px Helvetica,Arial,sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "bottom"; ctx.fillText("ordinary ET (no cavity), N-independent", ET_ML + 7, yOf(base) - 3);
     // N_max turnover marker
     if (Nm > 1 && Math.log10(Nm) <= xhi) {
       const xm = xOf(Math.log10(Nm)); ctx.strokeStyle = AMBER; ctx.setLineDash([4, 3]); ctx.lineWidth = 1; seg(ctx, xm, ET_MT, xm, ET_MT + ET_PH); ctx.setLineDash([]);
-      ctx.fillStyle = AMBER; ctx.font = "700 9px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText(`N_max ≈ ${Math.round(Nm).toLocaleString()}`, xm, ET_MT + 3);
+      ctx.fillStyle = AMBER; ctx.font = "700 9px Helvetica,Arial,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText(`N_max ≈ ${Math.round(Nm).toLocaleString()}`, xm, ET_MT + 3);
     }
     // the total (cavity-modified) ET rate, the turnover curve
     ctx.strokeStyle = CYAN; ctx.lineWidth = 2.2; ctx.beginPath();
     for (let i = 0; i < curve.length; i++) { const x = xOf(Math.log10(curve[i]!.N)), y = yOf(base + curve[i]!.kTotal); i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); }
     ctx.stroke();
     ctx.strokeStyle = AXIS; ctx.lineWidth = 0.75; ctx.strokeRect(ET_ML, ET_MT, ET_PW, ET_PH);
-    ctx.fillStyle = CYAN; ctx.font = "600 8.5px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "right"; ctx.textBaseline = "top"; ctx.fillText(`cavity-modified rate · |T| = ${(etT * 1000).toFixed(1)} meV`, ET_ML + ET_PW - 7, ET_MT + 4);
-    ctx.fillStyle = INK; ctx.font = "600 11px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic"; ctx.fillText("molecule number  N  (log scale)", ET_ML + ET_PW / 2, ET_CH - 8);
+    ctx.fillStyle = CYAN; ctx.font = "600 8.5px Helvetica,Arial,sans-serif"; ctx.textAlign = "right"; ctx.textBaseline = "top"; ctx.fillText(`cavity-modified rate · |T| = ${(etT * 1000).toFixed(1)} meV`, ET_ML + ET_PW - 7, ET_MT + 4);
+    ctx.fillStyle = INK; ctx.font = "600 11px Helvetica,Arial,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic"; ctx.fillText("molecule number  N  (log scale)", ET_ML + ET_PW / 2, ET_CH - 8);
     ctx.save(); ctx.translate(16, ET_MT + ET_PH / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top"; ctx.fillText("total ET rate  (normalized to the N_max peak)", 0, 0); ctx.restore();
   }
 
@@ -1511,7 +1510,7 @@ export function App() {
     for (let i = 0; i < M; i++) { elo = Math.min(elo, ELP[i]!, Ecav[i]!); ehi = Math.max(ehi, EUP[i]!, Ecav[i]!); }
     elo = Math.min(elo, Eexc); ehi = Math.max(ehi, Eexc); const pad = (ehi - elo) * 0.08 + 1e-4; elo -= pad; ehi += pad;
     const xOf = (k: number) => DP_ML + (k / kmax) * DP_PW, yOf = (E: number) => DP_MT + (1 - (E - elo) / (ehi - elo)) * DP_PH;
-    const F = "'IBM Plex Sans',system-ui,sans-serif";
+    const F = "Helvetica,Arial,sans-serif";
     ctx.font = "500 9px " + F;
     for (let t = 0; t <= 4; t++) { const E = elo + (ehi - elo) * t / 4, y = yOf(E); ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5; seg(ctx, DP_ML, y, DP_ML + DP_PW, y); ctx.fillStyle = DIM; ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(E.toFixed(3), DP_ML - 6, y); }
     ctx.textAlign = "center"; ctx.textBaseline = "top";
@@ -1522,8 +1521,8 @@ export function App() {
     ctx.font = "600 8.5px " + F; ctx.textAlign = "left"; ctx.fillStyle = "#6e7681"; ctx.fillText("external angle θ", DP_ML + 2, DP_MT - 17);
     // bare modes (uncoupled): cavity parabola + flat exciton
     ctx.setLineDash([5, 4]); ctx.lineWidth = 1.2;
-    ctx.strokeStyle = "rgba(0,255,255,0.4)"; ctx.beginPath(); for (let i = 0; i < M; i++) { const x = xOf(kPar[i]!), y = yOf(Ecav[i]!); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.stroke();
-    ctx.strokeStyle = "rgba(255,58,58,0.4)"; ctx.beginPath(); ctx.moveTo(xOf(0), yOf(Eexc)); ctx.lineTo(xOf(kmax), yOf(Eexc)); ctx.stroke();
+    ctx.strokeStyle = "rgba(31,119,180,0.5)"; ctx.beginPath(); for (let i = 0; i < M; i++) { const x = xOf(kPar[i]!), y = yOf(Ecav[i]!); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.stroke();
+    ctx.strokeStyle = "rgba(214,39,40,0.5)"; ctx.beginPath(); ctx.moveTo(xOf(0), yOf(Eexc)); ctx.lineTo(xOf(kmax), yOf(Eexc)); ctx.stroke();
     ctx.setLineDash([]);
     // polariton branches, coloured by photon fraction (cyan = photon, red = exciton)
     const branch = (E: number[], phot: (i: number) => number) => { ctx.lineWidth = 2.6; for (let i = 0; i < M - 1; i++) { ctx.strokeStyle = lerpHex(RED, CYAN, Math.max(0, Math.min(1, phot(i)))); ctx.beginPath(); ctx.moveTo(xOf(kPar[i]!), yOf(E[i]!)); ctx.lineTo(xOf(kPar[i + 1]!), yOf(E[i + 1]!)); ctx.stroke(); } };
@@ -1555,7 +1554,7 @@ export function App() {
     const ctx = sized(cvEl, PP_CW, PP_CH);
     ctx.fillStyle = PANEL; ctx.fillRect(0, 0, PP_CW, PP_CH);
     const yOf = (v: number) => PP_MT + (1 - v) * PP_PH, xOf = (t: number) => PP_ML + (t / pc.T) * PP_PW;
-    ctx.font = "500 9px 'IBM Plex Sans',system-ui,sans-serif";
+    ctx.font = "500 9px Helvetica,Arial,sans-serif";
     for (const v of [0, 0.5, 1]) { ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5; seg(ctx, PP_ML, yOf(v), PP_ML + PP_PW, yOf(v)); ctx.fillStyle = DIM; ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(v.toFixed(1), PP_ML - 6, yOf(v)); }
     // one dashed gridline + tick per vacuum-Rabi cycle (0…6)
     const cycT = 2 * Math.PI / pc.split;
@@ -1577,7 +1576,7 @@ export function App() {
     const tnow = ((simT.current % pc.T) + pc.T) % pc.T; // live cursor, wraps every 6 cycles
     ctx.strokeStyle = "rgba(255,204,0,0.7)"; ctx.lineWidth = 1; ctx.setLineDash([3, 3]); seg(ctx, xOf(tnow), PP_MT, xOf(tnow), PP_MT + PP_PH); ctx.setLineDash([]);
     ctx.lineWidth = 0.75; ctx.strokeStyle = AXIS; ctx.strokeRect(PP_ML, PP_MT, PP_PW, PP_PH);
-    ctx.fillStyle = INK; ctx.font = "600 11px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = INK; ctx.font = "600 11px Helvetica,Arial,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
     ctx.fillText("time   t Ω_R / 2π   (Rabi cycles)", PP_ML + PP_PW / 2, PP_CH - 8);
     ctx.save(); ctx.translate(13, PP_MT + PP_PH / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top"; ctx.fillText("population  P   (─ leaked when Γ>0)", 0, 0); ctx.restore();
   }
@@ -1680,7 +1679,7 @@ export function App() {
       <div className="topbar">
         <span className="brand">POLARITON CAVITY-QED LAB</span>
         <span className="topbar-right">
-          <span className="status"><span className="live">●</span> {ready ? "WASM CORE LIVE" : "LOADING…"} · QuTiP-GOLDEN CORE + ANALYTIC-VALIDATED OPTICS/VIBRONICS</span>
+          <span className="status">{ready ? "Ready" : "Loading…"} · QuTiP-golden core, analytic-validated optics / vibronics</span>
           <button className="tour-btn" onClick={() => goTour(0)} title="guided tour of all six views: build a polariton from scratch">TOUR</button>
           <button className="examples-btn" onClick={() => setGallery(true)} title="load a configured example experiment to get started">EXAMPLES</button>
           <button className="copy-link" onClick={copyLink} title="copy a shareable link to this exact configuration">{copied ? "COPIED" : "COPY LINK"}</button>
@@ -2002,7 +2001,7 @@ export function App() {
             </>
           ) : regime === "dispersion" ? (
             <div className="pane grow">
-              <div className="pane-head">Microcavity exciton-polariton dispersion · lower/upper polariton <i style={{ color: CYAN, fontStyle: "normal" }}>━</i> coloured photon→exciton · bare cavity <i style={{ color: "rgba(0,255,255,0.6)", fontStyle: "normal" }}>┄</i> · exciton <i style={{ color: "rgba(255,58,58,0.6)", fontStyle: "normal" }}>┄</i></div>
+              <div className="pane-head">Microcavity exciton-polariton dispersion · lower/upper polariton <i style={{ color: CYAN, fontStyle: "normal" }}>━</i> coloured photon→exciton · bare cavity <i style={{ color: "rgba(31,119,180,0.7)", fontStyle: "normal" }}>┄</i> · exciton <i style={{ color: "rgba(214,39,40,0.7)", fontStyle: "normal" }}>┄</i></div>
               <PanelEqn t={"E_{\\mathrm{LP/UP}}(k_\\parallel)=\\tfrac12\\!\\left[E_c+E_x\\pm\\sqrt{(E_c-E_x)^2+(2V)^2}\\right],\\quad E_c(k_\\parallel)=E_c^0+\\frac{\\hbar^2k_\\parallel^2}{2m_{\\mathrm{cav}}}"} where="2×2 coupled-oscillator (Hopfield); anticross, never cross" />
               <div className="pane-sub"><b>What:</b> the cavity photon is a light 2-D particle, so its energy rises with in-plane momentum k‖ and sweeps through the flat exciton. The coupling 2V turns that crossing into an <b>anticrossing</b>: the lower and upper polaritons, each a k-dependent mix of <span style={{ color: CYAN }}>photon</span> and <span style={{ color: RED }}>exciton</span> (the Hopfield fractions, shown as colour). <b>Approx:</b> single coupled mode, parabolic cavity, no loss.</div>
               <PlotWrap cw={DP_CW} ch={DP_CH} area={{ ml: DP_ML, mt: DP_MT, pw: DP_PW, ph: DP_PH }} inv={(px, py) => { const Eexc = DEFAULT_MICROCAVITY.Eexc, mcav = DEFAULT_MICROCAVITY.mcav, Ecav0 = Eexc + disp.delta, V = disp.rabi2V / 2; const kP = linspace(0, 7e6, 48), b = polaritonBranches(kP, { Ecav0, Eexc, mcav, V }), c = cavityDispersion(kP, { Ecav0, mcav }); let lo = Math.min(Eexc, ...b.ELP, ...c), hi = Math.max(Eexc, ...b.EUP, ...c); const pd = (hi - lo) * 0.08 + 1e-4; lo -= pd; hi += pd; return [(((px - DP_ML) / DP_PW) * 7).toFixed(2), (lo + (1 - (py - DP_MT) / DP_PH) * (hi - lo)).toFixed(3)]; }}>
@@ -2096,7 +2095,7 @@ export function App() {
           {regime === "single" ? (
             <>
               <div className="pane">
-                <div className="pane-head">Panel A · joint density matrix ρ · |ρ_ij| brightness · sign <i style={{ color: "#00ffff", fontStyle: "normal" }}>+ ▪</i> <i style={{ color: "#ff3333", fontStyle: "normal" }}>− ▪</i> · coherence = cyan/red pair</div>
+                <div className="pane-head">Panel A · joint density matrix ρ · |ρ_ij| brightness · sign <i style={{ color: CYAN, fontStyle: "normal" }}>+ ▪</i> <i style={{ color: RED, fontStyle: "normal" }}>− ▪</i> · coherence = cyan/red pair</div>
                 <PanelEqn t={"\\rho_{ij}=\\langle i|\\hat\\rho|j\\rangle,\\quad |i\\rangle\\in\\{|n,g\\rangle,\\,|n,e\\rangle\\}"} where="cavity Fock n ⊗ atom {g,e}" />
                 <div className="pane-sub"><b>What:</b> each cell is one matrix element of the joint atom⊗cavity state. <b>Diagonal</b>=populations; the off-diagonal <b>cyan/red pair</b> at (|0,e⟩,|1,g⟩) is the vacuum-Rabi coherence, flipping sign as the quantum sloshes. <b>Approx:</b> single-excitation subspace, the full 32×32 ρ is cropped to its populated 8×8 block.</div>
                 <canvas ref={rhoCanvas} className="cv" />
@@ -2276,9 +2275,9 @@ function PlotWrap({ cw, ch, area, inv, fit, children }: { cw: number; ch: number
     ctx.setTransform(d, 0, 0, d, 0, 0); ctx.clearRect(0, 0, cw, ch);
     const x = (e.clientX - r.left) * (cw / r.width), y = (e.clientY - r.top) * (ch / r.height);
     if (x < area.ml || x > area.ml + area.pw || y < area.mt || y > area.mt + area.ph) return;
-    ctx.strokeStyle = "#ffffff44"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(Math.round(x) + 0.5, area.mt); ctx.lineTo(Math.round(x) + 0.5, area.mt + area.ph); ctx.stroke();
+    ctx.strokeStyle = CROSS; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(Math.round(x) + 0.5, area.mt); ctx.lineTo(Math.round(x) + 0.5, area.mt + area.ph); ctx.stroke();
     const v = inv(x, y); if (!v) return;
-    ctx.fillStyle = "#00ffff"; ctx.font = "10px 'IBM Plex Sans',system-ui,sans-serif";
+    ctx.fillStyle = INK; ctx.font = "10px Helvetica,Arial,sans-serif";
     const right = x > area.ml + area.pw * 0.62; ctx.textAlign = right ? "right" : "left"; ctx.textBaseline = "bottom";
     ctx.fillText(`[${v[0]}, ${v[1]}]`, x + (right ? -5 : 5), Math.max(area.mt + 11, y - 5));
   };
@@ -2298,7 +2297,7 @@ function logDoublet(fd: { omega: Float64Array; power: Float64Array }, eigs: Floa
   const ratio = top.length === 2 ? Math.min(top[0]!.p, top[1]!.p) / Math.max(top[0]!.p, top[1]!.p) : NaN;
   console.log(
     `%c[transmission 1.A]%c Ω_R = 2‖g‖ = ${(eigs[n - 1]! - eigs[0]!).toFixed(4)}  ·  predicted peaks ω_c ± ‖g‖ = ${fmt(1 - gn, 4)}, ${(1 + gn).toFixed(4)}  ·  measured ${top.map((t) => `${t.w.toFixed(4)} (h=${t.p.toFixed(3)})`).join("  ")}  ·  LP/UP height ratio = ${ratio.toFixed(3)}`,
-    "color:#00ffff;font-weight:600", "color:#8b949e",
+    "color:#1f77b4;font-weight:600", "color:#8b949e",
   );
 }
 function argmaxPhoton(cols: SweepCol[]): { j: number; k: number } {

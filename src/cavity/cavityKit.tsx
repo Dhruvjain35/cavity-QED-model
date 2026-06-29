@@ -5,7 +5,7 @@
 // post chain. No cylinders, no chrome, no HDRI, everything reads as a real optics-bench resonator.
 import { MutableRefObject, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
-import { Bloom, ChromaticAberration, EffectComposer, Vignette } from "@react-three/postprocessing";
+import { Bloom, EffectComposer } from "@react-three/postprocessing";
 import * as THREE from "three";
 
 // ── cavity geometry (world units) ──────────────────────────────────────────────────────────────────
@@ -90,11 +90,11 @@ export function FieldStack({ ampRef, opacityBase = 0.15, visible = true }: { amp
         <group key={i} position={[0, 0, d.z]}>
           <mesh>
             <circleGeometry args={[d.rOuter, 56]} />
-            <meshBasicMaterial ref={(el) => { outerMats.current[i] = el; }} color="#00ffff" transparent opacity={opacityBase * 0.4} side={THREE.DoubleSide} depthWrite={false} toneMapped={false} />
+            <meshBasicMaterial ref={(el) => { outerMats.current[i] = el; }} color="#4f9bd9" transparent opacity={opacityBase * 0.4} side={THREE.DoubleSide} depthWrite={false} toneMapped={false} />
           </mesh>
           <mesh>
             <circleGeometry args={[d.rInner, 48]} />
-            <meshBasicMaterial ref={(el) => { innerMats.current[i] = el; }} color="#00ffff" transparent opacity={opacityBase} side={THREE.DoubleSide} depthWrite={false} toneMapped={false} />
+            <meshBasicMaterial ref={(el) => { innerMats.current[i] = el; }} color="#4f9bd9" transparent opacity={opacityBase} side={THREE.DoubleSide} depthWrite={false} toneMapped={false} />
           </mesh>
         </group>
       ))}
@@ -110,19 +110,16 @@ export function LightRig() {
       <directionalLight intensity={1.5} position={[3, 5, 3]} color="#ffffff" />
       <directionalLight intensity={0.5} position={[-2, -1, -3]} color="#7fa0ff" />
       <directionalLight intensity={0.7} position={[0, 2, 6]} color="#cdddff" />{/* fill aimed at the mirror faces so they catch light */}
-      <pointLight position={[0, 0, 0]} intensity={0.8} color="#00ffff" distance={200} decay={2} />
+      <pointLight position={[0, 0, 0]} intensity={0.55} color="#5a82b8" distance={200} decay={2} />
     </>
   );
 }
 
 // ── surgical post chain (CATEGORY 2.F) ────────────────────────────────────────────────────────────────
-export function CavityPost({ bloomIntensity = 0.6 }: { bloomIntensity?: number }) {
-  const ca = useMemo(() => new THREE.Vector2(0.0004, 0.0004), []);
+export function CavityPost({ bloomIntensity = 0.4 }: { bloomIntensity?: number }) {
   return (
     <EffectComposer>
-      <Bloom luminanceThreshold={0.92} luminanceSmoothing={0.4} intensity={bloomIntensity} radius={0.5} mipmapBlur />
-      <ChromaticAberration offset={ca} radialModulation={false} modulationOffset={0} />
-      <Vignette eskil={false} offset={0.3} darkness={0.45} />
+      <Bloom luminanceThreshold={0.95} luminanceSmoothing={0.3} intensity={bloomIntensity} radius={0.4} mipmapBlur />
     </EffectComposer>
   );
 }

@@ -202,8 +202,8 @@ function StandingWaveField({ ampRef, intensity = 1, visible = true }: { ampRef: 
         </mesh>
       ))}
       <group ref={grp}>
-        <mesh geometry={geo}><meshStandardMaterial color="#23d4ff" emissive="#23d4ff" emissiveIntensity={0.85} roughness={0.35} metalness={0} toneMapped={false} /></mesh>
-        <mesh geometry={geo} scale={[1, -1, 1]}><meshStandardMaterial color="#1597d6" emissive="#1597d6" emissiveIntensity={0.45} roughness={0.35} metalness={0} transparent opacity={0.6} toneMapped={false} /></mesh>
+        <mesh geometry={geo}><meshStandardMaterial color="#4f9bd9" emissive="#4f9bd9" emissiveIntensity={0.7} roughness={0.35} metalness={0} toneMapped={false} /></mesh>
+        <mesh geometry={geo} scale={[1, -1, 1]}><meshStandardMaterial color="#3f7fb8" emissive="#3f7fb8" emissiveIntensity={0.4} roughness={0.35} metalness={0} transparent opacity={0.6} toneMapped={false} /></mesh>
       </group>
     </group>
   );
@@ -273,14 +273,14 @@ function CavReadout({ liveRef, stateRef, tRef }: { liveRef: MutableRefObject<Liv
 function drawSpark(cv: HTMLCanvasElement | null, ring: { t: Float32Array; p: Float32Array; b: Float32Array; n: number; head: number }, T: number) {
   if (!cv) return; const ctx = cv.getContext("2d"); if (!ctx) return;
   const W = cv.width, H = cv.height; ctx.clearRect(0, 0, W, H);
-  ctx.fillStyle = "#080b11"; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = "#1a1a1a"; ctx.fillRect(0, 0, W, H);
   const n = ring.n; if (n < 2) return;
   const at = (j: number) => (ring.head - n + j + 320) % 320;
   const t0 = ring.t[at(0)]!, t1 = ring.t[at(n - 1)]!, span = Math.max(1e-6, t1 - t0);
   const x = (t: number) => ((t - t0) / span) * (W - 1), y = (v: number) => (H - 2) - v * (H - 4);
-  if (T > 0) { ctx.strokeStyle = "#1b2026"; ctx.lineWidth = 0.5; for (let tc = Math.ceil(t0 / T) * T; tc < t1; tc += T) { const xx = x(tc); ctx.beginPath(); ctx.moveTo(xx, 0); ctx.lineTo(xx, H); ctx.stroke(); } }
+  if (T > 0) { ctx.strokeStyle = "#333333"; ctx.lineWidth = 0.5; for (let tc = Math.ceil(t0 / T) * T; tc < t1; tc += T) { const xx = x(tc); ctx.beginPath(); ctx.moveTo(xx, 0); ctx.lineTo(xx, H); ctx.stroke(); } }
   const line = (arr: Float32Array, color: string) => { ctx.strokeStyle = color; ctx.lineWidth = 1.2; ctx.beginPath(); for (let j = 0; j < n; j++) { const xx = x(ring.t[at(j)]!), yy = y(arr[at(j)]!); j === 0 ? ctx.moveTo(xx, yy) : ctx.lineTo(xx, yy); } ctx.stroke(); };
-  line(ring.p, "#00ffff"); line(ring.b, "#ff3333");
+  line(ring.p, "#5aa9dd"); line(ring.b, "#e8915a");
   ctx.strokeStyle = "rgba(255,255,255,0.4)"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(W - 1, 0); ctx.lineTo(W - 1, H); ctx.stroke();
 }
 
@@ -307,7 +307,7 @@ export function LiveCavityScene({ stateRef, tRef, inspectRef, m, ensemble, polTh
     <div className="cav-stage">
       <CavReadout liveRef={liveRef} stateRef={stateRef} tRef={tRef} />
       <Canvas dpr={[1, 2]} gl={{ antialias: true, alpha: true }} camera={{ position: [0, 60, 330], fov: 50 }}>
-        <color attach="background" args={["#070b12"]} />
+        <color attach="background" args={["#1e1e1e"]} />
         <PerspectiveCamera makeDefault fov={50} position={[0, 60, 330]} />
         <LightRig />
         <SimSampler stateRef={stateRef} tRef={tRef} inspectRef={inspectRef} liveRef={liveRef} fieldAmpRef={fieldAmpRef} m={m} loss={loss} />
