@@ -8,6 +8,9 @@ const HTC_EXPLICIT_CAP = 3; // N ≤ this → exact (N+1)·nv^N diagonalization;
 import { buildEnsemble, brightWeights } from "./cavity/ensemble";
 import { PolaritonFormation } from "./PolaritonFormation";
 import { SceneBoundary } from "./SceneBoundary";
+// validated closed-form analytic oracle (unit-tested in engine/__tests__): the cavity-modified
+// electron-transfer turnover (Sharma & Chen N_max).
+import { etRateVsN, nMax, DEFAULT_HTC, logspace } from "../engine";
 
 const MODE_WAIST = 2.4; // TEM00 Gaussian mode waist w (length units of the molecular layout)
 
@@ -107,6 +110,8 @@ const SW_CW = SW_ML + SW_PW + SW_MR, SW_CH = SW_MT + SW_PH + SW_MB;
 const SWEEP_GMAX = 0.2, SWEEP_STEPS = 90;
 const HT_ML = 58, HT_MR = 18, HT_MT = 18, HT_MB = 32, HT_PW = 720, HT_PH = 372;
 const HT_CW = HT_ML + HT_PW + HT_MR, HT_CH = HT_MT + HT_PH + HT_MB;
+const ET_ML = 64, ET_MR = 20, ET_MT = 18, ET_MB = 36, ET_PW = 716, ET_PH = 320; // electron-transfer turnover (System C, the N_max result)
+const ET_CW = ET_ML + ET_PW + ET_MR, ET_CH = ET_MT + ET_PH + ET_MB;
 const HTC_GRID = 760; // absorption-spectrum sampling points
 const MX_S = 196; // live Hamiltonian heatmap size (px)
 
@@ -202,6 +207,7 @@ export function App() {
   const [dyn, setDyn] = useState({ m: 12, g: 0.06, sigma: 0.03, seed: 1, init: 0, order: 1.0, gamma: 0.022, theta: 0, detuning: 0 }); // CANONICAL DEFAULT, σ=0.03 locks the clean strong-coupling regime; τ resets to 0; populations show 0–6 Rabi cycles; detuning=0 = resonance
   const [inspect, setInspect] = useState<number | null>(null); // clicked dressed eigenstate (UI badge)
   const [htcBusy, setHtcBusy] = useState(false); // exact N-body vibronic diagonalization is heavy: paint a "computing" state instead of a frozen-looking click
+  const [etT, setEtT] = useState<number>(DEFAULT_HTC.T01); // photon-mediated ET coupling |T| [eV]; sets where the rate turns over (N_max = 1 + ħω_c·E_AD/|T|²)
   const [dynView, setDynView] = useState<"formation" | "dynamics">("formation"); // DYNAMICS lead view
   const [pfSel, setPfSel] = useState<"LP" | "UP" | null>("LP"); // formation: start frozen on the LP polariton (show the hybrid immediately); null = oscillate
   const [tour, setTour] = useState<number | null>(null); // guided first-run tour: step index, null = closed
@@ -259,7 +265,7 @@ export function App() {
   const sweepData = useRef<{ gs: Float64Array; eigs: Float64Array[] } | null>(null);
   const matCanvas = useRef<HTMLCanvasElement>(null);
   const matData = useRef<{ h: Float64Array; n: number } | null>(null);
-  const htcCanvas = useRef<HTMLCanvasElement>(null), vibCompareCanvas = useRef<HTMLCanvasElement>(null);
+  const htcCanvas = useRef<HTMLCanvasElement>(null), vibCompareCanvas = useRef<HTMLCanvasElement>(null), etCanvas = useRef<HTMLCanvasElement>(null);
   const htcData = useRef<{ live: { eigs: Float64Array; photon: Float64Array; absorption: Float64Array }; fc: { pos: Float64Array; weight: Float64Array }; nVib: number; method: string } | null>(null);
   const offscreen = useRef<HTMLCanvasElement | null>(null), husimiOff = useRef<HTMLCanvasElement | null>(null), bridgeOff = useRef<HTMLCanvasElement | null>(null);
   const quantum = useRef<Quantum | null>(null);
@@ -316,7 +322,7 @@ export function App() {
     const r = regimeRef.current;
     if (r === "collective") renderSpectrum();
     else if (r === "cavity") { drawCavity(); drawStopband(); drawCollective(); }
-    else if (r === "vibronic") { drawHtc(); drawMatrix(); drawVibronicCompare(); drawDisorder(); }
+    else if (r === "vibronic") { drawHtc(); drawMatrix(); drawVibronicCompare(); drawDisorder(); drawETrate(); }
     else singleDirty.current = true; // single + dynamics run a RAF loop that redraws on the next frame
   };
   useEffect(() => {
@@ -437,6 +443,11 @@ export function App() {
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [regime, dHtc, wcEv]);
+
+  // the electron-transfer turnover is closed-form (cheap), so it redraws directly on tab entry and on the
+  // coupling slider, independent of the heavy WASM vibronic diagonalization.
+  useEffect(() => { if (regime === "vibronic") drawETrate(); // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [regime, etT]);
 
   useEffect(() => {
     dpr.current = Math.min(window.devicePixelRatio || 1, 2);
@@ -1440,6 +1451,43 @@ export function App() {
     ctx.fillStyle = "#8b949e"; ctx.fillText("bare  γ + σ", DI_ML + 6, DI_MT + 16);
   }
 
+  // System C, the central result (Sharma & Chen 2024): the cavity-modified electron-transfer rate vs
+  // molecule number N is NON-MONOTONIC. The collective polariton energy Ω₊=√(N−1)|T| sweeps up through
+  // ħω_c, so the photon-coupled ET channel goes barrier-less exactly at N = N_max = 1 + ħω_c·E_AD/|T|²;
+  // the rate rises, peaks at N_max, then decays (E_a² ∝ N). Closed form via the validated engine oracle.
+  function drawETrate() {
+    const cv = etCanvas.current; if (!cv) return;
+    const ctx = sized(cv, ET_CW, ET_CH);
+    ctx.fillStyle = PANEL; ctx.fillRect(0, 0, ET_CW, ET_CH);
+    const P = { hbar_wc: DEFAULT_HTC.hbar_wc, E_AD: DEFAULT_HTC.E_AD, Delta: DEFAULT_HTC.Delta, T01: etT, H_AD: DEFAULT_HTC.H_AD, E_r: DEFAULT_HTC.E_r, kT: DEFAULT_HTC.kT };
+    const Ns = logspace(0, 5, 240), curve = etRateVsN(Ns, P), Nm = nMax({ hbar_wc: P.hbar_wc, E_AD: P.E_AD, T: P.T01 });
+    // total physical rate = parallel channels add (ordinary ET + the photon-mediated cavity channels). It
+    // rises ABOVE the N-independent baseline and peaks at N_max, the cavity enhancement of electron transfer.
+    const base = curve[0]!.baseline; let pk = base; for (const c of curve) pk = Math.max(pk, base + c.kTotal); pk = pk || 1; const xhi = 5;
+    const xOf = (ln: number) => ET_ML + (ln / xhi) * ET_PW, yOf = (v: number) => ET_MT + (1 - (v / pk) / 1.06) * ET_PH;
+    ctx.font = "500 9px 'IBM Plex Sans',system-ui,sans-serif";
+    for (const f of [0, 0.25, 0.5, 0.75, 1]) { const y = yOf(pk * f); ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5; seg(ctx, ET_ML, y, ET_ML + ET_PW, y); ctx.fillStyle = DIM; ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(f.toFixed(2), ET_ML - 6, y); }
+    const sup = ["", "¹", "²", "³", "⁴", "⁵"];
+    ctx.textAlign = "center"; ctx.textBaseline = "top";
+    for (let d = 0; d <= 5; d++) { const x = xOf(d); ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5; seg(ctx, x, ET_MT, x, ET_MT + ET_PH); ctx.fillStyle = DIM; ctx.fillText(d === 0 ? "1" : "10" + sup[d], x, ET_MT + ET_PH + 6); }
+    // ordinary (non-cavity) ET rate: flat, N-independent reference
+    ctx.strokeStyle = "rgba(148,163,184,0.7)"; ctx.lineWidth = 1.3; ctx.setLineDash([5, 4]); seg(ctx, ET_ML, yOf(base), ET_ML + ET_PW, yOf(base)); ctx.setLineDash([]);
+    ctx.fillStyle = "#8b949e"; ctx.font = "600 8.5px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "bottom"; ctx.fillText("ordinary ET (no cavity), N-independent", ET_ML + 7, yOf(base) - 3);
+    // N_max turnover marker
+    if (Nm > 1 && Math.log10(Nm) <= xhi) {
+      const xm = xOf(Math.log10(Nm)); ctx.strokeStyle = AMBER; ctx.setLineDash([4, 3]); ctx.lineWidth = 1; seg(ctx, xm, ET_MT, xm, ET_MT + ET_PH); ctx.setLineDash([]);
+      ctx.fillStyle = AMBER; ctx.font = "700 9px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText(`N_max ≈ ${Math.round(Nm).toLocaleString()}`, xm, ET_MT + 3);
+    }
+    // the total (cavity-modified) ET rate, the turnover curve
+    ctx.strokeStyle = CYAN; ctx.lineWidth = 2.2; ctx.beginPath();
+    for (let i = 0; i < curve.length; i++) { const x = xOf(Math.log10(curve[i]!.N)), y = yOf(base + curve[i]!.kTotal); i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); }
+    ctx.stroke();
+    ctx.strokeStyle = AXIS; ctx.lineWidth = 0.75; ctx.strokeRect(ET_ML, ET_MT, ET_PW, ET_PH);
+    ctx.fillStyle = CYAN; ctx.font = "600 8.5px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "right"; ctx.textBaseline = "top"; ctx.fillText(`cavity-modified rate · |T| = ${(etT * 1000).toFixed(1)} meV`, ET_ML + ET_PW - 7, ET_MT + 4);
+    ctx.fillStyle = INK; ctx.font = "600 11px 'IBM Plex Sans',system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic"; ctx.fillText("molecule number  N  (log scale)", ET_ML + ET_PW / 2, ET_CH - 8);
+    ctx.save(); ctx.translate(16, ET_MT + ET_PH / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top"; ctx.fillText("total ET rate  (normalized to the N_max peak)", 0, 0); ctx.restore();
+  }
+
   function updateHtcReadouts() {
     const set = (k: string, v: string) => { const el = read.current[k]; if (el) el.textContent = v; };
     const Er = htc.S * htc.wv;
@@ -1743,6 +1791,7 @@ export function App() {
               <Field sym="g" texSym="g/\omega_c" label="cavity coupling" value={htc.g} min={0} max={0.25} step={0.005} unit="" tip="single-molecule light–matter coupling g in units of ω_c (dimensionless); collective splitting = 2g√N" onChange={(g) => setHtc((s) => ({ ...s, g }))} />
               <Field sym="N" texSym="N" label="ensemble size" value={htc.N} min={1} max={400} step={1} unit="" int tip="number of molecules N (count). Exact diagonalization for N≤3; asymptotic large-N approximation above." onChange={(N) => setHtc((s) => ({ ...s, N: Math.round(N) }))} />
               <Field sym="γ" texSym="\gamma/\omega_c" label="linewidth (HWHM)" value={htc.gamma} min={0.004} max={0.04} step={0.002} unit="" tip="bare emitter linewidth (half width at half max) in units of ω_c (dimensionless)" onChange={(gamma) => setHtc((s) => ({ ...s, gamma }))} />
+              <Field sym="|T|" texSym="|T|" label="photon-ET coupling" value={etT} min={0.006} max={0.06} step={0.001} unit="eV" tip="photon-mediated electron-transfer coupling |T| (eV), Panel X. Sets the N_max turnover: N_max = 1 + ħω_c·E_AD/|T|². Stronger coupling moves the turnover to fewer molecules." onChange={setEtT} />
               <div className="btn-row">
                 <button className={htc.N <= 1 ? "on" : ""} onClick={() => setHtc((s) => ({ ...s, N: 1 }))}>N = 1</button>
                 <button className={htc.N >= 100 ? "on" : ""} title="jump to N=200 to demonstrate polaron decoupling (λ→λ/√N); switches from exact to the large-N asymptotic solver" onClick={() => setHtc((s) => ({ ...s, N: 200 }))}>N = 200 · large-N</button>
@@ -1882,6 +1931,14 @@ export function App() {
                 <div className="pane-sub"><b>What:</b> adding molecular energy disorder σ broadens a bare line one-for-one (grey), but the cavity polariton (cyan) stays sharp far longer because it averages over the disordered ensemble, "motional/exchange narrowing". They cross at σ=Ω_R.</div>
                 <PlotWrap cw={DI_CW} ch={DI_CH} area={{ ml: DI_ML, mt: DI_MT, pw: DI_PW, ph: DI_PH }} inv={(px, py) => { const OmR = 2 * htc.g * Math.sqrt(htc.N), g2 = (s: number) => htc.gamma + s * s / (2 * Math.max(1e-6, OmR)), b2 = (s: number) => htc.gamma + s; let ym = 1e-6; for (let i = 0; i <= 100; i++) { const s = 0.5 * i / 100; ym = Math.max(ym, g2(s), b2(s)); } ym *= 1.08; return [(((px - DI_ML) / DI_PW) * 0.5).toFixed(3), ((1 - (py - DI_MT) / DI_PH) * ym).toFixed(3)]; }}>
                   <canvas ref={disorderCanvas} className="cv" />
+                </PlotWrap>
+              </div>
+              <div className="pane">
+                <div className="pane-head">Panel X · cavity-modified electron-transfer rate vs molecule number N · the <i style={{ color: AMBER, fontStyle: "normal" }}>N_max turnover</i> (Sharma &amp; Chen 2024, the result this model is built around) · cavity rate <i style={{ color: CYAN, fontStyle: "normal" }}>━</i> vs ordinary ET <i style={{ color: "#8b949e", fontStyle: "normal" }}>┄</i></div>
+                <PanelEqn t={"k(N)\\propto e^{-E_a(N)^2/4E_r k_BT},\\quad E_a=\\Omega_+(N)-\\hbar\\omega_c,\\quad N_{\\max}=1+\\frac{\\hbar\\omega_c\\,E_{AD}}{|T|^2}"} where="barrier-less when the collective polariton Ω₊=√(N−1)|T| reaches ħω_c" />
+                <div className="pane-sub"><b>What:</b> placing N molecules in the cavity opens a photon-mediated electron-transfer channel whose barrier vanishes when the collective polariton energy reaches the photon energy. The rate is <b>non-monotonic</b>: it rises, peaks at N_max, then decays. Drag <i>|T|</i> to move the turnover (stronger coupling gives an earlier N_max). <b>Approx:</b> RWA-I, Marcus/FGR kernel, on resonance.</div>
+                <PlotWrap cw={ET_CW} ch={ET_CH} area={{ ml: ET_ML, mt: ET_MT, pw: ET_PW, ph: ET_PH }} inv={(px, py) => [Math.round(10 ** (((px - ET_ML) / ET_PW) * 5)).toLocaleString(), (1 - (py - ET_MT) / ET_PH).toFixed(2)]}>
+                  <canvas ref={etCanvas} className="cv" />
                 </PlotWrap>
               </div>
             </>
