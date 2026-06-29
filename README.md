@@ -2,7 +2,7 @@
 
 An open-source, in-browser cavity-QED instrument. Its quantum core, Jaynes–Cummings Lindblad dynamics, the Tavis–Cummings collective spectrum, the Wigner function, and the partial trace, is checked element-by-element against **QuTiP 5.3 / NumPy** goldens committed to the repo; the auxiliary modules (transfer-matrix cavity optics, Holstein–Tavis–Cummings vibronics, FFT transmission) are checked against **closed-form analytic benchmarks**. Every number states which arbiter validates it, see [`docs/VALIDATION.md`](docs/VALIDATION.md).
 
-**Live:** <https://sim-woad.vercel.app>
+**Live:** <https://cqed-lab.vercel.app>
 
 ![Collective Tavis–Cummings polariton spectrum, anticrossing dispersion, the M−1 dark-state reservoir at ω_a, and the per-eigenstate Wigner bridge](docs/img/collective-spectrum.png)
 
