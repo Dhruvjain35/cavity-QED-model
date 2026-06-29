@@ -359,7 +359,6 @@ tr[title] { cursor: help; }
    The container colour shows through the 1px gaps as clean gridlines. */
 .regime-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; margin: 6px 8px; border: 1px solid var(--rule-2); background: var(--rule-2); }
 .regime-toggle button { font-family: var(--sans); font-size: 9px; font-weight: 600; letter-spacing: 0.02em; padding: 7px 4px; border: none; background: var(--bg); color: var(--faint); cursor: pointer; }
-.regime-toggle button:nth-child(5) { grid-column: 1 / -1; }
 .regime-toggle button:hover { color: var(--ink); background: var(--rule-soft); }
 .regime-toggle button.on { background: var(--cyan); color: #000; font-weight: 700; }
 .tree-group { border-bottom: 1px solid var(--rule); }

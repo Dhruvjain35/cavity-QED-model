@@ -9,8 +9,8 @@ import { buildEnsemble, brightWeights } from "./cavity/ensemble";
 import { PolaritonFormation } from "./PolaritonFormation";
 import { SceneBoundary } from "./SceneBoundary";
 // validated closed-form analytic oracle (unit-tested in engine/__tests__): the cavity-modified
-// electron-transfer turnover (Sharma & Chen N_max).
-import { etRateVsN, nMax, DEFAULT_HTC, logspace } from "../engine";
+// electron-transfer turnover (Sharma & Chen N_max) and the microcavity exciton-polariton dispersion.
+import { etRateVsN, nMax, DEFAULT_HTC, logspace, polaritonBranches, cavityDispersion, hopfield, angleToK, DEFAULT_MICROCAVITY, linspace } from "../engine";
 
 const MODE_WAIST = 2.4; // TEM00 Gaussian mode waist w (length units of the molecular layout)
 
@@ -112,6 +112,8 @@ const HT_ML = 58, HT_MR = 18, HT_MT = 18, HT_MB = 32, HT_PW = 720, HT_PH = 372;
 const HT_CW = HT_ML + HT_PW + HT_MR, HT_CH = HT_MT + HT_PH + HT_MB;
 const ET_ML = 64, ET_MR = 20, ET_MT = 18, ET_MB = 36, ET_PW = 716, ET_PH = 320; // electron-transfer turnover (System C, the N_max result)
 const ET_CW = ET_ML + ET_PW + ET_MR, ET_CH = ET_MT + ET_PH + ET_MB;
+const DP_ML = 66, DP_MR = 22, DP_MT = 30, DP_MB = 40, DP_PW = 900, DP_PH = 430; // exciton-polariton dispersion E(k‖), twin angle axis on top
+const DP_CW = DP_ML + DP_PW + DP_MR, DP_CH = DP_MT + DP_PH + DP_MB;
 const HTC_GRID = 760; // absorption-spectrum sampling points
 const MX_S = 196; // live Hamiltonian heatmap size (px)
 
@@ -166,7 +168,7 @@ function husimiImage(q: Float64Array, n: number, qmax: number): ImageData {
 }
 
 type SweepCol = { x: number; eigs: Float64Array; photon: Float64Array };
-type Regime = "single" | "collective" | "cavity" | "dynamics" | "vibronic";
+type Regime = "single" | "collective" | "cavity" | "dynamics" | "vibronic" | "dispersion";
 type Pt = { t: number; n: number; pe: number; pur: number; s: number };
 
 // Curated example gallery, each preset loads a configured experiment and jumps to its tab, so a cold
@@ -208,6 +210,7 @@ export function App() {
   const [inspect, setInspect] = useState<number | null>(null); // clicked dressed eigenstate (UI badge)
   const [htcBusy, setHtcBusy] = useState(false); // exact N-body vibronic diagonalization is heavy: paint a "computing" state instead of a frozen-looking click
   const [etT, setEtT] = useState<number>(DEFAULT_HTC.T01); // photon-mediated ET coupling |T| [eV]; sets where the rate turns over (N_max = 1 + ħω_c·E_AD/|T|²)
+  const [disp, setDisp] = useState({ delta: -0.012, rabi2V: 0.010 }); // exciton-polariton dispersion: cavity-exciton detuning δ [eV] (Ecav0 = Eexc + δ, negative puts the anticrossing at finite k) and vacuum-Rabi splitting 2V [eV]
   const [dynView, setDynView] = useState<"formation" | "dynamics">("formation"); // DYNAMICS lead view
   const [pfSel, setPfSel] = useState<"LP" | "UP" | null>("LP"); // formation: start frozen on the LP polariton (show the hybrid immediately); null = oscillate
   const [tour, setTour] = useState<number | null>(null); // guided first-run tour: step index, null = closed
@@ -265,7 +268,7 @@ export function App() {
   const sweepData = useRef<{ gs: Float64Array; eigs: Float64Array[] } | null>(null);
   const matCanvas = useRef<HTMLCanvasElement>(null);
   const matData = useRef<{ h: Float64Array; n: number } | null>(null);
-  const htcCanvas = useRef<HTMLCanvasElement>(null), vibCompareCanvas = useRef<HTMLCanvasElement>(null), etCanvas = useRef<HTMLCanvasElement>(null);
+  const htcCanvas = useRef<HTMLCanvasElement>(null), vibCompareCanvas = useRef<HTMLCanvasElement>(null), etCanvas = useRef<HTMLCanvasElement>(null), dispCanvas = useRef<HTMLCanvasElement>(null);
   const htcData = useRef<{ live: { eigs: Float64Array; photon: Float64Array; absorption: Float64Array }; fc: { pos: Float64Array; weight: Float64Array }; nVib: number; method: string } | null>(null);
   const offscreen = useRef<HTMLCanvasElement | null>(null), husimiOff = useRef<HTMLCanvasElement | null>(null), bridgeOff = useRef<HTMLCanvasElement | null>(null);
   const quantum = useRef<Quantum | null>(null);
@@ -323,6 +326,7 @@ export function App() {
     if (r === "collective") renderSpectrum();
     else if (r === "cavity") { drawCavity(); drawStopband(); drawCollective(); }
     else if (r === "vibronic") { drawHtc(); drawMatrix(); drawVibronicCompare(); drawDisorder(); drawETrate(); }
+    else if (r === "dispersion") drawDispersion();
     else singleDirty.current = true; // single + dynamics run a RAF loop that redraws on the next frame
   };
   useEffect(() => {
@@ -448,6 +452,10 @@ export function App() {
   // coupling slider, independent of the heavy WASM vibronic diagonalization.
   useEffect(() => { if (regime === "vibronic") drawETrate(); // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [regime, etT]);
+
+  // exciton-polariton dispersion is also closed-form (cheap): redraw on tab entry and on the δ / 2V sliders.
+  useEffect(() => { if (regime === "dispersion") drawDispersion(); // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [regime, disp]);
 
   useEffect(() => {
     dpr.current = Math.min(window.devicePixelRatio || 1, 2);
@@ -1488,6 +1496,49 @@ export function App() {
     ctx.save(); ctx.translate(16, ET_MT + ET_PH / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top"; ctx.fillText("total ET rate  (normalized to the N_max peak)", 0, 0); ctx.restore();
   }
 
+  // System A: microcavity exciton-polaritons. The bare cavity photon disperses parabolically in the in-plane
+  // wavevector k‖ and crosses the (flat) exciton; the light-matter coupling turns the crossing into an
+  // ANTICROSSING, the lower/upper polariton branches, each a k-dependent photon/exciton (Hopfield) mix.
+  // The field's canonical angle-resolved figure. Closed form via the unit-tested engine oracle.
+  function drawDispersion() {
+    const cv = dispCanvas.current; if (!cv) return;
+    const ctx = sized(cv, DP_CW, DP_CH);
+    ctx.fillStyle = PANEL; ctx.fillRect(0, 0, DP_CW, DP_CH);
+    const Eexc = DEFAULT_MICROCAVITY.Eexc, mcav = DEFAULT_MICROCAVITY.mcav, Ecav0 = Eexc + disp.delta, V = disp.rabi2V / 2;
+    const kmax = 7e6, M = 260, kPar = linspace(0, kmax, M);
+    const { ELP, EUP } = polaritonBranches(kPar, { Ecav0, Eexc, mcav, V }), Ecav = cavityDispersion(kPar, { Ecav0, mcav });
+    let elo = Infinity, ehi = -Infinity;
+    for (let i = 0; i < M; i++) { elo = Math.min(elo, ELP[i]!, Ecav[i]!); ehi = Math.max(ehi, EUP[i]!, Ecav[i]!); }
+    elo = Math.min(elo, Eexc); ehi = Math.max(ehi, Eexc); const pad = (ehi - elo) * 0.08 + 1e-4; elo -= pad; ehi += pad;
+    const xOf = (k: number) => DP_ML + (k / kmax) * DP_PW, yOf = (E: number) => DP_MT + (1 - (E - elo) / (ehi - elo)) * DP_PH;
+    const F = "'IBM Plex Sans',system-ui,sans-serif";
+    ctx.font = "500 9px " + F;
+    for (let t = 0; t <= 4; t++) { const E = elo + (ehi - elo) * t / 4, y = yOf(E); ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5; seg(ctx, DP_ML, y, DP_ML + DP_PW, y); ctx.fillStyle = DIM; ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(E.toFixed(3), DP_ML - 6, y); }
+    ctx.textAlign = "center"; ctx.textBaseline = "top";
+    for (let kk = 0; kk <= 7; kk++) { const x = xOf(kk * 1e6); ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5; seg(ctx, x, DP_MT, x, DP_MT + DP_PH); ctx.fillStyle = DIM; ctx.fillText(String(kk), x, DP_MT + DP_PH + 6); }
+    // top axis: external emission angle θ (k‖ = (E/ħc) sinθ)
+    ctx.textBaseline = "bottom"; ctx.fillStyle = "#6e7681";
+    for (const th of [0, 10, 20, 30, 45, 60]) { const k = angleToK(Eexc, th); if (k <= kmax) { const x = xOf(k); ctx.strokeStyle = "#6e7681"; ctx.lineWidth = 0.6; seg(ctx, x, DP_MT, x, DP_MT - 4); ctx.fillStyle = "#6e7681"; ctx.fillText(th + "°", x, DP_MT - 5); } }
+    ctx.font = "600 8.5px " + F; ctx.textAlign = "left"; ctx.fillStyle = "#6e7681"; ctx.fillText("external angle θ", DP_ML + 2, DP_MT - 17);
+    // bare modes (uncoupled): cavity parabola + flat exciton
+    ctx.setLineDash([5, 4]); ctx.lineWidth = 1.2;
+    ctx.strokeStyle = "rgba(0,255,255,0.4)"; ctx.beginPath(); for (let i = 0; i < M; i++) { const x = xOf(kPar[i]!), y = yOf(Ecav[i]!); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.stroke();
+    ctx.strokeStyle = "rgba(255,58,58,0.4)"; ctx.beginPath(); ctx.moveTo(xOf(0), yOf(Eexc)); ctx.lineTo(xOf(kmax), yOf(Eexc)); ctx.stroke();
+    ctx.setLineDash([]);
+    // polariton branches, coloured by photon fraction (cyan = photon, red = exciton)
+    const branch = (E: number[], phot: (i: number) => number) => { ctx.lineWidth = 2.6; for (let i = 0; i < M - 1; i++) { ctx.strokeStyle = lerpHex(RED, CYAN, Math.max(0, Math.min(1, phot(i)))); ctx.beginPath(); ctx.moveTo(xOf(kPar[i]!), yOf(E[i]!)); ctx.lineTo(xOf(kPar[i + 1]!), yOf(E[i + 1]!)); ctx.stroke(); } };
+    const photLP = (i: number) => hopfield(Ecav[i]! - Eexc, V).C2, photUP = (i: number) => hopfield(Ecav[i]! - Eexc, V).X2;
+    branch(ELP, photLP); branch(EUP, photUP);
+    ctx.font = "700 10px " + F; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+    ctx.fillStyle = lerpHex(RED, CYAN, photLP(M - 1)); ctx.fillText("LP", xOf(kmax) + 5, yOf(ELP[M - 1]!));
+    ctx.fillStyle = lerpHex(RED, CYAN, photUP(M - 1)); ctx.fillText("UP", xOf(kmax) + 5, yOf(EUP[M - 1]!));
+    ctx.strokeStyle = AXIS; ctx.lineWidth = 0.75; ctx.strokeRect(DP_ML, DP_MT, DP_PW, DP_PH);
+    ctx.fillStyle = CYAN; ctx.font = "600 8.5px " + F; ctx.textAlign = "right"; ctx.textBaseline = "top"; ctx.fillText(`2V = ${Math.round(disp.rabi2V * 1000)} meV · δ = ${Math.round(disp.delta * 1000)} meV`, DP_ML + DP_PW - 7, DP_MT + 5);
+    ctx.textAlign = "left"; ctx.fillStyle = CYAN; ctx.fillText("photon-like", DP_ML + 7, DP_MT + 5); ctx.fillStyle = RED; ctx.fillText("exciton-like", DP_ML + 70, DP_MT + 5);
+    ctx.fillStyle = INK; ctx.font = "600 11px " + F; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic"; ctx.fillText("in-plane wavevector  k∥  (µm⁻¹)", DP_ML + DP_PW / 2, DP_CH - 8);
+    ctx.save(); ctx.translate(17, DP_MT + DP_PH / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top"; ctx.fillText("energy  E  (eV)", 0, 0); ctx.restore();
+  }
+
   function updateHtcReadouts() {
     const set = (k: string, v: string) => { const el = read.current[k]; if (el) el.textContent = v; };
     const Er = htc.S * htc.wv;
@@ -1714,6 +1765,7 @@ export function App() {
             <button className={regime === "collective" ? "on" : ""} onClick={() => setRegime("collective")}>COLLECTIVE</button>
             <button className={regime === "dynamics" ? "on" : ""} onClick={() => setRegime("dynamics")}>DYNAMICS</button>
             <button className={regime === "vibronic" ? "on" : ""} onClick={() => setRegime("vibronic")}>VIBRONIC</button>
+            <button className={regime === "dispersion" ? "on" : ""} onClick={() => setRegime("dispersion")}>DISPERSION</button>
           </div>
           {regime === "single" ? (
             <>
@@ -1784,7 +1836,7 @@ export function App() {
                 <button className={dynSweep ? "on" : ""} onClick={() => { if (!dynSweep) setDynView("dynamics"); setDynSweep((v) => !v); }}>SWEEP g vs Ω_R</button>
               </div>
             </Group>
-          ) : (
+          ) : regime === "vibronic" ? (
             <Group title="VIBRONIC · HOLSTEIN-TC" k="htc" c={collapsed} t={toggle}>
               <Field sym="ω" texSym="\omega_v/\omega_c" label="vibrational mode" value={htc.wv} min={0.04} max={0.4} step={0.005} unit="" tip="vibrational (phonon) frequency ω_v in units of ω_c (dimensionless); sets the spacing of the Franck–Condon replicas" onChange={(wv) => setHtc((s) => ({ ...s, wv }))} />
               <Field sym="S" texSym="S=\lambda^2" label="Huang-Rhys factor" value={htc.S} min={0} max={3} step={0.05} unit="" tip="exciton–phonon coupling strength S=λ² (dimensionless); higher S = more/brighter vibrational sidebands and a larger Stokes shift" onChange={(S) => setHtc((s) => ({ ...s, S }))} />
@@ -1797,6 +1849,11 @@ export function App() {
                 <button className={htc.N >= 100 ? "on" : ""} title="jump to N=200 to demonstrate polaron decoupling (λ→λ/√N); switches from exact to the large-N asymptotic solver" onClick={() => setHtc((s) => ({ ...s, N: 200 }))}>N = 200 · large-N</button>
               </div>
             </Group>
+          ) : (
+            <Group title="EXCITON-POLARITON" k="disp" c={collapsed} t={toggle}>
+              <Field sym="δ" texSym="\delta" label="cavity-exciton detuning" value={disp.delta} min={-0.04} max={0.04} step={0.002} unit="eV" tip="cavity-photon energy at k‖=0 minus the exciton energy, δ = E_cav(0) − E_exc (eV). δ<0 puts the photon below the exciton at normal incidence, so the anticrossing sits at a finite angle." onChange={(delta) => setDisp((s) => ({ ...s, delta }))} />
+              <Field sym="2V" texSym="2V" label="vacuum-Rabi splitting" value={disp.rabi2V} min={0.002} max={0.04} step={0.001} unit="eV" tip="light-matter coupling, the minimum LP/UP gap at resonance (eV). Larger 2V opens a wider anticrossing." onChange={(rabi2V) => setDisp((s) => ({ ...s, rabi2V }))} />
+            </Group>
           )}
         </aside>
 
@@ -1807,7 +1864,8 @@ export function App() {
               : regime === "collective" ? <><b>N emitters sharing one cavity mode (Tavis–Cummings).</b> <span className="ts-watch">Watch:</span> the avoided crossing, 2 bright polaritons split by 2g√N, the N−1 dark states pinned at ω_a. <span className="ts-watch">Drag:</span> N/g set the splitting; σ adds emitter disorder. Click any eigenstate to see its photon content.</>
               : regime === "cavity" ? <><b>The optical hardware behind the coupling (DBR Fabry–Pérot cavity).</b> <span className="ts-watch">Watch:</span> the standing-wave field |E(z)|² and how the mirror stack sets the mode volume → the single-emitter coupling g. <span className="ts-watch">Drag:</span> wavelength, mirror pairs, and indices to retune the cavity.</>
               : regime === "dynamics" ? <><b>Live many-emitter dynamics (Tavis–Cummings, real-time).</b> <span className="ts-watch">Watch:</span> one excitation sloshing photon↔molecules in 3D, plus the doublet in transmission. <span className="ts-watch">Drag:</span> N/g set Ω_R=2g√N; Γ is the cavity linewidth, so each polariton leaks in proportion to its photon weight while the dark reservoir stays trapped (Γ=0 is the lossless limit).</>
-              : <><b>Vibronic coupling, molecules with vibrations in a cavity (Holstein–Tavis–Cummings).</b> <span className="ts-watch">Watch:</span> the Franck–Condon vibrational comb (bare) reshaped into polaritons in-cavity. <span className="ts-watch">Drag:</span> Huang–Rhys S, vibrational mode ω_v, coupling g, ensemble N.</>}
+              : regime === "vibronic" ? <><b>Vibronic coupling, molecules with vibrations in a cavity (Holstein–Tavis–Cummings).</b> <span className="ts-watch">Watch:</span> the Franck–Condon vibrational comb (bare) reshaped into polaritons in-cavity. <span className="ts-watch">Drag:</span> Huang–Rhys S, vibrational mode ω_v, coupling g, ensemble N.</>
+              : <><b>Microcavity exciton-polaritons, the angle-resolved dispersion E(k‖).</b> <span className="ts-watch">Watch:</span> the parabolic cavity photon and the flat exciton anticross into lower/upper polariton branches, each coloured by its photon/exciton (Hopfield) fraction. <span className="ts-watch">Drag:</span> detuning δ moves the anticrossing; 2V sets its gap.</>}
           </div>
           {regime === "single" ? (
             <>
@@ -1942,6 +2000,15 @@ export function App() {
                 </PlotWrap>
               </div>
             </>
+          ) : regime === "dispersion" ? (
+            <div className="pane grow">
+              <div className="pane-head">Microcavity exciton-polariton dispersion · lower/upper polariton <i style={{ color: CYAN, fontStyle: "normal" }}>━</i> coloured photon→exciton · bare cavity <i style={{ color: "rgba(0,255,255,0.6)", fontStyle: "normal" }}>┄</i> · exciton <i style={{ color: "rgba(255,58,58,0.6)", fontStyle: "normal" }}>┄</i></div>
+              <PanelEqn t={"E_{\\mathrm{LP/UP}}(k_\\parallel)=\\tfrac12\\!\\left[E_c+E_x\\pm\\sqrt{(E_c-E_x)^2+(2V)^2}\\right],\\quad E_c(k_\\parallel)=E_c^0+\\frac{\\hbar^2k_\\parallel^2}{2m_{\\mathrm{cav}}}"} where="2×2 coupled-oscillator (Hopfield); anticross, never cross" />
+              <div className="pane-sub"><b>What:</b> the cavity photon is a light 2-D particle, so its energy rises with in-plane momentum k‖ and sweeps through the flat exciton. The coupling 2V turns that crossing into an <b>anticrossing</b>: the lower and upper polaritons, each a k-dependent mix of <span style={{ color: CYAN }}>photon</span> and <span style={{ color: RED }}>exciton</span> (the Hopfield fractions, shown as colour). <b>Approx:</b> single coupled mode, parabolic cavity, no loss.</div>
+              <PlotWrap cw={DP_CW} ch={DP_CH} area={{ ml: DP_ML, mt: DP_MT, pw: DP_PW, ph: DP_PH }} inv={(px, py) => { const Eexc = DEFAULT_MICROCAVITY.Eexc, mcav = DEFAULT_MICROCAVITY.mcav, Ecav0 = Eexc + disp.delta, V = disp.rabi2V / 2; const kP = linspace(0, 7e6, 48), b = polaritonBranches(kP, { Ecav0, Eexc, mcav, V }), c = cavityDispersion(kP, { Ecav0, mcav }); let lo = Math.min(Eexc, ...b.ELP, ...c), hi = Math.max(Eexc, ...b.EUP, ...c); const pd = (hi - lo) * 0.08 + 1e-4; lo -= pd; hi += pd; return [(((px - DP_ML) / DP_PW) * 7).toFixed(2), (lo + (1 - (py - DP_MT) / DP_PH) * (hi - lo)).toFixed(3)]; }}>
+                <canvas ref={dispCanvas} className="cv" />
+              </PlotWrap>
+            </div>
           ) : (
             <>
               <div className="dyn-viewtabs">
@@ -2117,7 +2184,7 @@ export function App() {
               </div>
               {Hud}
             </>
-          ) : (
+          ) : regime === "vibronic" ? (
             <>
               <RegimeBadge gEff={htc.g * Math.sqrt(htc.N)} wc={1} loss={htc.gamma} lossSym="γ" splitSym="2g√N" />
               <div className="pane">
@@ -2135,6 +2202,24 @@ export function App() {
               <div className="pane">
                 <div className="pane-head">⟨i|Ĥ<sub>HTC</sub>|j⟩ · photon ⊕ vibronic blocks · Holstein/FC off-diagonals brighten with S</div>
                 <canvas ref={matCanvas} className="cv" style={{ margin: "0 auto" }} />
+              </div>
+              {Hud}
+            </>
+          ) : (
+            <>
+              <div className="pane">
+                <div className="pane-head">Exciton-polariton observables · microcavity (System A)</div>
+                <div className="pane-sub">a light cavity photon coupled to a heavy exciton; the branches anticross with a minimum gap 2V. Fractions shown at normal incidence (k‖=0).</div>
+                <table className="metrics"><tbody>
+                  {(() => { const V = disp.rabi2V / 2, h0 = hopfield(disp.delta, V); return <>
+                    <Row label={<>detuning <i>δ</i></>} v={`${Math.round(disp.delta * 1000)}`} unit="meV" tip="cavity-photon energy at normal incidence minus the exciton energy, δ = E_cav(0) − E_exc" />
+                    <Row label={<>Rabi splitting <i>2V</i></>} v={`${Math.round(disp.rabi2V * 1000)}`} unit="meV" tip="light-matter coupling, the minimum LP/UP gap (reached at resonance)" />
+                    <Row label={<>LP photon |C|²</>} v={h0.C2.toFixed(2)} tip="Hopfield photon fraction of the lower polariton at k‖=0" />
+                    <Row label={<>LP exciton |X|²</>} v={h0.X2.toFixed(2)} tip="Hopfield exciton fraction of the lower polariton at k‖=0 (|C|²+|X|²=1)" />
+                    <Row label={<>cavity mass <i>m</i><sub>cav</sub></>} v={DEFAULT_MICROCAVITY.mcav.toExponential(1)} unit="m_e" tip="photon effective mass, ~1e-5 electron masses; this is why the cavity disperses steeply with k‖" />
+                    <Row label={<>index <i>n</i><sub>cav</sub></>} v={DEFAULT_MICROCAVITY.n.toFixed(1)} tip="cavity-medium refractive index; sets the external-angle ↔ k‖ map" />
+                  </>; })()}
+                </tbody></table>
               </div>
               {Hud}
             </>
