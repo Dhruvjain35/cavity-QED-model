@@ -5,6 +5,29 @@ All notable changes to this project are recorded here. The format loosely follow
 
 ## [Unreleased]
 
+### Added
+- **Dispersion tab.** Microcavity exciton-polariton dispersion `E(k‖)` from the 2×2 coupled-oscillator
+  (Hopfield) model, plus the **angle-resolved reflectivity heatmap** `A(ω,k‖) = −(1/π) Im G_c`: the same
+  anticrossing as a theory curve and as a lab measures it, on a perceptually-uniform `inferno` colormap.
+  Live `δ`, `2V`, and cavity-linewidth `κ` sliders sharpen or broaden the branches.
+- **Transmission-spectroscopy view** in Dynamics: the vacuum-Rabi anticrossing in transmission `A(ω,Δ)` as
+  the cavity tunes through the emitters, with a live `Δ`-slice cursor, the line-cut doublet, and a
+  cavity-QED figures-of-merit panel (`Ω_R`, collective cooperativity, cavity `Q`, strong/weak regime). All
+  analytic from the input-output cavity Green's function, no new WASM.
+- **Electron-transfer `N_max` turnover panel** (Vibronic) reproducing the Sharma & Chen collective-coupling
+  result, and a 23-case `vitest` suite for the closed-form analytic engine.
+
+### Changed
+- **Full UI redesign to a dark, professional instrument theme** (VS Code / IBM Quantum Composer idiom):
+  graphite panels, 1px hairlines, a single restrained selection-blue accent, native system sans + tabular
+  mono, a numbered sidebar nav, subtle rounding on controls and scopes. Removed the neon, glows, and the
+  "live" pulsing dot.
+- **All plots are now dark-faced** and integrate into the dashboard; the Wigner / density-matrix heatmaps
+  use a dark diverging map and the 2D intensity maps use `inferno`.
+- **Hero plots fit their container** so the Dispersion and Transmission tabs fill the screen instead of
+  floating at native size, re-rendered crisp at the displayed size (no stretched bitmaps), with the hover
+  crosshair kept aligned.
+
 ### Fixed
 - **Live-dynamics decay model is now physically correct.** Cavity loss acts on the photon, so each
   eigenstate now decays in proportion to its photon fraction `f_k = |⟨0|φ_k⟩|²`. The bright polaritons
@@ -25,7 +48,7 @@ All notable changes to this project are recorded here. The format loosely follow
 
 ### Changed
 - **Tab order now follows the physics build-up and the guided tour:** Single emitter, Cavity field,
-  Collective, Dynamics, Vibronic.
+  Collective, Dynamics, Vibronic, Dispersion.
 - **Guided tour** auto-opens once on a first visit, walks all six views, and the 3D scene labels (light
   field, molecules, cavity mirrors) are anchored to real 3D points so they track the camera on orbit/zoom.
 - Removed em dashes from all user-facing copy; tightened the avoided-crossing centerpiece and the 3D
