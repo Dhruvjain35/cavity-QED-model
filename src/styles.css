@@ -124,7 +124,9 @@ body { background: var(--bg); color: var(--ink); font-family: var(--sans); font-
 .center > .pane.grow { display: flex; flex-direction: column; }
 /* hero canvases are CENTERED at their native size inside the grow pane (never CSS-upscaled, upscaling a
    fixed buffer both blurs the plot and balloons its fonts). max-* only ever scales DOWN on a tight pane. */
-.center > .pane.grow > .plotwrap, .center > .pane.grow > .cv, .center > .pane.grow > .bloch-wrap { align-self: center; margin: auto; max-width: 100%; max-height: 100%; min-height: 0; }
+.center > .pane.grow > .bloch-wrap { align-self: center; margin: auto; max-width: 100%; max-height: 100%; min-height: 0; }
+/* hero plots fill the column width and re-render crisp at that size (see sized()); never leave dead margins */
+.center > .pane.grow > .plotwrap, .center > .pane.grow > .cv { align-self: stretch; margin: 4px 0; width: 100%; max-width: 100%; min-height: 0; }
 /* CAVITY tab: two panels (R, N) side-by-side so they fill the column width instead of stacking small */
 .cav-row { display: flex; min-height: 0; border-bottom: 1px solid var(--rule); }
 .cav-row > .pane { flex: 1; min-width: 0; border-bottom: none; border-right: 1px solid var(--rule); display: flex; flex-direction: column; }
@@ -178,8 +180,8 @@ tr[title] { cursor: help; }
 .tab-sub .ts-watch { color: var(--cyan-d); }
 .cv { display: block; max-width: 100%; }
 /* center single-canvas plots in their pane at native size (no upscaling) */
-.center > .pane > .plotwrap { display: block; width: fit-content; max-width: 100%; margin: 0 auto; }
-.center > .pane > .cv { display: block; margin: 0 auto; }
+.center > .pane > .plotwrap { display: block; width: 100%; max-width: 100%; margin: 4px 0; }
+.center > .pane > .cv { display: block; width: 100%; margin: 4px 0; }
 .tex { display: inline-block; line-height: 1; }
 .tex .katex { font-size: 1.0em; color: inherit; }
 .cv.click { cursor: crosshair; }
@@ -493,11 +495,11 @@ table.metrics { width: 100%; border-collapse: collapse; }
 /* ---- TRANSMISSION dashboard: map on top, line-cut + figures-of-merit below ---- */
 .trans-view { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow-y: auto; }
 .trans-view > .pane.grow { flex: 0 0 auto; display: flex; flex-direction: column; }
-.trans-view > .pane.grow > .plotwrap { align-self: center; margin: 4px auto; max-width: 100%; }
-.trans-view .cv { max-width: 100%; height: auto; }
+.trans-view > .pane.grow > .plotwrap { width: 100%; max-width: 100%; margin: 4px 0; }
+.trans-view .cv { width: 100% !important; max-width: 100%; height: auto !important; }
 .trans-bottom { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(230px, 0.6fr); border-top: 1px solid var(--rule); min-height: 0; }
 .trans-bottom > .pane { border-right: 1px solid var(--rule); display: flex; flex-direction: column; min-width: 0; }
-.trans-bottom > .pane > .plotwrap { align-self: center; margin: 4px auto; max-width: 100%; }
+.trans-bottom > .pane > .plotwrap { width: 100%; max-width: 100%; margin: 4px 0; }
 .trans-readouts { padding: 9px 11px 11px; display: flex; flex-direction: column; gap: 7px; min-width: 0; }
 .tr-head { font-size: 8px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint); margin-bottom: 1px; }
 .tr-card { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 8px 11px; background: var(--panel-2); border: 1px solid var(--rule); border-radius: var(--r-sm); }
@@ -512,3 +514,15 @@ table.metrics { width: 100%; border-collapse: collapse; }
 .tr-weak .tr-v { color: var(--amber-d); }
 .tr-note { font-size: 9px; line-height: 1.5; color: var(--faint); margin-top: 3px; }
 @container center (max-width: 720px) { .trans-bottom { grid-template-columns: 1fr; } .trans-bottom > .pane { border-right: none; border-bottom: 1px solid var(--rule); } }
+
+/* fill canvases: override the inline native size set by sized() so single-column plots render at the full
+   column width (sized() then re-renders them crisp at that resolution). Multi-column tabs are not matched. */
+.center > .pane > .plotwrap > .cv,
+.center > .pane.grow > .plotwrap > .cv,
+.center > .pane > .cv,
+.center > .pane.grow > .cv,
+.trans-bottom > .pane > .plotwrap > .cv { width: 100% !important; height: auto !important; }
+
+/* CAVITY tab side-by-side pair: fill each half-panel too (consistency with the hero plots) */
+.cav-row > .pane > .plotwrap { width: 100%; margin: auto 0; }
+.cav-row > .pane > .plotwrap > .cv, .cav-row > .pane > .cv { width: 100% !important; height: auto !important; margin: auto 0; }

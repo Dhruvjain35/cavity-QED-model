@@ -603,11 +603,21 @@ export function App() {
   // Each plot is drawn at a FIXED logical size w×h; the backing store is w×h×dpr (so it is crisp at 1:1 on a
   // retina display) and the canvas is shown at exactly w×h CSS px (inline). Panes are laid out around these
   // sizes, canvases are NEVER CSS-upscaled to "fill" (that both blurs and balloons the fonts).
+  // Resolution-independent sizing. The plot is authored in a fixed logical CW×CH coordinate system, but it
+  // RENDERS at whatever width CSS gives the canvas: native (centred) by default, or 100% of the column for
+  // the "fill" plots (see styles.css). Reading clientWidth lets us pick a render scale so the backing buffer
+  // matches the on-screen device pixels exactly, so an enlarged plot is genuinely re-rendered crisp (not a
+  // stretched bitmap) and its fonts/strokes scale up proportionally, like resizing a real figure. Uniform
+  // scale keeps the hover→data mapping (which divides by the element rect) exactly correct.
   function sized(cv: HTMLCanvasElement, w: number, h: number): CanvasRenderingContext2D {
-    const bw = Math.round(w * dpr.current), bh = Math.round(h * dpr.current);
-    if (cv.width !== bw || cv.height !== bh) { cv.width = bw; cv.height = bh; cv.style.width = w + "px"; cv.style.height = h + "px"; }
+    const dd = dpr.current;
+    const dispW = cv.clientWidth || w;            // CSS-driven display width (fill = column width, native = w)
+    const scale = dispW > 8 ? dispW / w : 1;
+    const bw = Math.round(w * scale * dd), bh = Math.round(h * scale * dd);
+    if (cv.width !== bw || cv.height !== bh) { cv.width = bw; cv.height = bh; }
+    if (!cv.style.width) { cv.style.width = w + "px"; cv.style.height = h + "px"; } // native default; fill canvases are overridden to 100%/auto in CSS
     const ctx = cv.getContext("2d")!;
-    ctx.setTransform(dpr.current, 0, 0, dpr.current, 0, 0);
+    ctx.setTransform(scale * dd, 0, 0, scale * dd, 0, 0);
     ctx.lineJoin = "round"; ctx.lineCap = "round"; // smooth curve joints
     return ctx;
   }
