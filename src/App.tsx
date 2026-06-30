@@ -121,10 +121,13 @@ const DM_CW = DM_ML + DM_PW + DM_MR, DM_CH = DM_MT + DM_PH + DM_MB;
 const HTC_GRID = 760; // absorption-spectrum sampling points
 const MX_S = 196; // live Hamiltonian heatmap size (px)
 
-// industrial spectroscopic palette: cyan photons · red excitons · amber phonons · purple dark · green calib.
-const PANEL = "#ffffff", INK = "#1a1a1a", DIM = "#555555", AXIS = "#000000";
-const CYAN = "#1f77b4", RED = "#d62728", AMBER = "#ff7f0e", PURPLE = "#9467bd", GREEN = "#2ca02c";
-const COBALT = CYAN, CRIMSON = RED, EMERALD = GREEN, SLATE = "#888888"; // legacy aliases -> tab10 data palette
+// DARK-FACED plot system: the figure background IS the graphite UI (#1e1e1e) so plots integrate seamlessly
+// into the dashboard (VS Code / IBM Quantum Composer / monitoring-console idiom). Axes/grid are light-on-dark;
+// the data palette is brightened so it reads on graphite: cyan photons · red excitons · amber phonons ·
+// purple dark · green calib. The matplotlib-tab10 hues are kept in spirit but lifted in luminance.
+const PANEL = "#1e1e1e", INK = "#d6d6d6", DIM = "#9a9a9a", AXIS = "#8a8a8a";
+const CYAN = "#4ea0e0", RED = "#f0696b", AMBER = "#f0a23a", PURPLE = "#c58ad0", GREEN = "#5fbf5f";
+const COBALT = CYAN, CRIMSON = RED, EMERALD = GREEN, SLATE = "#8a8a8a"; // legacy aliases -> bright-on-dark palette
 // the two bright polaritons = the eigenstates of largest PHOTON weight |⟨0|φ_k⟩|² = vecs[k]² (row 0);
 // lower energy = LP, higher = UP. Robust under disorder (which spreads the dark band past the extremes).
 function brightPolaritonIdx(vecs: Float64Array, eigs: Float64Array, n: number) {
@@ -133,7 +136,7 @@ function brightPolaritonIdx(vecs: Float64Array, eigs: Float64Array, n: number) {
   const kLP = eigs[pa]! <= eigs[pb]! ? pa : pb, kUP = kLP === pa ? pb : pa;
   return { kLP, kUP };
 }
-const GRIDLINE = "#e6e6e6", DASH = "#bbbbbb", CROSS = "rgba(40,40,40,0.45)";
+const GRIDLINE = "#2d2d2d", DASH = "#454545", CROSS = "rgba(220,220,220,0.35)";
 
 const minus = (s: string) => s.replace("-", "−");
 const fmt = (v: number, d: number) => minus(v.toFixed(d));
@@ -145,13 +148,13 @@ const lin = (a: number, b: number, s: number) => Math.round(a + (b - a) * s);
 // (W=0), t=1 → blue (+W). t is the normalised position in [−wmax,+wmax], i.e. t=(W+wmax)/2wmax.
 function wignerRGB(t: number): [number, number, number] {
   t = clamp(t, 0, 1);
-  if (t < 0.5) { const s = t / 0.5; return [lin(214, 255, s), lin(39, 255, s), lin(40, 255, s)]; }
-  const s = (t - 0.5) / 0.5; return [lin(255, 31, s), lin(255, 119, s), lin(255, 180, s)];
+  if (t < 0.5) { const s = t / 0.5; return [lin(240, 30, s), lin(105, 30, s), lin(107, 30, s)]; }
+  const s = (t - 0.5) / 0.5; return [lin(30, 78, s), lin(30, 160, s), lin(30, 224, s)];
 }
 // White sequential Husimi ramp (Q ≥ 0): t=0 → white (vacuum of the panel), t=1 → blue peak. t = Q/qmax.
 function husimiRGB(t: number): [number, number, number] {
   t = clamp(t, 0, 1);
-  return [lin(255, 31, t), lin(255, 119, t), lin(255, 180, t)];
+  return [lin(30, 90, t), lin(30, 195, t), lin(30, 240, t)];
 }
 function wignerImage(w: Float64Array, n: number, wmax: number): ImageData {
   const px = new Uint8ClampedArray(n * n * 4);
@@ -220,8 +223,8 @@ export function App() {
   const [inspect, setInspect] = useState<number | null>(null); // clicked dressed eigenstate (UI badge)
   const [htcBusy, setHtcBusy] = useState(false); // exact N-body vibronic diagonalization is heavy: paint a "computing" state instead of a frozen-looking click
   const [etT, setEtT] = useState<number>(DEFAULT_HTC.T01); // photon-mediated ET coupling |T| [eV]; sets where the rate turns over (N_max = 1 + ħω_c·E_AD/|T|²)
-  const [disp, setDisp] = useState({ delta: -0.012, rabi2V: 0.010 }); // exciton-polariton dispersion: cavity-exciton detuning δ [eV] (Ecav0 = Eexc + δ, negative puts the anticrossing at finite k) and vacuum-Rabi splitting 2V [eV]
-  const [dynView, setDynView] = useState<"formation" | "dynamics">("formation"); // DYNAMICS lead view
+  const [disp, setDisp] = useState({ delta: -0.012, rabi2V: 0.010, kappa: 0.004 }); // exciton-polariton dispersion: cavity-exciton detuning δ [eV] (Ecav0 = Eexc + δ, negative puts the anticrossing at finite k), vacuum-Rabi splitting 2V [eV], and the cavity linewidth κ [eV] that sets how sharp the reflectivity-map ridges are
+  const [dynView, setDynView] = useState<"formation" | "dynamics" | "transmission">("formation"); // DYNAMICS lead view
   const [pfSel, setPfSel] = useState<"LP" | "UP" | null>("LP"); // formation: start frozen on the LP polariton (show the hybrid immediately); null = oscillate
   const [tour, setTour] = useState<number | null>(null); // guided first-run tour: step index, null = closed
   const [dynSweep, setDynSweep] = useState(false); // coupling-sweep dispersion mode (replaces the 3D)
@@ -280,6 +283,7 @@ export function App() {
   const matData = useRef<{ h: Float64Array; n: number } | null>(null);
   const htcCanvas = useRef<HTMLCanvasElement>(null), vibCompareCanvas = useRef<HTMLCanvasElement>(null), etCanvas = useRef<HTMLCanvasElement>(null), dispCanvas = useRef<HTMLCanvasElement>(null);
   const dispMapCanvas = useRef<HTMLCanvasElement>(null), dispMapOff = useRef<HTMLCanvasElement | null>(null); // angle-resolved reflectivity heatmap + its NX×NY offscreen
+  const transMapCanvas = useRef<HTMLCanvasElement>(null), transMapOff = useRef<HTMLCanvasElement | null>(null); // transmission-vs-detuning anticrossing heatmap (dynamics) + offscreen
   const htcData = useRef<{ live: { eigs: Float64Array; photon: Float64Array; absorption: Float64Array }; fc: { pos: Float64Array; weight: Float64Array }; nVib: number; method: string } | null>(null);
   const offscreen = useRef<HTMLCanvasElement | null>(null), husimiOff = useRef<HTMLCanvasElement | null>(null), bridgeOff = useRef<HTMLCanvasElement | null>(null);
   const quantum = useRef<Quantum | null>(null);
@@ -338,6 +342,7 @@ export function App() {
     else if (r === "cavity") { drawCavity(); drawStopband(); drawCollective(); }
     else if (r === "vibronic") { drawHtc(); drawMatrix(); drawVibronicCompare(); drawDisorder(); drawETrate(); }
     else if (r === "dispersion") { drawDispersion(); drawDispersionMap(); }
+    else if (r === "dynamics" && dynViewRef.current === "transmission") drawTransmissionMap();
     else singleDirty.current = true; // single + dynamics run a RAF loop that redraws on the next frame
   };
   useEffect(() => {
@@ -467,6 +472,10 @@ export function App() {
   // exciton-polariton dispersion is also closed-form (cheap): redraw on tab entry and on the δ / 2V sliders.
   useEffect(() => { if (regime === "dispersion") { drawDispersion(); drawDispersionMap(); } // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [regime, disp]);
+  // dynamics transmission map is closed-form (analytic cavity Green's function): redraw on tab/view entry
+  // and whenever the coupling g, ensemble size N, cavity loss Γ or disorder σ change.
+  useEffect(() => { if (regime === "dynamics" && dynView === "transmission") drawTransmissionMap(); // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [regime, dynView, dyn.g, dyn.m, dyn.gamma, dyn.sigma]);
 
   useEffect(() => {
     dpr.current = Math.min(window.devicePixelRatio || 1, 2);
@@ -721,9 +730,9 @@ export function App() {
     ctx.fillStyle = PANEL; ctx.fillRect(0, 0, BL_CW, BL_CH);
     const cx = BL_ML + BL_S / 2, cy = BL_MT + BL_S / 2, R = (BL_S / 2) / 1.12;
     const xPx = (v: number) => cx + v * R, yPx = (v: number) => cy - v * R;
-    ctx.strokeStyle = "#b4b4b4"; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(cx, cy, R, 0, 2 * Math.PI); ctx.stroke(); // unit circle
+    ctx.strokeStyle = "#5a5a5a"; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(cx, cy, R, 0, 2 * Math.PI); ctx.stroke(); // unit circle
     ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5; ctx.beginPath(); ctx.arc(cx, cy, R * 0.5, 0, 2 * Math.PI); ctx.stroke();
-    ctx.strokeStyle = "#cccccc"; ctx.lineWidth = 0.6; seg(ctx, xPx(-1.12), cy, xPx(1.12), cy); seg(ctx, cx, yPx(-1.12), cx, yPx(1.12));
+    ctx.strokeStyle = "#3c3c3c"; ctx.lineWidth = 0.6; seg(ctx, xPx(-1.12), cy, xPx(1.12), cy); seg(ctx, cx, yPx(-1.12), cx, yPx(1.12));
     ctx.fillStyle = DIM; ctx.font = "500 8px Helvetica,Arial,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top";
     for (const t of [-1, 1]) ctx.fillText(minus(`${t}`), xPx(t), cy + 4);
     ctx.textAlign = "right"; ctx.textBaseline = "middle";
@@ -731,7 +740,7 @@ export function App() {
     const bc = blochCurve.current; // analytic spiral: oldest at opacity 0.08, newest at 1.0
     if (bc && bc.n >= 2) {
       for (let i = 1; i < bc.n; i++) {
-        ctx.strokeStyle = `rgba(31,119,180,${(0.10 + 0.90 * (i / (bc.n - 1))).toFixed(3)})`; ctx.lineWidth = 1.4;
+        ctx.strokeStyle = `rgba(78,160,224,${(0.12 + 0.88 * (i / (bc.n - 1))).toFixed(3)})`; ctx.lineWidth = 1.5;
         ctx.beginPath(); ctx.moveTo(xPx(bc.data[(i - 1) * 2]!), yPx(bc.data[(i - 1) * 2 + 1]!)); ctx.lineTo(xPx(bc.data[i * 2]!), yPx(bc.data[i * 2 + 1]!)); ctx.stroke();
       }
     }
@@ -767,10 +776,10 @@ export function App() {
       const r = re[i * DFULL + j]!, m = im[i * DFULL + j]!, mag = Math.hypot(r, m);
       const v = Math.min(1, mag / maxAbs);                  // normalised to the largest |ρ_ij| this frame
       const signed = Math.abs(r) >= Math.abs(m) ? r : m;    // the non-zero (dominant) component carries the sign
-      ctx.fillStyle = signed >= 0 ? lerpHex("#ffffff", "#1f77b4", v) : lerpHex("#ffffff", "#d62728", v);
+      ctx.fillStyle = signed >= 0 ? lerpHex("#1e1e1e", "#4ea0e0", v) : lerpHex("#1e1e1e", "#f0696b", v);
       ctx.fillRect(R_ML + j * cell, R_MT + i * cell, cell, cell);
     }
-    ctx.strokeStyle = "#d2d2d2"; ctx.lineWidth = 1; // explicit 1px matrix grid
+    ctx.strokeStyle = "#333333"; ctx.lineWidth = 1; // explicit 1px matrix grid
     for (let k = 0; k <= B; k++) { const p = k * cell; seg(ctx, R_ML + p, R_MT, R_ML + p, R_MT + R_S); seg(ctx, R_ML, R_MT + p, R_ML + R_S, R_MT + p); }
     ctx.strokeStyle = AXIS; ctx.lineWidth = 0.75; ctx.strokeRect(R_ML, R_MT, R_S, R_S);
     ctx.fillStyle = DIM; ctx.font = "500 8px Helvetica,Arial,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top";
@@ -803,7 +812,7 @@ export function App() {
     ctx.fillStyle = INK; ctx.font = "600 10px Helvetica,Arial,sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "bottom";
     ctx.fillText(`SELECTED |ψ_k⟩  k=${pk}`, lx, by - 6);
     const hbar = (y: number, frac: number, c2: string, lab: string) => {
-      ctx.fillStyle = "#ececec"; ctx.fillRect(lx, y, lw, bh);
+      ctx.fillStyle = "#2c2c2c"; ctx.fillRect(lx, y, lw, bh);
       ctx.fillStyle = c2; ctx.fillRect(lx, y, lw * Math.max(0, Math.min(1, frac)), bh);
       ctx.strokeStyle = AXIS; ctx.lineWidth = 0.75; ctx.strokeRect(lx, y, lw, bh);
       ctx.fillStyle = INK; ctx.font = "600 10px Helvetica,Arial,sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.fillText(lab, lx + 5, y + bh / 2);
@@ -1199,7 +1208,7 @@ export function App() {
     const yA = yOf(WA);
     ctx.strokeStyle = "rgba(139,148,158,0.45)"; ctx.setLineDash([1, 3]); ctx.lineWidth = 0.75; seg(ctx, HP_ML, yA, HP_ML + HP_PW, yA); ctx.setLineDash([]);
     ctx.fillStyle = DIM; ctx.font = "9px Helvetica,Arial,sans-serif"; ctx.textAlign = "right"; ctx.textBaseline = "bottom"; ctx.fillText("ω_a", HP_ML + HP_PW - 3, yA - 2);
-    if (Math.abs(dyn.detuning) > 1e-9) { const yC = yOf(WA + dyn.detuning); ctx.strokeStyle = "rgba(31,119,180,0.55)"; ctx.setLineDash([1, 3]); ctx.lineWidth = 0.75; seg(ctx, HP_ML, yC, HP_ML + HP_PW, yC); ctx.setLineDash([]); ctx.fillStyle = "rgba(31,119,180,0.9)"; ctx.fillText("ω_c", HP_ML + HP_PW - 3, yC - 2); }
+    if (Math.abs(dyn.detuning) > 1e-9) { const yC = yOf(WA + dyn.detuning); ctx.strokeStyle = "rgba(78,160,224,0.6)"; ctx.setLineDash([1, 3]); ctx.lineWidth = 0.75; seg(ctx, HP_ML, yC, HP_ML + HP_PW, yC); ctx.setLineDash([]); ctx.fillStyle = "rgba(110,180,235,0.95)"; ctx.fillText("ω_c", HP_ML + HP_PW - 3, yC - 2); }
     if (dark.length) {
       let dlo = Infinity, dhi = -Infinity; for (const k of dark) { dlo = Math.min(dlo, eigs[k]!); dhi = Math.max(dhi, eigs[k]!); }
       const yb = yOf(dhi), yt = yOf(dlo), bw = xOf(0.05) - HP_ML, yc = (yb + yt) / 2;
@@ -1249,11 +1258,11 @@ export function App() {
     let maxAbs = 1e-9; for (let i = 0; i < h.length; i++) maxAbs = Math.max(maxAbs, Math.abs(h[i]!));
     for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
       const val = h[i * n + j]!, v = Math.sqrt(Math.min(1, Math.abs(val) / maxAbs));
-      ctx.fillStyle = val >= 0 ? lerpHex("#ffffff", "#1f77b4", v) : lerpHex("#ffffff", "#d62728", v);
+      ctx.fillStyle = val >= 0 ? lerpHex("#1e1e1e", "#4ea0e0", v) : lerpHex("#1e1e1e", "#f0696b", v);
       ctx.fillRect(ml + j * cell, mt + i * cell, cell + 0.7, cell + 0.7);
     }
     if (gridOn) { // razor-thin black dividers → explicit matrix grid, not a blurry image
-      ctx.strokeStyle = "#d2d2d2"; ctx.lineWidth = 1;
+      ctx.strokeStyle = "#333333"; ctx.lineWidth = 1;
       for (let k = 0; k <= n; k++) { const x = ml + k * cell, y = mt + k * cell; seg(ctx, x, mt, x, mt + n * cell); seg(ctx, ml, y, ml + n * cell, y); }
     }
     ctx.strokeStyle = AXIS; ctx.lineWidth = 0.75; ctx.strokeRect(ml, mt, n * cell, n * cell);
@@ -1293,12 +1302,12 @@ export function App() {
     // bare-mode markers: emitter ω_a (red) fixed at 1, cavity ω_c (cyan) at 1+detuning, they coincide at
     // resonance; off-resonance the polariton peaks sit asymmetrically between them.
     ctx.setLineDash([1, 3]); ctx.lineWidth = 0.75;
-    ctx.strokeStyle = "rgba(214,39,40,0.6)"; seg(ctx, xOf(WA), FF_MT, xOf(WA), FF_MT + FF_PH);
-    if (Math.abs(dyn.detuning) > 1e-9) { ctx.strokeStyle = "rgba(31,119,180,0.6)"; seg(ctx, xOf(WA + dyn.detuning), FF_MT, xOf(WA + dyn.detuning), FF_MT + FF_PH); }
+    ctx.strokeStyle = "rgba(240,105,107,0.7)"; seg(ctx, xOf(WA), FF_MT, xOf(WA), FF_MT + FF_PH);
+    if (Math.abs(dyn.detuning) > 1e-9) { ctx.strokeStyle = "rgba(78,160,224,0.7)"; seg(ctx, xOf(WA + dyn.detuning), FF_MT, xOf(WA + dyn.detuning), FF_MT + FF_PH); }
     ctx.setLineDash([]);
     const om = fd.omega, pw = fd.power;
     const path = (close: boolean) => { ctx.beginPath(); let st = false; for (let i = 0; i < om.length; i++) { const w = om[i]!; if (w < wlo) continue; if (w > whi) break; const x = xOf(w), y = yOf(Math.min(1, pw[i]!)); if (!st) { if (close) { ctx.moveTo(x, yOf(0)); ctx.lineTo(x, y); } else ctx.moveTo(x, y); st = true; } else ctx.lineTo(x, y); } if (close && st) { ctx.lineTo(xOf(Math.min(whi, om[om.length - 1]!)), yOf(0)); ctx.closePath(); } };
-    path(true); ctx.fillStyle = "rgba(31,119,180,0.12)"; ctx.fill();
+    path(true); ctx.fillStyle = "rgba(78,160,224,0.18)"; ctx.fill();
     path(false); ctx.strokeStyle = CYAN; ctx.lineWidth = 1.6; ctx.stroke();
     ctx.strokeStyle = AXIS; ctx.lineWidth = 0.75; ctx.strokeRect(FF_ML, FF_MT, FF_PW, FF_PH);
     ctx.fillStyle = DIM; ctx.font = "10px Helvetica,Arial,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText("ω/ω_c", FF_ML + FF_PW / 2, FF_CH - 11);
@@ -1407,7 +1416,7 @@ export function App() {
     // legend (top-right, inside panel)
     ctx.font = "600 8px " + F; const lg0 = "bare FC  |⟨n|0⟩|² = e⁻ˢSⁿ/n!", lg1 = "in-cavity polariton absorption";
     const legW = Math.max(ctx.measureText(lg0).width, ctx.measureText(lg1).width) + 24, legX = lx + lw - legW - 5, legY = ly + 5;
-    ctx.fillStyle = "rgba(255,255,255,0.92)"; ctx.fillRect(legX, legY, legW, 26); ctx.strokeStyle = "#bbbbbb"; ctx.lineWidth = 0.5; ctx.strokeRect(legX, legY, legW, 26);
+    ctx.fillStyle = "rgba(20,20,20,0.85)"; ctx.fillRect(legX, legY, legW, 26); ctx.strokeStyle = "#4a4a4a"; ctx.lineWidth = 0.5; ctx.strokeRect(legX, legY, legW, 26);
     ctx.globalAlpha = 0.6; ctx.fillStyle = AMBER; ctx.fillRect(legX + 6, legY + 5, 9, 6); ctx.globalAlpha = 1;
     ctx.fillStyle = DIM; ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.fillText(lg0, legX + 20, legY + 8);
     ctx.strokeStyle = CYAN; ctx.lineWidth = 2; seg(ctx, legX + 6, legY + 18, legX + 15, legY + 18);
@@ -1528,13 +1537,13 @@ export function App() {
     ctx.textAlign = "center"; ctx.textBaseline = "top";
     for (let kk = 0; kk <= 7; kk++) { const x = xOf(kk * 1e6); ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5; seg(ctx, x, DP_MT, x, DP_MT + DP_PH); ctx.fillStyle = DIM; ctx.fillText(String(kk), x, DP_MT + DP_PH + 6); }
     // top axis: external emission angle θ (k‖ = (E/ħc) sinθ)
-    ctx.textBaseline = "bottom"; ctx.fillStyle = "#6e7681";
-    for (const th of [0, 10, 20, 30, 45, 60]) { const k = angleToK(Eexc, th); if (k <= kmax) { const x = xOf(k); ctx.strokeStyle = "#6e7681"; ctx.lineWidth = 0.6; seg(ctx, x, DP_MT, x, DP_MT - 4); ctx.fillStyle = "#6e7681"; ctx.fillText(th + "°", x, DP_MT - 5); } }
-    ctx.font = "600 8.5px " + F; ctx.textAlign = "left"; ctx.fillStyle = "#6e7681"; ctx.fillText("external angle θ", DP_ML + 2, DP_MT - 17);
+    ctx.textBaseline = "bottom"; ctx.fillStyle = "#8a9099";
+    for (const th of [0, 10, 20, 30, 45, 60]) { const k = angleToK(Eexc, th); if (k <= kmax) { const x = xOf(k); ctx.strokeStyle = "#8a9099"; ctx.lineWidth = 0.6; seg(ctx, x, DP_MT, x, DP_MT - 4); ctx.fillStyle = "#8a9099"; ctx.fillText(th + "°", x, DP_MT - 5); } }
+    ctx.font = "600 8.5px " + F; ctx.textAlign = "left"; ctx.fillStyle = "#8a9099"; ctx.fillText("external angle θ", DP_ML + 2, DP_MT - 17);
     // bare modes (uncoupled): cavity parabola + flat exciton
     ctx.setLineDash([5, 4]); ctx.lineWidth = 1.2;
-    ctx.strokeStyle = "rgba(31,119,180,0.5)"; ctx.beginPath(); for (let i = 0; i < M; i++) { const x = xOf(kPar[i]!), y = yOf(Ecav[i]!); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.stroke();
-    ctx.strokeStyle = "rgba(214,39,40,0.5)"; ctx.beginPath(); ctx.moveTo(xOf(0), yOf(Eexc)); ctx.lineTo(xOf(kmax), yOf(Eexc)); ctx.stroke();
+    ctx.strokeStyle = "rgba(110,180,235,0.6)"; ctx.beginPath(); for (let i = 0; i < M; i++) { const x = xOf(kPar[i]!), y = yOf(Ecav[i]!); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.stroke();
+    ctx.strokeStyle = "rgba(245,140,140,0.6)"; ctx.beginPath(); ctx.moveTo(xOf(0), yOf(Eexc)); ctx.lineTo(xOf(kmax), yOf(Eexc)); ctx.stroke();
     ctx.setLineDash([]);
     // polariton branches, coloured by photon fraction (cyan = photon, red = exciton)
     const branch = (E: number[], phot: (i: number) => number) => { ctx.lineWidth = 2.6; for (let i = 0; i < M - 1; i++) { ctx.strokeStyle = lerpHex(RED, CYAN, Math.max(0, Math.min(1, phot(i)))); ctx.beginPath(); ctx.moveTo(xOf(kPar[i]!), yOf(E[i]!)); ctx.lineTo(xOf(kPar[i + 1]!), yOf(E[i + 1]!)); ctx.stroke(); } };
@@ -1561,7 +1570,7 @@ export function App() {
     const F = "Helvetica,Arial,sans-serif";
     ctx.fillStyle = PANEL; ctx.fillRect(0, 0, DM_CW, DM_CH);
     const Eexc = DEFAULT_MICROCAVITY.Eexc, mcav = DEFAULT_MICROCAVITY.mcav, Ecav0 = Eexc + disp.delta, V = disp.rabi2V / 2;
-    const kmax = 7e6, kappa = 0.004, gamma = 0.0015; // cavity / exciton linewidths (eV): set the ridge sharpness
+    const kmax = 7e6, kappa = disp.kappa, gamma = 0.0015; // cavity / exciton linewidths (eV): set the ridge sharpness
     const kP = linspace(0, kmax, 64), b = polaritonBranches(kP, { Ecav0, Eexc, mcav, V }), cc = cavityDispersion(kP, { Ecav0, mcav });
     let elo = Math.min(Eexc, ...b.ELP, ...cc), ehi = Math.max(Eexc, ...b.EUP, ...cc);
     const pd = (ehi - elo) * 0.08 + 1e-4; elo -= pd; ehi += pd;
@@ -1599,14 +1608,71 @@ export function App() {
     for (let kk = 0; kk <= 7; kk++) { const x = xOf(kk * 1e6); seg(ctx, x, DM_MT + DM_PH, x, DM_MT + DM_PH + 3); ctx.fillText(String(kk), x, DM_MT + DM_PH + 6); }
     ctx.textAlign = "right"; ctx.textBaseline = "middle";
     for (let t = 0; t <= 4; t++) { const E = elo + (ehi - elo) * t / 4; seg(ctx, DM_ML - 3, yOf(E), DM_ML, yOf(E)); ctx.fillText(E.toFixed(3), DM_ML - 6, yOf(E)); }
-    ctx.textBaseline = "bottom"; ctx.fillStyle = "#6e7681";
-    for (const th of [0, 10, 20, 30, 45, 60]) { const k = angleToK(Eexc, th); if (k <= kmax) { const x = xOf(k); ctx.strokeStyle = "#6e7681"; ctx.lineWidth = 0.6; seg(ctx, x, DM_MT, x, DM_MT - 4); ctx.fillStyle = "#6e7681"; ctx.fillText(th + "°", x, DM_MT - 5); } }
-    ctx.font = "600 8px " + F; ctx.textAlign = "left"; ctx.fillStyle = "#6e7681"; ctx.fillText("external angle θ", DM_ML + 2, DM_MT - 16);
+    ctx.textBaseline = "bottom"; ctx.fillStyle = "#8a9099";
+    for (const th of [0, 10, 20, 30, 45, 60]) { const k = angleToK(Eexc, th); if (k <= kmax) { const x = xOf(k); ctx.strokeStyle = "#8a9099"; ctx.lineWidth = 0.6; seg(ctx, x, DM_MT, x, DM_MT - 4); ctx.fillStyle = "#8a9099"; ctx.fillText(th + "°", x, DM_MT - 5); } }
+    ctx.font = "600 8px " + F; ctx.textAlign = "left"; ctx.fillStyle = "#8a9099"; ctx.fillText("external angle θ", DM_ML + 2, DM_MT - 16);
     ctx.strokeStyle = AXIS; ctx.lineWidth = 0.75; ctx.strokeRect(DM_ML, DM_MT, DM_PW, DM_PH);
     colorbar(ctx, DM_ML + DM_PW + 16, DM_MT, 11, DM_PH, hotRGB, [{ f: 1, label: "max" }, { f: 0, label: "0" }], "A(ω,k)");
     ctx.fillStyle = INK; ctx.font = "600 11px " + F; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
     ctx.fillText("in-plane wavevector  k∥  (µm⁻¹)", DM_ML + DM_PW / 2, DM_CH - 8);
     ctx.save(); ctx.translate(15, DM_MT + DM_PH / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top"; ctx.fillText("energy  E  (eV)", 0, 0); ctx.restore();
+  }
+
+  // Cavity transmission map A(ω,Δ) as the cavity is tuned through the emitters (the Nature atom-mirror /
+  // circuit-QED spectroscopy figure): the same vacuum-Rabi anticrossing seen in transmission. For each
+  // detuning Δ = ω_c − ω_a the cavity spectral function peaks at the two polariton energies; the bright
+  // ridges anticross at Δ=0 with a minimum gap Ω_R = 2g√N. Ties live to the dynamics g, N, Γ(κ), σ dials.
+  function drawTransmissionMap() {
+    const cv = transMapCanvas.current; if (!cv) return;
+    const ctx = sized(cv, DM_CW, DM_CH);
+    const F = "Helvetica,Arial,sans-serif";
+    ctx.fillStyle = PANEL; ctx.fillRect(0, 0, DM_CW, DM_CH);
+    const G = dyn.g * Math.sqrt(Math.max(1, dyn.m));     // collective vacuum-Rabi coupling g√N
+    const kappa = Math.max(0.006, dyn.gamma);            // cavity linewidth (floored so razor-sharp ridges still render)
+    const gamma = 0.008 + dyn.sigma;                     // emitter linewidth incl. inhomogeneous broadening σ
+    const dmax = Math.max(0.12, 2.6 * G);                // detuning sweep half-range (units of ω_c)
+    const Epm = (d: number): [number, number] => { const h = (WA + d + WA) / 2, r = 0.5 * Math.sqrt(d * d + 4 * G * G); return [h - r, h + r]; };
+    let ylo = Infinity, yhi = -Infinity;
+    for (const d of [-dmax, 0, dmax]) { const [a, c] = Epm(d); ylo = Math.min(ylo, a); yhi = Math.max(yhi, c); }
+    const pad = (yhi - ylo) * 0.1 + 1e-3; ylo -= pad; yhi += pad;
+    const xOf = (d: number) => DM_ML + ((d + dmax) / (2 * dmax)) * DM_PW, yOf = (E: number) => DM_MT + (1 - (E - ylo) / (yhi - ylo)) * DM_PH;
+    if (!transMapOff.current) { const o = document.createElement("canvas"); o.width = DM_NX; o.height = DM_NY; transMapOff.current = o; }
+    const A = new Float64Array(DM_NX * DM_NY); let amax = 1e-12;
+    for (let ix = 0; ix < DM_NX; ix++) {
+      const d = -dmax + (ix / (DM_NX - 1)) * 2 * dmax, wc = WA + d;
+      for (let iy = 0; iy < DM_NY; iy++) {
+        const w = yhi - (iy / (DM_NY - 1)) * (yhi - ylo), a = w - wc, bb = w - WA;
+        const Dr = a * bb - (kappa * gamma) / 4 - G * G, Di = a * (gamma / 2) + bb * (kappa / 2);
+        const denom = Dr * Dr + Di * Di, im = ((gamma / 2) * Dr - bb * Di) / denom;
+        const val = Math.max(0, -im / Math.PI); A[iy * DM_NX + ix] = val; if (val > amax) amax = val;
+      }
+    }
+    const octx = transMapOff.current.getContext("2d")!, img = octx.createImageData(DM_NX, DM_NY);
+    for (let i = 0; i < A.length; i++) { const t = Math.pow(A[i]! / amax, 0.45), [r, g, bl] = hotRGB(t), o = i * 4; img.data[o] = r; img.data[o + 1] = g; img.data[o + 2] = bl; img.data[o + 3] = 255; }
+    octx.putImageData(img, 0, 0); ctx.imageSmoothingEnabled = true; ctx.drawImage(transMapOff.current, DM_ML, DM_MT, DM_PW, DM_PH);
+    // bare modes over the imshow: cavity line ω_c = ω_a + Δ (diagonal) and the flat emitter ω = ω_a
+    ctx.save(); ctx.setLineDash([5, 4]); ctx.lineWidth = 1;
+    ctx.strokeStyle = "rgba(110,180,235,0.55)"; ctx.beginPath(); ctx.moveTo(xOf(-dmax), yOf(WA - dmax)); ctx.lineTo(xOf(dmax), yOf(WA + dmax)); ctx.stroke();
+    ctx.strokeStyle = "rgba(245,150,150,0.55)"; ctx.beginPath(); ctx.moveTo(xOf(-dmax), yOf(WA)); ctx.lineTo(xOf(dmax), yOf(WA)); ctx.stroke();
+    ctx.restore();
+    // resonance guide + Ω_R gap callout at Δ=0
+    const [eL, eU] = Epm(0);
+    ctx.save(); ctx.setLineDash([2, 3]); ctx.lineWidth = 0.75; ctx.strokeStyle = "rgba(220,220,220,0.4)"; seg(ctx, xOf(0), DM_MT, xOf(0), DM_MT + DM_PH); ctx.restore();
+    ctx.strokeStyle = "rgba(245,178,90,0.9)"; ctx.lineWidth = 1.2; seg(ctx, xOf(0) + 16, yOf(eL), xOf(0) + 16, yOf(eU));
+    ctx.fillStyle = "#f5b25a"; ctx.font = "600 9px " + F; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+    ctx.fillText(`Ω_R = 2g√N = ${(2 * G).toFixed(3)}`, xOf(0) + 21, yOf((eL + eU) / 2));
+    // axes (light on the white margins), ticks, colourbar
+    ctx.fillStyle = DIM; ctx.font = "500 8.5px " + F; ctx.textAlign = "center"; ctx.textBaseline = "top";
+    for (let i = 0; i <= 6; i++) { const d = -dmax + (i / 6) * 2 * dmax, x = xOf(d); seg(ctx, x, DM_MT + DM_PH, x, DM_MT + DM_PH + 3); ctx.fillText(fmt(d, 2), x, DM_MT + DM_PH + 6); }
+    ctx.textAlign = "right"; ctx.textBaseline = "middle";
+    for (let t = 0; t <= 4; t++) { const E = ylo + (yhi - ylo) * t / 4; seg(ctx, DM_ML - 3, yOf(E), DM_ML, yOf(E)); ctx.fillText(E.toFixed(3), DM_ML - 6, yOf(E)); }
+    ctx.fillStyle = "#8a9099"; ctx.font = "600 8px " + F; ctx.textAlign = "left"; ctx.textBaseline = "bottom";
+    ctx.fillText("UP", xOf(dmax) - 16, yOf(Epm(dmax)[1]) - 3); ctx.fillText("LP", xOf(dmax) - 16, yOf(Epm(dmax)[0]) + 11);
+    ctx.strokeStyle = AXIS; ctx.lineWidth = 0.75; ctx.strokeRect(DM_ML, DM_MT, DM_PW, DM_PH);
+    colorbar(ctx, DM_ML + DM_PW + 16, DM_MT, 11, DM_PH, hotRGB, [{ f: 1, label: "max" }, { f: 0, label: "0" }], "T(ω,Δ)");
+    ctx.fillStyle = INK; ctx.font = "600 11px " + F; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+    ctx.fillText("cavity–emitter detuning  Δ = ω_c − ω_a  (units of ω_c)", DM_ML + DM_PW / 2, DM_CH - 8);
+    ctx.save(); ctx.translate(15, DM_MT + DM_PH / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top"; ctx.fillText("probe frequency  ω  (units of ω_c)", 0, 0); ctx.restore();
   }
 
   function updateHtcReadouts() {
@@ -1923,6 +1989,7 @@ export function App() {
             <Group title="EXCITON-POLARITON" k="disp" c={collapsed} t={toggle}>
               <Field sym="δ" texSym="\delta" label="cavity-exciton detuning" value={disp.delta} min={-0.04} max={0.04} step={0.002} unit="eV" tip="cavity-photon energy at k‖=0 minus the exciton energy, δ = E_cav(0) − E_exc (eV). δ<0 puts the photon below the exciton at normal incidence, so the anticrossing sits at a finite angle." onChange={(delta) => setDisp((s) => ({ ...s, delta }))} />
               <Field sym="2V" texSym="2V" label="vacuum-Rabi splitting" value={disp.rabi2V} min={0.002} max={0.04} step={0.001} unit="eV" tip="light-matter coupling, the minimum LP/UP gap at resonance (eV). Larger 2V opens a wider anticrossing." onChange={(rabi2V) => setDisp((s) => ({ ...s, rabi2V }))} />
+              <Field sym="κ" texSym="\kappa" label="cavity linewidth" value={disp.kappa} min={0.001} max={0.016} step={0.001} unit="eV" tip="cavity-photon linewidth κ (eV): the homogeneous broadening of the reflectivity-map branches. Small κ = razor-sharp polariton ridges (high-Q cavity); large κ = broad, washed-out branches that merge near the anticrossing." onChange={(kappa) => setDisp((s) => ({ ...s, kappa }))} />
             </Group>
           )}
         </aside>
@@ -2079,7 +2146,7 @@ export function App() {
                 <canvas ref={dispCanvas} className="cv" />
               </PlotWrap>
               <div className="pane-head">Angle-resolved reflectivity map · A(ω,k∥) = −(1/π) Im G_c · the dispersion as it is <i style={{ color: AMBER, fontStyle: "normal" }}>measured</i> · bare cavity <i style={{ color: "rgba(130,195,245,0.9)", fontStyle: "normal" }}>┄</i> · exciton <i style={{ color: "rgba(245,150,150,0.9)", fontStyle: "normal" }}>┄</i></div>
-              <div className="pane-sub"><b>What:</b> the same anticrossing, rendered the way a lab actually records it. For each in-plane wavevector k∥ (set by the collection angle θ) the cavity spectral function A(ω,k∥) peaks at the LP/UP energies; the two bright ridges are the polariton branches, the dark gap between them is the vacuum-Rabi splitting 2V. Intensity follows the photon (Hopfield) weight, so each branch brightens on its photon-like side. <b>Model:</b> input-output cavity Green's function, κ = 4 meV, γ = 1.5 meV linewidths.</div>
+              <div className="pane-sub"><b>What:</b> the same anticrossing, rendered the way a lab actually records it. For each in-plane wavevector k∥ (set by the collection angle θ) the cavity spectral function A(ω,k∥) peaks at the LP/UP energies; the two bright ridges are the polariton branches, the dark gap between them is the vacuum-Rabi splitting 2V. Intensity follows the photon (Hopfield) weight, so each branch brightens on its photon-like side. <b>Model:</b> input-output cavity Green's function, κ = {Math.round(disp.kappa * 1000)} meV (live), γ = 1.5 meV linewidths.</div>
               <div className="plotwrap"><canvas ref={dispMapCanvas} className="cv" /></div>
             </div>
           ) : (
@@ -2087,8 +2154,16 @@ export function App() {
               <div className="dyn-viewtabs">
                 <button className={dynView === "formation" ? "on" : ""} onClick={() => setDynView("formation")}>Polariton formation</button>
                 <button className={dynView === "dynamics" ? "on" : ""} onClick={() => setDynView("dynamics")}>▶ Live dynamics</button>
+                <button className={dynView === "transmission" ? "on" : ""} onClick={() => setDynView("transmission")}>Transmission map</button>
               </div>
-              {dynView === "formation" ? (
+              {dynView === "transmission" ? (
+                <div className="pane grow">
+                  <div className="pane-head">Cavity transmission spectroscopy · A(ω,Δ) as the cavity tunes through the emitters · the vacuum-Rabi anticrossing as it is <i style={{ color: AMBER, fontStyle: "normal" }}>measured</i> · bare cavity <i style={{ color: "rgba(110,180,235,0.95)", fontStyle: "normal" }}>┄</i> · emitter <i style={{ color: "rgba(245,150,150,0.95)", fontStyle: "normal" }}>┄</i></div>
+                  <PanelEqn t={"T(\\omega,\\Delta)\\propto-\\tfrac1\\pi\\,\\mathrm{Im}\\,\\frac{\\omega-\\omega_a+i\\gamma/2}{(\\omega-\\omega_c+i\\kappa/2)(\\omega-\\omega_a+i\\gamma/2)-G^2},\\quad G=g\\sqrt N"} where="input-output cavity Green's function; poles at the LP/UP energies, gap Ω_R=2g√N at Δ=0" />
+                  <div className="pane-sub"><b>What:</b> sweep the cavity across the emitter resonance and record what comes through. Each vertical slice is a transmission spectrum; the two bright ridges are the lower/upper polaritons, anticrossing at Δ=0 where they never touch, separated by the vacuum-Rabi gap Ω_R = 2g√N. Raise the cavity loss Γ to broaden the ridges, raise N or g to open the gap. <b>Live</b> from the same dials that drive the 3D and the populations.</div>
+                  <div className="plotwrap"><canvas ref={transMapCanvas} className="cv" /></div>
+                </div>
+              ) : dynView === "formation" ? (
                 <div className="pf-grid">
                   <div className="pf-left">
                     <div className="pane-head">Polariton formation · cavity photon + molecules → LP/UP · the coupling & detuning dials drive the live simulation</div>

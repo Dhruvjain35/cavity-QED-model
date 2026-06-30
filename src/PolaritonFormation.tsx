@@ -7,14 +7,14 @@
 // coupling/detuning dials drive the REAL simulation and the 3D hybrid stays in lockstep.
 import { useEffect, useMemo, useRef } from "react";
 
-const CY = "#1f77b4", RD = "#d62728", INKC = "#1a1a1a", DIMC = "#555555", AXISC = "#000000", GRID = "#e6e6e6", PANELC = "#ffffff", AMBER = "#ff7f0e";
+const CY = "#4ea0e0", RD = "#f0696b", INKC = "#d6d6d6", DIMC = "#9a9a9a", AXISC = "#8a8a8a", GRID = "#2d2d2d", PANELC = "#1e1e1e", AMBER = "#f0a23a";
 const F = "Helvetica,Arial,sans-serif";
 const dpr = () => Math.min(typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1, 2);
 const GMAX = 0.5, DX = 0.45, EY = 0.82; // FIXED axes so dragging coupling visibly GROWS the gap (no rescale)
 
 function mix(t: number) { // photon fraction 0 (matter, red) → 1 (photon, blue)
   const u = Math.max(0, Math.min(1, t));
-  const r = Math.round(214 * (1 - u) + 31 * u), g = Math.round(39 * (1 - u) + 119 * u), b = Math.round(40 * (1 - u) + 180 * u);
+  const r = Math.round(240 * (1 - u) + 78 * u), g = Math.round(105 * (1 - u) + 160 * u), b = Math.round(107 * (1 - u) + 224 * u);
   return `rgb(${r},${g},${b})`;
 }
 function polariton(delta: number, G: number) {
@@ -49,8 +49,8 @@ export function PolaritonFormation({ g, n, delta, onDelta, onG, selected, onSele
     ctx.strokeStyle = AXISC; ctx.lineWidth = 0.75; ctx.strokeRect(ML, MT, PW, PH);
     // bare modes (uncoupled): photon (cyan, sloped) + molecule (red, flat)
     ctx.setLineDash([4, 3]); ctx.lineWidth = 1.1;
-    ctx.strokeStyle = "rgba(31,119,180,0.5)"; ctx.beginPath(); ctx.moveTo(xOf(-DX), yOf(1 - DX)); ctx.lineTo(xOf(DX), yOf(1 + DX)); ctx.stroke();
-    ctx.strokeStyle = "rgba(214,39,40,0.5)"; ctx.beginPath(); ctx.moveTo(xOf(-DX), yOf(1)); ctx.lineTo(xOf(DX), yOf(1)); ctx.stroke();
+    ctx.strokeStyle = "rgba(110,180,235,0.6)"; ctx.beginPath(); ctx.moveTo(xOf(-DX), yOf(1 - DX)); ctx.lineTo(xOf(DX), yOf(1 + DX)); ctx.stroke();
+    ctx.strokeStyle = "rgba(245,140,140,0.6)"; ctx.beginPath(); ctx.moveTo(xOf(-DX), yOf(1)); ctx.lineTo(xOf(DX), yOf(1)); ctx.stroke();
     ctx.setLineDash([]);
     // polariton branches coloured by photon fraction
     const SEG = 200; ctx.lineWidth = 3;
@@ -63,7 +63,7 @@ export function PolaritonFormation({ g, n, delta, onDelta, onG, selected, onSele
     }
     // Ω_R gap at resonance
     const r0 = polariton(0, G), xg = xOf(0);
-    ctx.strokeStyle = "rgba(40,40,40,0.5)"; ctx.lineWidth = 1; ctx.setLineDash([2, 2]); ctx.beginPath(); ctx.moveTo(xg, yOf(r0.eUP)); ctx.lineTo(xg, yOf(r0.eLP)); ctx.stroke(); ctx.setLineDash([]);
+    ctx.strokeStyle = "rgba(220,220,220,0.55)"; ctx.lineWidth = 1; ctx.setLineDash([2, 2]); ctx.beginPath(); ctx.moveTo(xg, yOf(r0.eUP)); ctx.lineTo(xg, yOf(r0.eLP)); ctx.stroke(); ctx.setLineDash([]);
     ctx.fillStyle = INKC; ctx.font = `600 9px ${F}`; ctx.textAlign = "center"; ctx.textBaseline = "bottom"; ctx.fillText(`Ω_R = 2g√N = ${(2 * G).toFixed(3)}`, xg, yOf(r0.eUP) - 4);
     // operating point
     ctx.strokeStyle = "rgba(255,204,0,0.55)"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(xOf(delta), MT); ctx.lineTo(xOf(delta), MT + PH); ctx.stroke();
