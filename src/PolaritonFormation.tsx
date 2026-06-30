@@ -10,7 +10,7 @@ import { useEffect, useMemo, useRef } from "react";
 const CY = "#4ea0e0", RD = "#f0696b", INKC = "#d6d6d6", DIMC = "#9a9a9a", AXISC = "#8a8a8a", GRID = "#2d2d2d", PANELC = "#1e1e1e", AMBER = "#f0a23a";
 const F = "Helvetica,Arial,sans-serif";
 const dpr = () => Math.min(typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1, 2);
-const GMAX = 0.5, DX = 0.45, EY = 0.82; // FIXED axes so dragging coupling visibly GROWS the gap (no rescale)
+const GMAX = 0.5, DX = 0.45, EY0 = 0.82; // base half-height; the y-axis expands past this only when the gap demands it
 
 function mix(t: number) { // photon fraction 0 (matter, red) → 1 (photon, blue)
   const u = Math.max(0, Math.min(1, t));
@@ -30,10 +30,13 @@ export function PolaritonFormation({ g, n, delta, onDelta, onG, selected, onSele
   selected: "LP" | "UP" | null; onSelect: (b: "LP" | "UP" | null) => void;
 }) {
   const G = useMemo(() => g * Math.sqrt(Math.max(1, n)), [g, n]);
+  // adaptive half-height: at large g√N the branches at d=±DX reach 1 ± [DX/2 + √(DX²+4G²)/2]; grow the axis
+  // to contain them (plus headroom) so the LP/UP curves and their labels never spill out of the frame.
+  const ey = Math.max(EY0, DX / 2 + 0.5 * Math.sqrt(DX * DX + 4 * G * G) + 0.14);
   const cv = useRef<HTMLCanvasElement>(null);
   const CW = 600, CH = 430, ML = 52, MR = 36, MT = 18, MB = 36, PW = CW - ML - MR, PH = CH - MT - MB;
   const xOf = (d: number) => ML + ((d + DX) / (2 * DX)) * PW;
-  const yOf = (e: number) => MT + (1 - (e - (1 - EY)) / (2 * EY)) * PH;
+  const yOf = (e: number) => MT + (1 - (e - (1 - ey)) / (2 * ey)) * PH;
   const dAt = (px: number) => Math.max(-DX, Math.min(DX, ((px - ML) / PW) * 2 * DX - DX));
   const here = polariton(delta, G);
 
@@ -45,7 +48,7 @@ export function PolaritonFormation({ g, n, delta, onDelta, onG, selected, onSele
     ctx.strokeStyle = GRID; ctx.lineWidth = 0.5; ctx.font = `500 8.5px ${F}`; ctx.fillStyle = DIMC; ctx.textAlign = "center"; ctx.textBaseline = "top";
     for (let i = -2; i <= 2; i++) { const x = xOf(i * DX / 2); ctx.beginPath(); ctx.moveTo(x, MT); ctx.lineTo(x, MT + PH); ctx.stroke(); ctx.fillText((i * DX / 2).toFixed(2), x, MT + PH + 5); }
     ctx.textAlign = "right"; ctx.textBaseline = "middle";
-    for (let i = 0; i <= 4; i++) { const e = (1 - EY) + (i / 4) * 2 * EY, y = yOf(e); ctx.beginPath(); ctx.moveTo(ML, y); ctx.lineTo(ML + PW, y); ctx.stroke(); ctx.fillText(e.toFixed(2), ML - 6, y); }
+    for (let i = 0; i <= 4; i++) { const e = (1 - ey) + (i / 4) * 2 * ey, y = yOf(e); ctx.beginPath(); ctx.moveTo(ML, y); ctx.lineTo(ML + PW, y); ctx.stroke(); ctx.fillText(e.toFixed(2), ML - 6, y); }
     ctx.strokeStyle = AXISC; ctx.lineWidth = 0.75; ctx.strokeRect(ML, MT, PW, PH);
     // bare modes (uncoupled): photon (cyan, sloped) + molecule (red, flat)
     ctx.setLineDash([4, 3]); ctx.lineWidth = 1.1;
@@ -61,17 +64,24 @@ export function PolaritonFormation({ g, n, delta, onDelta, onG, selected, onSele
         ctx.strokeStyle = mix(pf0); ctx.beginPath(); ctx.moveTo(xOf(d0), yOf(e0)); ctx.lineTo(xOf(d1), yOf(e1)); ctx.stroke();
       }
     }
+    // label with a dark plate behind it so it stays legible over the branches/grid (never buried by a line)
+    const tag = (text: string, x: number, y: number, align: CanvasTextAlign, color: string, weight = 700, size = 10) => {
+      ctx.font = `${weight} ${size}px ${F}`; ctx.textBaseline = "middle"; const w = ctx.measureText(text).width, padx = 4, h = size + 6;
+      const bx = align === "left" ? x - padx : align === "right" ? x - w - padx : x - w / 2 - padx;
+      ctx.fillStyle = "rgba(18,18,18,0.82)"; ctx.fillRect(bx, y - h / 2, w + 2 * padx, h);
+      ctx.fillStyle = color; ctx.textAlign = align; ctx.fillText(text, x, y);
+    };
     // Ω_R gap at resonance
     const r0 = polariton(0, G), xg = xOf(0);
     ctx.strokeStyle = "rgba(220,220,220,0.55)"; ctx.lineWidth = 1; ctx.setLineDash([2, 2]); ctx.beginPath(); ctx.moveTo(xg, yOf(r0.eUP)); ctx.lineTo(xg, yOf(r0.eLP)); ctx.stroke(); ctx.setLineDash([]);
-    ctx.fillStyle = INKC; ctx.font = `600 9px ${F}`; ctx.textAlign = "center"; ctx.textBaseline = "bottom"; ctx.fillText(`Ω_R = 2g√N = ${(2 * G).toFixed(3)}`, xg, yOf(r0.eUP) - 4);
+    tag(`Ω_R = 2g√N = ${(2 * G).toFixed(3)}`, xg, yOf(r0.eUP) - 11, "center", INKC, 600, 9);
     // operating point
     ctx.strokeStyle = "rgba(255,204,0,0.55)"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(xOf(delta), MT); ctx.lineTo(xOf(delta), MT + PH); ctx.stroke();
     for (const [name, e, pf] of [["UP", here.eUP, here.pfUP], ["LP", here.eLP, here.pfLP]] as const) {
       const x = xOf(delta), y = yOf(e), sel = selected === name;
       ctx.beginPath(); ctx.arc(x, y, sel ? 7 : 5, 0, 2 * Math.PI); ctx.fillStyle = mix(pf); ctx.fill();
       if (sel) { ctx.strokeStyle = AMBER; ctx.lineWidth = 1.8; ctx.beginPath(); ctx.arc(x, y, 10, 0, 2 * Math.PI); ctx.stroke(); }
-      ctx.fillStyle = INKC; ctx.font = `700 10px ${F}`; ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.fillText(name, x + 13, y);
+      tag(name, x + 13, y, "left", sel ? AMBER : INKC, 700, 10);
     }
     ctx.fillStyle = DIMC; ctx.font = `600 9px ${F}`; ctx.textAlign = "center"; ctx.textBaseline = "bottom";
     ctx.fillText("detuning  Δ = ω_c − ω_a  (units of ω_a)", ML + PW / 2, CH - 3);

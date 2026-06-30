@@ -115,9 +115,12 @@ const ET_CW = ET_ML + ET_PW + ET_MR, ET_CH = ET_MT + ET_PH + ET_MB;
 const DP_ML = 66, DP_MR = 22, DP_MT = 30, DP_MB = 40, DP_PW = 900, DP_PH = 430; // exciton-polariton dispersion E(k‖), twin angle axis on top
 const DP_CW = DP_ML + DP_PW + DP_MR, DP_CH = DP_MT + DP_PH + DP_MB;
 // angle-resolved reflectivity / spectral-function map A(ω,k‖): the measured exciton-polariton dispersion,
-// a hot-colormap imshow inside a white figure (the Nature/PRL angle-resolved spectroscopy convention).
+// an inferno imshow inside the dark figure (the Nature/PRL angle-resolved spectroscopy convention).
 const DM_ML = 58, DM_MR = 72, DM_MT = 28, DM_MB = 40, DM_PW = 860, DM_PH = 330, DM_NX = 220, DM_NY = 200;
 const DM_CW = DM_ML + DM_PW + DM_MR, DM_CH = DM_MT + DM_PH + DM_MB;
+// line-cut companion: the transmission spectrum T(ω) at the current detuning (the 2D map's vertical slice)
+const TC_ML = 46, TC_MR = 14, TC_MT = 16, TC_MB = 30, TC_PW = 470, TC_PH = 226;
+const TC_CW = TC_ML + TC_PW + TC_MR, TC_CH = TC_MT + TC_PH + TC_MB;
 const HTC_GRID = 760; // absorption-spectrum sampling points
 const MX_S = 196; // live Hamiltonian heatmap size (px)
 
@@ -172,12 +175,27 @@ function husimiImage(q: Float64Array, n: number, qmax: number): ImageData {
   }
   return new ImageData(px, n, n);
 }
-// matplotlib 'hot' colormap (black → red → orange → yellow → white): the standard intensity ramp for
-// angle-resolved reflectivity / spectroscopy heatmaps. t in [0,1].
-function hotRGB(t: number): [number, number, number] {
+// matplotlib 'inferno' colormap (black → indigo → magenta → orange → pale yellow): the modern, perceptually
+// uniform intensity ramp used for angle-resolved reflectivity / spectroscopy heatmaps. Anchored + lerped.
+const INFERNO: [number, number, number, number][] = [
+  [0.00, 0, 0, 4], [0.10, 12, 8, 38], [0.20, 36, 12, 79], [0.30, 66, 10, 104], [0.40, 98, 20, 110],
+  [0.50, 130, 31, 107], [0.60, 164, 45, 96], [0.70, 196, 60, 78], [0.80, 224, 93, 56], [0.87, 237, 121, 41],
+  [0.93, 248, 168, 30], [1.00, 252, 255, 164],
+];
+function infernoRGB(t: number): [number, number, number] {
   t = clamp(t, 0, 1);
-  const r = clamp(t / 0.365, 0, 1), g = clamp((t - 0.365) / (0.746 - 0.365), 0, 1), b = clamp((t - 0.746) / (1 - 0.746), 0, 1);
-  return [Math.round(255 * r), Math.round(255 * g), Math.round(255 * b)];
+  let i = 0; while (i < INFERNO.length - 2 && t > INFERNO[i + 1]![0]) i++;
+  const a = INFERNO[i]!, b = INFERNO[i + 1]!, s = (t - a[0]) / (b[0] - a[0] || 1);
+  return [Math.round(a[1] + (b[1] - a[1]) * s), Math.round(a[2] + (b[2] - a[2]) * s), Math.round(a[3] + (b[3] - a[3]) * s)];
+}
+// floating label with a translucent dark plate behind it, so on-plot annotations stay legible over any
+// curve or grid (the fix for text being swallowed by a line). Returns nothing; draws at (x,y).
+function plate(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, align: CanvasTextAlign, color: string, font = "700 10px Helvetica,Arial,sans-serif") {
+  ctx.font = font; ctx.textAlign = align; ctx.textBaseline = "middle";
+  const w = ctx.measureText(text).width, padx = 4, h = 14;
+  const bx = align === "left" ? x - padx : align === "right" ? x - w - padx : x - w / 2 - padx;
+  ctx.fillStyle = "rgba(18,18,18,0.8)"; ctx.fillRect(bx, y - h / 2, w + 2 * padx, h);
+  ctx.fillStyle = color; ctx.fillText(text, x, y);
 }
 
 type SweepCol = { x: number; eigs: Float64Array; photon: Float64Array };
@@ -284,6 +302,7 @@ export function App() {
   const htcCanvas = useRef<HTMLCanvasElement>(null), vibCompareCanvas = useRef<HTMLCanvasElement>(null), etCanvas = useRef<HTMLCanvasElement>(null), dispCanvas = useRef<HTMLCanvasElement>(null);
   const dispMapCanvas = useRef<HTMLCanvasElement>(null), dispMapOff = useRef<HTMLCanvasElement | null>(null); // angle-resolved reflectivity heatmap + its NX×NY offscreen
   const transMapCanvas = useRef<HTMLCanvasElement>(null), transMapOff = useRef<HTMLCanvasElement | null>(null); // transmission-vs-detuning anticrossing heatmap (dynamics) + offscreen
+  const transCutCanvas = useRef<HTMLCanvasElement>(null); // transmission line-cut T(ω) at the current detuning
   const htcData = useRef<{ live: { eigs: Float64Array; photon: Float64Array; absorption: Float64Array }; fc: { pos: Float64Array; weight: Float64Array }; nVib: number; method: string } | null>(null);
   const offscreen = useRef<HTMLCanvasElement | null>(null), husimiOff = useRef<HTMLCanvasElement | null>(null), bridgeOff = useRef<HTMLCanvasElement | null>(null);
   const quantum = useRef<Quantum | null>(null);
@@ -342,7 +361,7 @@ export function App() {
     else if (r === "cavity") { drawCavity(); drawStopband(); drawCollective(); }
     else if (r === "vibronic") { drawHtc(); drawMatrix(); drawVibronicCompare(); drawDisorder(); drawETrate(); }
     else if (r === "dispersion") { drawDispersion(); drawDispersionMap(); }
-    else if (r === "dynamics" && dynViewRef.current === "transmission") drawTransmissionMap();
+    else if (r === "dynamics" && dynViewRef.current === "transmission") { drawTransmissionMap(); drawTransCut(); }
     else singleDirty.current = true; // single + dynamics run a RAF loop that redraws on the next frame
   };
   useEffect(() => {
@@ -474,8 +493,8 @@ export function App() {
   }, [regime, disp]);
   // dynamics transmission map is closed-form (analytic cavity Green's function): redraw on tab/view entry
   // and whenever the coupling g, ensemble size N, cavity loss Γ or disorder σ change.
-  useEffect(() => { if (regime === "dynamics" && dynView === "transmission") drawTransmissionMap(); // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [regime, dynView, dyn.g, dyn.m, dyn.gamma, dyn.sigma]);
+  useEffect(() => { if (regime === "dynamics" && dynView === "transmission") { drawTransmissionMap(); drawTransCut(); } // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [regime, dynView, dyn.g, dyn.m, dyn.gamma, dyn.sigma, dyn.detuning]);
 
   useEffect(() => {
     dpr.current = Math.min(window.devicePixelRatio || 1, 2);
@@ -1550,11 +1569,12 @@ export function App() {
     const photLP = (i: number) => hopfield(Ecav[i]! - Eexc, V).C2, photUP = (i: number) => hopfield(Ecav[i]! - Eexc, V).X2;
     branch(ELP, photLP); branch(EUP, photUP);
     ctx.font = "700 10px " + F; ctx.textAlign = "left"; ctx.textBaseline = "middle";
-    ctx.fillStyle = lerpHex(RED, CYAN, photLP(M - 1)); ctx.fillText("LP", xOf(kmax) + 5, yOf(ELP[M - 1]!));
-    ctx.fillStyle = lerpHex(RED, CYAN, photUP(M - 1)); ctx.fillText("UP", xOf(kmax) + 5, yOf(EUP[M - 1]!));
     ctx.strokeStyle = AXIS; ctx.lineWidth = 0.75; ctx.strokeRect(DP_ML, DP_MT, DP_PW, DP_PH);
-    ctx.fillStyle = CYAN; ctx.font = "600 8.5px " + F; ctx.textAlign = "right"; ctx.textBaseline = "top"; ctx.fillText(`2V = ${Math.round(disp.rabi2V * 1000)} meV · δ = ${Math.round(disp.delta * 1000)} meV`, DP_ML + DP_PW - 7, DP_MT + 5);
-    ctx.textAlign = "left"; ctx.fillStyle = CYAN; ctx.fillText("photon-like", DP_ML + 7, DP_MT + 5); ctx.fillStyle = RED; ctx.fillText("exciton-like", DP_ML + 70, DP_MT + 5);
+    plate(ctx, "LP", xOf(kmax) + 5, yOf(ELP[M - 1]!), "left", lerpHex(RED, CYAN, photLP(M - 1)), "700 10px " + F);
+    plate(ctx, "UP", xOf(kmax) + 5, yOf(EUP[M - 1]!), "left", lerpHex(RED, CYAN, photUP(M - 1)), "700 10px " + F);
+    plate(ctx, `2V = ${Math.round(disp.rabi2V * 1000)} meV · δ = ${Math.round(disp.delta * 1000)} meV`, DP_ML + DP_PW - 7, DP_MT + 11, "right", CYAN, "600 8.5px " + F);
+    plate(ctx, "photon-like", DP_ML + 8, DP_MT + 11, "left", CYAN, "600 8.5px " + F);
+    plate(ctx, "exciton-like", DP_ML + 98, DP_MT + 11, "left", RED, "600 8.5px " + F);
     ctx.fillStyle = INK; ctx.font = "600 11px " + F; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic"; ctx.fillText("in-plane wavevector  k∥  (µm⁻¹)", DP_ML + DP_PW / 2, DP_CH - 8);
     ctx.save(); ctx.translate(17, DP_MT + DP_PH / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top"; ctx.fillText("energy  E  (eV)", 0, 0); ctx.restore();
   }
@@ -1592,7 +1612,7 @@ export function App() {
     }
     const octx = dispMapOff.current.getContext("2d")!, img = octx.createImageData(DM_NX, DM_NY);
     for (let i = 0; i < A.length; i++) {
-      const t = Math.pow(A[i]! / amax, 0.45), [r, g, bl] = hotRGB(t), o = i * 4;  // γ=0.45 brightens mid-tones
+      const t = Math.pow(A[i]! / amax, 0.45), [r, g, bl] = infernoRGB(t), o = i * 4;  // γ=0.45 brightens mid-tones
       img.data[o] = r; img.data[o + 1] = g; img.data[o + 2] = bl; img.data[o + 3] = 255;
     }
     octx.putImageData(img, 0, 0);
@@ -1612,7 +1632,7 @@ export function App() {
     for (const th of [0, 10, 20, 30, 45, 60]) { const k = angleToK(Eexc, th); if (k <= kmax) { const x = xOf(k); ctx.strokeStyle = "#8a9099"; ctx.lineWidth = 0.6; seg(ctx, x, DM_MT, x, DM_MT - 4); ctx.fillStyle = "#8a9099"; ctx.fillText(th + "°", x, DM_MT - 5); } }
     ctx.font = "600 8px " + F; ctx.textAlign = "left"; ctx.fillStyle = "#8a9099"; ctx.fillText("external angle θ", DM_ML + 2, DM_MT - 16);
     ctx.strokeStyle = AXIS; ctx.lineWidth = 0.75; ctx.strokeRect(DM_ML, DM_MT, DM_PW, DM_PH);
-    colorbar(ctx, DM_ML + DM_PW + 16, DM_MT, 11, DM_PH, hotRGB, [{ f: 1, label: "max" }, { f: 0, label: "0" }], "A(ω,k)");
+    colorbar(ctx, DM_ML + DM_PW + 16, DM_MT, 11, DM_PH, infernoRGB, [{ f: 1, label: "max" }, { f: 0, label: "0" }], "A(ω,k)");
     ctx.fillStyle = INK; ctx.font = "600 11px " + F; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
     ctx.fillText("in-plane wavevector  k∥  (µm⁻¹)", DM_ML + DM_PW / 2, DM_CH - 8);
     ctx.save(); ctx.translate(15, DM_MT + DM_PH / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top"; ctx.fillText("energy  E  (eV)", 0, 0); ctx.restore();
@@ -1648,7 +1668,7 @@ export function App() {
       }
     }
     const octx = transMapOff.current.getContext("2d")!, img = octx.createImageData(DM_NX, DM_NY);
-    for (let i = 0; i < A.length; i++) { const t = Math.pow(A[i]! / amax, 0.45), [r, g, bl] = hotRGB(t), o = i * 4; img.data[o] = r; img.data[o + 1] = g; img.data[o + 2] = bl; img.data[o + 3] = 255; }
+    for (let i = 0; i < A.length; i++) { const t = Math.pow(A[i]! / amax, 0.45), [r, g, bl] = infernoRGB(t), o = i * 4; img.data[o] = r; img.data[o + 1] = g; img.data[o + 2] = bl; img.data[o + 3] = 255; }
     octx.putImageData(img, 0, 0); ctx.imageSmoothingEnabled = true; ctx.drawImage(transMapOff.current, DM_ML, DM_MT, DM_PW, DM_PH);
     // bare modes over the imshow: cavity line ω_c = ω_a + Δ (diagonal) and the flat emitter ω = ω_a
     ctx.save(); ctx.setLineDash([5, 4]); ctx.lineWidth = 1;
@@ -1658,9 +1678,12 @@ export function App() {
     // resonance guide + Ω_R gap callout at Δ=0
     const [eL, eU] = Epm(0);
     ctx.save(); ctx.setLineDash([2, 3]); ctx.lineWidth = 0.75; ctx.strokeStyle = "rgba(220,220,220,0.4)"; seg(ctx, xOf(0), DM_MT, xOf(0), DM_MT + DM_PH); ctx.restore();
-    ctx.strokeStyle = "rgba(245,178,90,0.9)"; ctx.lineWidth = 1.2; seg(ctx, xOf(0) + 16, yOf(eL), xOf(0) + 16, yOf(eU));
-    ctx.fillStyle = "#f5b25a"; ctx.font = "600 9px " + F; ctx.textAlign = "left"; ctx.textBaseline = "middle";
-    ctx.fillText(`Ω_R = 2g√N = ${(2 * G).toFixed(3)}`, xOf(0) + 21, yOf((eL + eU) / 2));
+    ctx.strokeStyle = "rgba(245,178,90,0.95)"; ctx.lineWidth = 1.2; seg(ctx, xOf(0) + 16, yOf(eL), xOf(0) + 16, yOf(eU));
+    plate(ctx, `Ω_R = 2g√N = ${(2 * G).toFixed(3)}`, xOf(0) + 22, yOf((eL + eU) / 2), "left", "#f5c97a", "600 9px " + F);
+    // live detuning cursor: marks the column the line-cut spectrum is taken from (follows the Δ dial)
+    const dcur = clamp(dyn.detuning ?? 0, -dmax, dmax);
+    ctx.strokeStyle = "rgba(120,200,255,0.85)"; ctx.lineWidth = 1; seg(ctx, xOf(dcur), DM_MT, xOf(dcur), DM_MT + DM_PH);
+    plate(ctx, "Δ slice", xOf(dcur), DM_MT + 9, "center", "#9cd2ff", "600 8px " + F);
     // axes (light on the white margins), ticks, colourbar
     ctx.fillStyle = DIM; ctx.font = "500 8.5px " + F; ctx.textAlign = "center"; ctx.textBaseline = "top";
     for (let i = 0; i <= 6; i++) { const d = -dmax + (i / 6) * 2 * dmax, x = xOf(d); seg(ctx, x, DM_MT + DM_PH, x, DM_MT + DM_PH + 3); ctx.fillText(fmt(d, 2), x, DM_MT + DM_PH + 6); }
@@ -1669,10 +1692,49 @@ export function App() {
     ctx.fillStyle = "#8a9099"; ctx.font = "600 8px " + F; ctx.textAlign = "left"; ctx.textBaseline = "bottom";
     ctx.fillText("UP", xOf(dmax) - 16, yOf(Epm(dmax)[1]) - 3); ctx.fillText("LP", xOf(dmax) - 16, yOf(Epm(dmax)[0]) + 11);
     ctx.strokeStyle = AXIS; ctx.lineWidth = 0.75; ctx.strokeRect(DM_ML, DM_MT, DM_PW, DM_PH);
-    colorbar(ctx, DM_ML + DM_PW + 16, DM_MT, 11, DM_PH, hotRGB, [{ f: 1, label: "max" }, { f: 0, label: "0" }], "T(ω,Δ)");
+    colorbar(ctx, DM_ML + DM_PW + 16, DM_MT, 11, DM_PH, infernoRGB, [{ f: 1, label: "max" }, { f: 0, label: "0" }], "T(ω,Δ)");
     ctx.fillStyle = INK; ctx.font = "600 11px " + F; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
     ctx.fillText("cavity–emitter detuning  Δ = ω_c − ω_a  (units of ω_c)", DM_ML + DM_PW / 2, DM_CH - 8);
     ctx.save(); ctx.translate(15, DM_MT + DM_PH / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top"; ctx.fillText("probe frequency  ω  (units of ω_c)", 0, 0); ctx.restore();
+  }
+
+  // transmission line-cut: a single vertical slice of the 2D map at the live detuning Δ, i.e. the spectrum
+  // you would record on a probe sweep, the vacuum-Rabi doublet. Two peaks at the polariton energies E±,
+  // separated by Ω_R at Δ=0; they pull apart and trade height (photon weight) as Δ moves off resonance.
+  function drawTransCut() {
+    const cv = transCutCanvas.current; if (!cv) return;
+    const ctx = sized(cv, TC_CW, TC_CH);
+    const F = "Helvetica,Arial,sans-serif";
+    ctx.fillStyle = PANEL; ctx.fillRect(0, 0, TC_CW, TC_CH);
+    const G = dyn.g * Math.sqrt(Math.max(1, dyn.m)), kappa = Math.max(0.006, dyn.gamma), gamma = 0.008 + dyn.sigma;
+    const d = dyn.detuning ?? 0, wc = WA + d, half = (wc + WA) / 2, r = 0.5 * Math.sqrt(d * d + 4 * G * G);
+    const eL = half - r, eU = half + r, span = Math.max(2 * G + (kappa + gamma) * 2, 0.08) * 1.5, wlo = half - span / 2, whi = half + span / 2;
+    const N = 480, pts: [number, number][] = []; let tmax = 1e-9;
+    for (let i = 0; i < N; i++) {
+      const w = wlo + (i / (N - 1)) * (whi - wlo), a = w - wc, bb = w - WA;
+      const Dr = a * bb - (kappa * gamma) / 4 - G * G, Di = a * (gamma / 2) + bb * (kappa / 2), denom = Dr * Dr + Di * Di;
+      const v = Math.max(0, -(((gamma / 2) * Dr - bb * Di) / denom) / Math.PI); pts.push([w, v]); if (v > tmax) tmax = v;
+    }
+    const xOf = (w: number) => TC_ML + ((w - wlo) / (whi - wlo)) * TC_PW, yOf = (t: number) => TC_MT + (1 - t / tmax) * TC_PH;
+    ctx.strokeStyle = GRIDLINE; ctx.lineWidth = 0.5; ctx.font = "500 8.5px " + F; ctx.fillStyle = DIM; ctx.textAlign = "right"; ctx.textBaseline = "middle";
+    for (let t = 0; t <= 2; t++) { const y = TC_MT + (1 - t / 2) * TC_PH; seg(ctx, TC_ML, y, TC_ML + TC_PW, y); ctx.fillText(t === 0 ? "0" : t === 2 ? "max" : "", TC_ML - 5, y); }
+    ctx.textAlign = "center"; ctx.textBaseline = "top";
+    for (let i = 0; i <= 4; i++) { const w = wlo + (i / 4) * (whi - wlo), x = xOf(w); seg(ctx, x, TC_MT + TC_PH, x, TC_MT + TC_PH + 3); ctx.fillText(fmt(w, 2), x, TC_MT + TC_PH + 5); }
+    // bare-mode guides (cavity ω_c, emitter ω_a)
+    ctx.save(); ctx.setLineDash([2, 3]); ctx.lineWidth = 0.75;
+    ctx.strokeStyle = "rgba(110,180,235,0.5)"; seg(ctx, xOf(wc), TC_MT, xOf(wc), TC_MT + TC_PH);
+    ctx.strokeStyle = "rgba(245,150,150,0.5)"; seg(ctx, xOf(WA), TC_MT, xOf(WA), TC_MT + TC_PH); ctx.restore();
+    // filled spectrum (warm, to match the inferno map)
+    ctx.beginPath(); ctx.moveTo(xOf(wlo), yOf(0)); for (const [w, v] of pts) ctx.lineTo(xOf(w), yOf(v)); ctx.lineTo(xOf(whi), yOf(0)); ctx.closePath();
+    ctx.fillStyle = "rgba(245,168,60,0.16)"; ctx.fill();
+    ctx.beginPath(); pts.forEach(([w, v], i) => (i ? ctx.lineTo(xOf(w), yOf(v)) : ctx.moveTo(xOf(w), yOf(v)))); ctx.strokeStyle = "#f5a83c"; ctx.lineWidth = 1.8; ctx.stroke();
+    // peak markers + LP/UP plates (evaluate T exactly at each polariton energy)
+    const Tat = (w: number) => { const a = w - wc, bb = w - WA, Dr = a * bb - (kappa * gamma) / 4 - G * G, Di = a * (gamma / 2) + bb * (kappa / 2); return Math.max(0, -(((gamma / 2) * Dr - bb * Di) / (Dr * Dr + Di * Di)) / Math.PI); };
+    for (const [name, e] of [["UP", eU], ["LP", eL]] as const) { const x = xOf(e); ctx.fillStyle = "#f5c97a"; ctx.beginPath(); ctx.arc(x, yOf(Tat(e)), 2.6, 0, 2 * Math.PI); ctx.fill(); plate(ctx, name, x, TC_MT + 9, "center", "#f5c97a", "700 9px " + F); }
+    ctx.strokeStyle = AXIS; ctx.lineWidth = 0.75; ctx.strokeRect(TC_ML, TC_MT, TC_PW, TC_PH);
+    plate(ctx, `Ω_R = ${(2 * G).toFixed(3)}`, TC_ML + TC_PW - 6, TC_MT + 10, "right", INK, "600 9px " + F);
+    ctx.fillStyle = DIM; ctx.font = "600 9px " + F; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic"; ctx.fillText("probe frequency  ω  (units of ω_c)", TC_ML + TC_PW / 2, TC_CH - 6);
+    ctx.save(); ctx.translate(13, TC_MT + TC_PH / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top"; ctx.fillText("transmission  T", 0, 0); ctx.restore();
   }
 
   function updateHtcReadouts() {
@@ -2157,11 +2219,33 @@ export function App() {
                 <button className={dynView === "transmission" ? "on" : ""} onClick={() => setDynView("transmission")}>Transmission map</button>
               </div>
               {dynView === "transmission" ? (
-                <div className="pane grow">
-                  <div className="pane-head">Cavity transmission spectroscopy · A(ω,Δ) as the cavity tunes through the emitters · the vacuum-Rabi anticrossing as it is <i style={{ color: AMBER, fontStyle: "normal" }}>measured</i> · bare cavity <i style={{ color: "rgba(110,180,235,0.95)", fontStyle: "normal" }}>┄</i> · emitter <i style={{ color: "rgba(245,150,150,0.95)", fontStyle: "normal" }}>┄</i></div>
-                  <PanelEqn t={"T(\\omega,\\Delta)\\propto-\\tfrac1\\pi\\,\\mathrm{Im}\\,\\frac{\\omega-\\omega_a+i\\gamma/2}{(\\omega-\\omega_c+i\\kappa/2)(\\omega-\\omega_a+i\\gamma/2)-G^2},\\quad G=g\\sqrt N"} where="input-output cavity Green's function; poles at the LP/UP energies, gap Ω_R=2g√N at Δ=0" />
-                  <div className="pane-sub"><b>What:</b> sweep the cavity across the emitter resonance and record what comes through. Each vertical slice is a transmission spectrum; the two bright ridges are the lower/upper polaritons, anticrossing at Δ=0 where they never touch, separated by the vacuum-Rabi gap Ω_R = 2g√N. Raise the cavity loss Γ to broaden the ridges, raise N or g to open the gap. <b>Live</b> from the same dials that drive the 3D and the populations.</div>
-                  <div className="plotwrap"><canvas ref={transMapCanvas} className="cv" /></div>
+                <div className="trans-view">
+                  <div className="pane grow">
+                    <div className="pane-head">Cavity transmission spectroscopy · A(ω,Δ) as the cavity tunes through the emitters · the vacuum-Rabi anticrossing as it is <i style={{ color: AMBER, fontStyle: "normal" }}>measured</i> · bare cavity <i style={{ color: "rgba(110,180,235,0.95)", fontStyle: "normal" }}>┄</i> · emitter <i style={{ color: "rgba(245,150,150,0.95)", fontStyle: "normal" }}>┄</i></div>
+                    <PanelEqn t={"T(\\omega,\\Delta)\\propto-\\tfrac1\\pi\\,\\mathrm{Im}\\,\\frac{\\omega-\\omega_a+i\\gamma/2}{(\\omega-\\omega_c+i\\kappa/2)(\\omega-\\omega_a+i\\gamma/2)-G^2},\\quad G=g\\sqrt N"} where="input-output cavity Green's function; poles at the LP/UP energies, gap Ω_R=2g√N at Δ=0" />
+                    <div className="pane-sub"><b>What:</b> sweep the cavity across the emitter resonance and record what comes through. Each vertical slice is a transmission spectrum; the two bright ridges are the lower/upper polaritons, anticrossing at Δ=0 where they never touch, separated by the vacuum-Rabi gap Ω_R = 2g√N. Raise the cavity loss Γ to broaden the ridges, raise N or g to open the gap. The <span style={{ color: "#9cd2ff" }}>Δ slice</span> marker is the spectrum drawn below; drag the detuning dial to move it. <b>Live</b> from the same dials that drive the 3D and the populations.</div>
+                    <div className="plotwrap"><canvas ref={transMapCanvas} className="cv" /></div>
+                  </div>
+                  <div className="trans-bottom">
+                    <div className="pane">
+                      <div className="pane-head">Transmission line-cut · T(ω) at the live detuning Δ = {fmt((dyn.detuning ?? 0), 3)} ω_c · the probe spectrum, a vacuum-Rabi doublet</div>
+                      <div className="plotwrap"><canvas ref={transCutCanvas} className="cv" /></div>
+                    </div>
+                    {(() => {
+                      const G = dyn.g * Math.sqrt(Math.max(1, dyn.m)), kap = Math.max(0.006, dyn.gamma), gam = 0.008 + dyn.sigma;
+                      const coop = (G * G) / (kap * gam), strong = 2 * G > (kap + gam) / 2;
+                      return (
+                        <div className="trans-readouts">
+                          <div className="tr-head">cavity QED figures of merit</div>
+                          <div className="tr-card"><span className="tr-k">vacuum-Rabi Ω<sub>R</sub> = 2g√N</span><span className="tr-v">{(2 * G).toFixed(3)}<i> ω_c</i></span></div>
+                          <div className="tr-card"><span className="tr-k">collective cooperativity C = G²/κγ</span><span className="tr-v">{coop >= 100 ? coop.toExponential(1) : coop.toFixed(1)}</span></div>
+                          <div className="tr-card"><span className="tr-k">cavity quality Q ≈ ω<sub>c</sub>/κ</span><span className="tr-v">{Math.round(1 / kap)}</span></div>
+                          <div className={"tr-card tr-regime " + (strong ? "tr-strong" : "tr-weak")}><span className="tr-k">coupling regime</span><span className="tr-v">{strong ? "STRONG" : "WEAK"}</span></div>
+                          <div className="tr-note">{strong ? "Ω_R exceeds the mean linewidth (κ+γ)/2: the doublet is resolved, energy reverses between light and matter before it leaks." : "the loss outruns the coupling: the peaks merge into one, energy leaks before a full Rabi cycle."}</div>
+                        </div>
+                      );
+                    })()}
+                  </div>
                 </div>
               ) : dynView === "formation" ? (
                 <div className="pf-grid">
