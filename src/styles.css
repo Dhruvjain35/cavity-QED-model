@@ -1,24 +1,28 @@
-/* Cavity-QED computational workbench. Light, neutral application chrome in the COMSOL / MATLAB /
-   Origin / QuTiP-matplotlib lineage: the one dark surface is the 3D viewport; everything else is
-   achromatic gray with a single restrained selection-blue accent. Native system sans for all
-   UI/labels/axes, tabular mono for numbers, KaTeX for equations. Zero radii, single-pixel rules,
-   no glows. Colour (matplotlib tab10) is rationed to plotted physics only: blue photons / red
-   excitons / orange phonons / purple dark / green calibration. */
+/* Cavity-QED computational workbench. Professional dark chrome in the VS Code / IBM Quantum Composer /
+   enterprise-instrument lineage: graphite panels (#1e1e1e / #252526 / #2d2d30), 1px hairline borders,
+   a single restrained selection-blue accent, system sans for UI and mono for numbers/code. The PLOTS
+   are the exception: matplotlib/QuTiP figures keep a WHITE face so published-grade physics pops on the
+   dark UI (the Jaynes-Cummings convention). Colour (matplotlib tab10 on white; hot/inferno on the 2D
+   intensity maps) is rationed to plotted physics only: blue photons / red excitons / orange phonons. */
 :root {
-  /* light, neutral application chrome (COMSOL / MATLAB / Origin convention); colour is rationed to the
-     plotted physics only. Surfaces achromatic; a single restrained selection-blue is the only accent. */
-  --app-bg: #f0f0f0; --bg: #f0f0f0; --panel: #f6f6f6; --panel-2: #ececec; --surface: #ffffff;
-  --rule: #d0d0d0; --rule-2: #c0c0c0; --rule-soft: #e4e4e4;
-  --ink: #1a1a1a; --dim: #555555; --faint: #8a8a8a; --axis: #000000;
-  --accent: #0078d4; --accent-fill: #cde2f5; --accent-edge: #3399ff;
+  /* graphite application chrome (VS Code Dark+ / enterprise dashboard). Surfaces are charcoal, never pure
+     black; a single VS Code selection-blue is the only accent. Plot canvases paint their own white face
+     in JS, so --surface stays a dark elevated UI tone without affecting the figures. */
+  --app-bg: #1e1e1e; --bg: #1e1e1e; --panel: #252526; --panel-2: #2d2d30; --surface: #2d2d30;
+  --rule: #3e3e42; --rule-2: #4d4d50; --rule-soft: #333336;
+  --ink: #d4d4d4; --dim: #9d9d9d; --faint: #6e7177; --axis: #000000;
+  --accent: #3794ff; --accent-fill: #094771; --accent-edge: #2b6cb0;
+  --input: #3c3c3c;
   --viewport: #1e1e1e; --viewport-2: #252526;
   /* labels/overlays that sit ON the dark 3D viewport: muted, legible, no neon glow */
-  --vp-panel: rgba(37, 37, 38, 0.95); --vp-ink: #d6d6d6; --vp-dim: #9aa4b0; --vp-field: #5aa9dd; --vp-matter: #e8915a;
+  --vp-panel: rgba(45, 45, 48, 0.95); --vp-ink: #d6d6d6; --vp-dim: #9aa4b0; --vp-field: #5aa9dd; --vp-matter: #e8915a;
   /* data colours = matplotlib tab10; used ONLY in plot series / legends / composition bars, never as chrome */
   --cyan: #1f77b4; --red: #d62728; --amber: #ff7f0e; --purple: #9467bd; --green: #2ca02c;
   --cobalt: #1f77b4; --crimson: #d62728; --emerald: #2ca02c;
-  /* native system sans (matches matplotlib/Arial axis output); tabular mono for numbers; KaTeX for math */
-  --sans: Arial, "Helvetica Neue", "Segoe UI", system-ui, -apple-system, "Liberation Sans", sans-serif;
+  /* brighter on-dark variants for the few coloured CHROME labels/dots (the data palette is too dark on graphite) */
+  --cyan-d: #4ea0e0; --red-d: #f06a6b; --amber-d: #f0a23a; --green-d: #5bbf5b;
+  /* native system sans (Segoe UI / SF Pro feel, VS Code idiom); tabular mono for numbers/code; KaTeX for math */
+  --sans: system-ui, "Segoe UI", -apple-system, "Helvetica Neue", Arial, sans-serif;
   --mono: Consolas, "SF Mono", Menlo, "DejaVu Sans Mono", ui-monospace, monospace;
   --serif: var(--sans);
 }
@@ -84,7 +88,7 @@ body { background: var(--bg); color: var(--ink); font-family: var(--sans); font-
 .about-overlay .about-title { font-size: 12px; font-weight: 700; letter-spacing: 0.02em; color: var(--ink); margin-bottom: 10px; }
 .about-overlay p { font-size: 10.5px; line-height: 1.55; color: var(--dim); margin: 0 0 9px; }
 .about-overlay p:last-child { margin-bottom: 0; }
-.about-link { color: var(--green); cursor: pointer; text-decoration: none; }
+.about-link { color: var(--cyan-d); cursor: pointer; text-decoration: none; }
 .about-link:hover { text-decoration: underline; }
 /* honest, in-app validation scope, every module → its arbiter, mirroring docs/VALIDATION.md */
 .about-val { border: 1px solid var(--rule-2); margin: 0 0 10px; }
@@ -92,8 +96,8 @@ body { background: var(--bg); color: var(--ink); font-family: var(--sans); font-
 .about-val-row { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; padding: 5px 7px; font-size: 9.5px; line-height: 1.4; }
 .about-val-row + .about-val-row { border-top: 1px solid var(--rule-soft); }
 .about-val-row > span:first-child { color: var(--dim); }
-.about-val-row .ok { color: var(--green); font-weight: 600; white-space: nowrap; }
-.about-val-row .an { color: var(--amber); font-weight: 600; white-space: nowrap; }
+.about-val-row .ok { color: var(--green-d); font-weight: 600; white-space: nowrap; }
+.about-val-row .an { color: var(--amber-d); font-weight: 600; white-space: nowrap; }
 .about-val-note { font-size: 9px; color: var(--faint); padding: 5px 7px; border-top: 1px solid var(--rule); }
 .about-x { position: absolute; top: 8px; right: 10px; background: transparent; border: none; color: var(--dim); font-size: 16px; cursor: pointer; line-height: 1; padding: 0; }
 .about-x:hover { color: var(--ink); }
@@ -161,14 +165,14 @@ tr[title] { cursor: help; }
 .regime-badge .rb-label { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; }
 .regime-badge .rb-ratios { display: flex; gap: 12px; font-size: 9.5px; color: var(--dim); margin-top: 4px; font-variant-numeric: tabular-nums; }
 .regime-badge .rb-note { font-size: 8.5px; color: var(--faint); margin-top: 3px; line-height: 1.3; text-transform: none; }
-.regime-badge.rb-wk { border-color: var(--rule-2); border-top: 2px solid var(--green); } .rb-wk .rb-dot, .rb-wk .rb-label { background: none; color: var(--green); } .rb-wk .rb-dot { background: var(--green); }
-.regime-badge.rb-st { border-color: var(--rule-2); border-top: 2px solid var(--cyan); } .rb-st .rb-dot, .rb-st .rb-label { color: var(--cyan); } .rb-st .rb-dot { background: var(--cyan); }
-.regime-badge.rb-us { border-color: var(--rule-2); border-top: 2px solid var(--amber); } .rb-us .rb-dot, .rb-us .rb-label { color: var(--amber); } .rb-us .rb-dot { background: var(--amber); }
-.rb-chk { font-size: 8px; color: var(--green); font-weight: 600; margin-left: 3px; vertical-align: middle; }
+.regime-badge.rb-wk { border-color: var(--rule-2); border-top: 2px solid var(--green-d); } .rb-wk .rb-label { color: var(--ink); } .rb-wk .rb-dot { background: var(--green-d); }
+.regime-badge.rb-st { border-color: var(--rule-2); border-top: 2px solid var(--cyan-d); } .rb-st .rb-label { color: var(--ink); } .rb-st .rb-dot { background: var(--cyan-d); }
+.regime-badge.rb-us { border-color: var(--rule-2); border-top: 2px solid var(--amber-d); } .rb-us .rb-label { color: var(--ink); } .rb-us .rb-dot { background: var(--amber-d); }
+.rb-chk { font-size: 8px; color: var(--green-d); font-weight: 600; margin-left: 3px; vertical-align: middle; }
 /* tab subtitle, the one-line "what is this tab" entry point (Standard 8) */
 .tab-sub { font-family: var(--sans); font-size: 9.5px; line-height: 1.4; color: var(--dim); padding: 5px 8px 6px; border-bottom: 1px solid var(--rule); background: var(--panel); }
 .tab-sub b { color: var(--ink); font-weight: 700; }
-.tab-sub .ts-watch { color: var(--cyan); }
+.tab-sub .ts-watch { color: var(--cyan-d); }
 .cv { display: block; max-width: 100%; }
 /* center single-canvas plots in their pane at native size (no upscaling) */
 .center > .pane > .plotwrap { display: block; width: fit-content; max-width: 100%; margin: 0 auto; }
@@ -215,7 +219,7 @@ tr[title] { cursor: help; }
 .pf-row input[type="range"] { flex: 1; min-width: 60px; }
 .pf-row b { font-family: var(--mono); font-size: 11px; font-variant-numeric: tabular-nums; min-width: 44px; text-align: right; }
 .pf-hint { font-size: 9px; color: var(--faint); line-height: 1.4; }
-.pf-warn { font-size: 9px; color: var(--amber); line-height: 1.4; border: 1px solid #8a6a13; padding: 4px 6px; background: #1a1505; }
+.pf-warn { font-size: 9px; color: var(--amber-d); line-height: 1.4; border: 1px solid #6e5512; padding: 4px 6px; background: #2a2008; }
 .pf-comps { display: flex; gap: 8px; }
 .pf-comp { flex: 1; min-width: 0; text-align: left; background: transparent; border: 1px solid var(--rule-2); padding: 6px 8px; cursor: pointer; }
 .pf-comp:hover { background: var(--panel-2); border-color: var(--rule-2); }
@@ -304,7 +308,7 @@ tr[title] { cursor: help; }
 .cr-k { font-size: 9px; color: var(--dim); white-space: nowrap; }
 .cr-k sub { font-size: 0.74em; }
 .cr-k b, .cr-leg b { color: var(--ink); font-variant-numeric: tabular-nums; font-weight: 700; }
-.cr-flow { font-size: 8.5px; color: var(--amber); font-weight: 700; white-space: nowrap; }
+.cr-flow { font-size: 8.5px; color: var(--amber-d); font-weight: 700; white-space: nowrap; }
 .cr-bar { display: flex; flex: 1 1 110px; min-width: 80px; height: 10px; border: 1px solid #000; overflow: hidden; }
 .cr-seg { height: 100%; transition: width 0.05s linear; }
 .cr-seg.cr-p { background: var(--cyan); }
@@ -348,9 +352,9 @@ tr[title] { cursor: help; }
 .leg-pe::before { background: var(--red); }
 .leg-dark::before { background: var(--purple); }
 .leg-pol::before { background: var(--cyan); }
-.leg-dash::before { background: none; height: 0; border-top: 1.5px dashed var(--axis); }
+.leg-dash::before { background: none; height: 0; border-top: 1.5px dashed var(--dim); }
 .leg-sel::before { background: none; width: 9px; height: 9px; border: 1.6px solid var(--amber); }
-.leg-band::before { background: var(--axis); }
+.leg-band::before { background: var(--dim); }
 .leg-field::before { background: var(--amber); }
 .leg-mol::before { width: 8px; height: 8px; background: var(--ink); }
 
@@ -378,10 +382,10 @@ tr[title] { cursor: help; }
 .knob-sym .katex { font-size: 0.9em; }
 .knob-entry { display: inline-flex; align-items: baseline; gap: 3px; }
 .knob.num-only { display: flex; align-items: center; justify-content: space-between; }
-.knob-input { width: 60px; font-family: var(--mono); font-size: 11.5px; font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; color: var(--ink); background: var(--surface); border: 1px solid var(--rule-2); padding: 3px 6px; transition: border-color 0.1s; }
+.knob-input { width: 60px; font-family: var(--mono); font-size: 11.5px; font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; color: var(--ink); background: var(--input); border: 1px solid var(--rule-2); padding: 3px 6px; transition: border-color 0.1s; }
 .knob-input.wide { width: 86px; }
-.knob-input:hover { border-color: var(--axis); }
-.knob-input:focus { outline: none; border-color: var(--accent); background: var(--surface); }
+.knob-input:hover { border-color: var(--faint); }
+.knob-input:focus { outline: none; border-color: var(--accent); background: var(--input); }
 .knob-input::-webkit-outer-spin-button, .knob-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .knob-input[type="number"] { -moz-appearance: textfield; }
 .knob-entry .u, .u { font-family: var(--sans); font-size: 9.5px; color: var(--faint); }
@@ -415,11 +419,11 @@ table.metrics { width: 100%; border-collapse: collapse; }
 .bridge .metrics { flex: 1; }
 
 /* validation / regression console */
-.hud .hud-pass { font-family: var(--sans); font-size: 10px; color: var(--green); margin-top: 6px; }
+.hud .hud-pass { font-family: var(--sans); font-size: 10px; color: var(--green-d); margin-top: 6px; }
 .reg-console { font-family: var(--mono); font-size: 9px; line-height: 1.5; color: var(--ink); background: var(--surface); border: 1px solid var(--rule-2); padding: 5px 6px; margin: 6px 0; max-height: 132px; overflow-y: auto; white-space: pre; }
 .reg-console .reg-head { color: var(--ink); font-weight: 700; margin-bottom: 2px; }
-.reg-console .reg-pass { color: var(--green); }
-.reg-console .reg-fail { color: var(--red); }
+.reg-console .reg-pass { color: var(--green-d); }
+.reg-console .reg-fail { color: var(--red-d); }
 
 /* dark scrollbars */
 .rail::-webkit-scrollbar, .dock::-webkit-scrollbar, .center::-webkit-scrollbar, .reg-console::-webkit-scrollbar { width: 7px; height: 7px; }

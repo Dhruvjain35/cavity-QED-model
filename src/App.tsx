@@ -114,6 +114,10 @@ const ET_ML = 64, ET_MR = 20, ET_MT = 18, ET_MB = 36, ET_PW = 716, ET_PH = 320; 
 const ET_CW = ET_ML + ET_PW + ET_MR, ET_CH = ET_MT + ET_PH + ET_MB;
 const DP_ML = 66, DP_MR = 22, DP_MT = 30, DP_MB = 40, DP_PW = 900, DP_PH = 430; // exciton-polariton dispersion E(k‖), twin angle axis on top
 const DP_CW = DP_ML + DP_PW + DP_MR, DP_CH = DP_MT + DP_PH + DP_MB;
+// angle-resolved reflectivity / spectral-function map A(ω,k‖): the measured exciton-polariton dispersion,
+// a hot-colormap imshow inside a white figure (the Nature/PRL angle-resolved spectroscopy convention).
+const DM_ML = 58, DM_MR = 72, DM_MT = 28, DM_MB = 40, DM_PW = 860, DM_PH = 330, DM_NX = 220, DM_NY = 200;
+const DM_CW = DM_ML + DM_PW + DM_MR, DM_CH = DM_MT + DM_PH + DM_MB;
 const HTC_GRID = 760; // absorption-spectrum sampling points
 const MX_S = 196; // live Hamiltonian heatmap size (px)
 
@@ -164,6 +168,13 @@ function husimiImage(q: Float64Array, n: number, qmax: number): ImageData {
     const o = i * 4; px[o] = r; px[o + 1] = g; px[o + 2] = b; px[o + 3] = 255;
   }
   return new ImageData(px, n, n);
+}
+// matplotlib 'hot' colormap (black → red → orange → yellow → white): the standard intensity ramp for
+// angle-resolved reflectivity / spectroscopy heatmaps. t in [0,1].
+function hotRGB(t: number): [number, number, number] {
+  t = clamp(t, 0, 1);
+  const r = clamp(t / 0.365, 0, 1), g = clamp((t - 0.365) / (0.746 - 0.365), 0, 1), b = clamp((t - 0.746) / (1 - 0.746), 0, 1);
+  return [Math.round(255 * r), Math.round(255 * g), Math.round(255 * b)];
 }
 
 type SweepCol = { x: number; eigs: Float64Array; photon: Float64Array };
@@ -268,6 +279,7 @@ export function App() {
   const matCanvas = useRef<HTMLCanvasElement>(null);
   const matData = useRef<{ h: Float64Array; n: number } | null>(null);
   const htcCanvas = useRef<HTMLCanvasElement>(null), vibCompareCanvas = useRef<HTMLCanvasElement>(null), etCanvas = useRef<HTMLCanvasElement>(null), dispCanvas = useRef<HTMLCanvasElement>(null);
+  const dispMapCanvas = useRef<HTMLCanvasElement>(null), dispMapOff = useRef<HTMLCanvasElement | null>(null); // angle-resolved reflectivity heatmap + its NX×NY offscreen
   const htcData = useRef<{ live: { eigs: Float64Array; photon: Float64Array; absorption: Float64Array }; fc: { pos: Float64Array; weight: Float64Array }; nVib: number; method: string } | null>(null);
   const offscreen = useRef<HTMLCanvasElement | null>(null), husimiOff = useRef<HTMLCanvasElement | null>(null), bridgeOff = useRef<HTMLCanvasElement | null>(null);
   const quantum = useRef<Quantum | null>(null);
@@ -325,7 +337,7 @@ export function App() {
     if (r === "collective") renderSpectrum();
     else if (r === "cavity") { drawCavity(); drawStopband(); drawCollective(); }
     else if (r === "vibronic") { drawHtc(); drawMatrix(); drawVibronicCompare(); drawDisorder(); drawETrate(); }
-    else if (r === "dispersion") drawDispersion();
+    else if (r === "dispersion") { drawDispersion(); drawDispersionMap(); }
     else singleDirty.current = true; // single + dynamics run a RAF loop that redraws on the next frame
   };
   useEffect(() => {
@@ -453,7 +465,7 @@ export function App() {
   }, [regime, etT]);
 
   // exciton-polariton dispersion is also closed-form (cheap): redraw on tab entry and on the δ / 2V sliders.
-  useEffect(() => { if (regime === "dispersion") drawDispersion(); // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (regime === "dispersion") { drawDispersion(); drawDispersionMap(); } // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [regime, disp]);
 
   useEffect(() => {
@@ -1395,7 +1407,7 @@ export function App() {
     // legend (top-right, inside panel)
     ctx.font = "600 8px " + F; const lg0 = "bare FC  |⟨n|0⟩|² = e⁻ˢSⁿ/n!", lg1 = "in-cavity polariton absorption";
     const legW = Math.max(ctx.measureText(lg0).width, ctx.measureText(lg1).width) + 24, legX = lx + lw - legW - 5, legY = ly + 5;
-    ctx.fillStyle = "rgba(12,15,18,0.88)"; ctx.fillRect(legX, legY, legW, 26); ctx.strokeStyle = AXIS; ctx.lineWidth = 0.5; ctx.strokeRect(legX, legY, legW, 26);
+    ctx.fillStyle = "rgba(255,255,255,0.92)"; ctx.fillRect(legX, legY, legW, 26); ctx.strokeStyle = "#bbbbbb"; ctx.lineWidth = 0.5; ctx.strokeRect(legX, legY, legW, 26);
     ctx.globalAlpha = 0.6; ctx.fillStyle = AMBER; ctx.fillRect(legX + 6, legY + 5, 9, 6); ctx.globalAlpha = 1;
     ctx.fillStyle = DIM; ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.fillText(lg0, legX + 20, legY + 8);
     ctx.strokeStyle = CYAN; ctx.lineWidth = 2; seg(ctx, legX + 6, legY + 18, legX + 15, legY + 18);
@@ -1536,6 +1548,65 @@ export function App() {
     ctx.textAlign = "left"; ctx.fillStyle = CYAN; ctx.fillText("photon-like", DP_ML + 7, DP_MT + 5); ctx.fillStyle = RED; ctx.fillText("exciton-like", DP_ML + 70, DP_MT + 5);
     ctx.fillStyle = INK; ctx.font = "600 11px " + F; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic"; ctx.fillText("in-plane wavevector  k∥  (µm⁻¹)", DP_ML + DP_PW / 2, DP_CH - 8);
     ctx.save(); ctx.translate(17, DP_MT + DP_PH / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top"; ctx.fillText("energy  E  (eV)", 0, 0); ctx.restore();
+  }
+
+  // Angle-resolved reflectivity / cavity spectral-function map A(ω,k‖) = −(1/π) Im G_c, the way an
+  // exciton-polariton dispersion is actually MEASURED (angle-resolved white-light reflectivity / PL). For
+  // each k‖ the cavity Green's function G_c(ω) = (ω−E_x+iγ/2) / [(ω−E_c(k)+iκ/2)(ω−E_x+iγ/2) − V²] has two
+  // poles at the LP/UP energies; its photonic spectral weight traces the two bright anticrossing branches.
+  // Rendered as a matplotlib 'hot' imshow inside a white figure (the Nature/PRL spectroscopy convention).
+  function drawDispersionMap() {
+    const cv = dispMapCanvas.current; if (!cv) return;
+    const ctx = sized(cv, DM_CW, DM_CH);
+    const F = "Helvetica,Arial,sans-serif";
+    ctx.fillStyle = PANEL; ctx.fillRect(0, 0, DM_CW, DM_CH);
+    const Eexc = DEFAULT_MICROCAVITY.Eexc, mcav = DEFAULT_MICROCAVITY.mcav, Ecav0 = Eexc + disp.delta, V = disp.rabi2V / 2;
+    const kmax = 7e6, kappa = 0.004, gamma = 0.0015; // cavity / exciton linewidths (eV): set the ridge sharpness
+    const kP = linspace(0, kmax, 64), b = polaritonBranches(kP, { Ecav0, Eexc, mcav, V }), cc = cavityDispersion(kP, { Ecav0, mcav });
+    let elo = Math.min(Eexc, ...b.ELP, ...cc), ehi = Math.max(Eexc, ...b.EUP, ...cc);
+    const pd = (ehi - elo) * 0.08 + 1e-4; elo -= pd; ehi += pd;
+    const xOf = (k: number) => DM_ML + (k / kmax) * DM_PW, yOf = (E: number) => DM_MT + (1 - (E - elo) / (ehi - elo)) * DM_PH;
+    // build the NX×NY spectral image (cavity DOS), normalised then γ-compressed so the weak branch stays visible
+    if (!dispMapOff.current) { const o = document.createElement("canvas"); o.width = DM_NX; o.height = DM_NY; dispMapOff.current = o; }
+    const Ec = cavityDispersion(linspace(0, kmax, DM_NX), { Ecav0, mcav });
+    const A = new Float64Array(DM_NX * DM_NY); let amax = 1e-12;
+    for (let iy = 0; iy < DM_NY; iy++) {
+      const w = ehi - (iy / (DM_NY - 1)) * (ehi - elo);
+      for (let ix = 0; ix < DM_NX; ix++) {
+        const a = w - Ec[ix]!, bb = w - Eexc;                                    // ω − E_c(k),  ω − E_x
+        const Dr = a * bb - (kappa * gamma) / 4 - V * V, Di = a * (gamma / 2) + bb * (kappa / 2);
+        const denom = Dr * Dr + Di * Di;                                         // |D|²
+        const im = ((gamma / 2) * Dr - bb * Di) / denom;                         // Im G_c = (Nu_i·D_r − Nu_r·D_i)/|D|²
+        const val = Math.max(0, -im / Math.PI);                                  // A = −Im G_c / π  ≥ 0
+        A[iy * DM_NX + ix] = val; if (val > amax) amax = val;
+      }
+    }
+    const octx = dispMapOff.current.getContext("2d")!, img = octx.createImageData(DM_NX, DM_NY);
+    for (let i = 0; i < A.length; i++) {
+      const t = Math.pow(A[i]! / amax, 0.45), [r, g, bl] = hotRGB(t), o = i * 4;  // γ=0.45 brightens mid-tones
+      img.data[o] = r; img.data[o + 1] = g; img.data[o + 2] = bl; img.data[o + 3] = 255;
+    }
+    octx.putImageData(img, 0, 0);
+    ctx.imageSmoothingEnabled = true; ctx.drawImage(dispMapOff.current, DM_ML, DM_MT, DM_PW, DM_PH);
+    // faint bare modes over the imshow (uncoupled cavity parabola + flat exciton), to show what anticrosses
+    ctx.save(); ctx.setLineDash([5, 4]); ctx.lineWidth = 1;
+    ctx.strokeStyle = "rgba(130,195,245,0.55)"; ctx.beginPath();
+    for (let ix = 0; ix < DM_NX; ix++) { const x = xOf((ix / (DM_NX - 1)) * kmax), y = yOf(Ec[ix]!); ix ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.stroke();
+    ctx.strokeStyle = "rgba(245,150,150,0.55)"; ctx.beginPath(); ctx.moveTo(xOf(0), yOf(Eexc)); ctx.lineTo(xOf(kmax), yOf(Eexc)); ctx.stroke();
+    ctx.restore();
+    // axes (dark on the white margins), ticks, twin angle axis, colourbar
+    ctx.fillStyle = DIM; ctx.font = "500 8.5px " + F; ctx.textAlign = "center"; ctx.textBaseline = "top";
+    for (let kk = 0; kk <= 7; kk++) { const x = xOf(kk * 1e6); seg(ctx, x, DM_MT + DM_PH, x, DM_MT + DM_PH + 3); ctx.fillText(String(kk), x, DM_MT + DM_PH + 6); }
+    ctx.textAlign = "right"; ctx.textBaseline = "middle";
+    for (let t = 0; t <= 4; t++) { const E = elo + (ehi - elo) * t / 4; seg(ctx, DM_ML - 3, yOf(E), DM_ML, yOf(E)); ctx.fillText(E.toFixed(3), DM_ML - 6, yOf(E)); }
+    ctx.textBaseline = "bottom"; ctx.fillStyle = "#6e7681";
+    for (const th of [0, 10, 20, 30, 45, 60]) { const k = angleToK(Eexc, th); if (k <= kmax) { const x = xOf(k); ctx.strokeStyle = "#6e7681"; ctx.lineWidth = 0.6; seg(ctx, x, DM_MT, x, DM_MT - 4); ctx.fillStyle = "#6e7681"; ctx.fillText(th + "°", x, DM_MT - 5); } }
+    ctx.font = "600 8px " + F; ctx.textAlign = "left"; ctx.fillStyle = "#6e7681"; ctx.fillText("external angle θ", DM_ML + 2, DM_MT - 16);
+    ctx.strokeStyle = AXIS; ctx.lineWidth = 0.75; ctx.strokeRect(DM_ML, DM_MT, DM_PW, DM_PH);
+    colorbar(ctx, DM_ML + DM_PW + 16, DM_MT, 11, DM_PH, hotRGB, [{ f: 1, label: "max" }, { f: 0, label: "0" }], "A(ω,k)");
+    ctx.fillStyle = INK; ctx.font = "600 11px " + F; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+    ctx.fillText("in-plane wavevector  k∥  (µm⁻¹)", DM_ML + DM_PW / 2, DM_CH - 8);
+    ctx.save(); ctx.translate(15, DM_MT + DM_PH / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top"; ctx.fillText("energy  E  (eV)", 0, 0); ctx.restore();
   }
 
   function updateHtcReadouts() {
@@ -2007,6 +2078,9 @@ export function App() {
               <PlotWrap cw={DP_CW} ch={DP_CH} area={{ ml: DP_ML, mt: DP_MT, pw: DP_PW, ph: DP_PH }} inv={(px, py) => { const Eexc = DEFAULT_MICROCAVITY.Eexc, mcav = DEFAULT_MICROCAVITY.mcav, Ecav0 = Eexc + disp.delta, V = disp.rabi2V / 2; const kP = linspace(0, 7e6, 48), b = polaritonBranches(kP, { Ecav0, Eexc, mcav, V }), c = cavityDispersion(kP, { Ecav0, mcav }); let lo = Math.min(Eexc, ...b.ELP, ...c), hi = Math.max(Eexc, ...b.EUP, ...c); const pd = (hi - lo) * 0.08 + 1e-4; lo -= pd; hi += pd; return [(((px - DP_ML) / DP_PW) * 7).toFixed(2), (lo + (1 - (py - DP_MT) / DP_PH) * (hi - lo)).toFixed(3)]; }}>
                 <canvas ref={dispCanvas} className="cv" />
               </PlotWrap>
+              <div className="pane-head">Angle-resolved reflectivity map · A(ω,k∥) = −(1/π) Im G_c · the dispersion as it is <i style={{ color: AMBER, fontStyle: "normal" }}>measured</i> · bare cavity <i style={{ color: "rgba(130,195,245,0.9)", fontStyle: "normal" }}>┄</i> · exciton <i style={{ color: "rgba(245,150,150,0.9)", fontStyle: "normal" }}>┄</i></div>
+              <div className="pane-sub"><b>What:</b> the same anticrossing, rendered the way a lab actually records it. For each in-plane wavevector k∥ (set by the collection angle θ) the cavity spectral function A(ω,k∥) peaks at the LP/UP energies; the two bright ridges are the polariton branches, the dark gap between them is the vacuum-Rabi splitting 2V. Intensity follows the photon (Hopfield) weight, so each branch brightens on its photon-like side. <b>Model:</b> input-output cavity Green's function, κ = 4 meV, γ = 1.5 meV linewidths.</div>
+              <div className="plotwrap"><canvas ref={dispMapCanvas} className="cv" /></div>
             </div>
           ) : (
             <>
