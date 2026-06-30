@@ -603,19 +603,22 @@ export function App() {
   // Each plot is drawn at a FIXED logical size w×h; the backing store is w×h×dpr (so it is crisp at 1:1 on a
   // retina display) and the canvas is shown at exactly w×h CSS px (inline). Panes are laid out around these
   // sizes, canvases are NEVER CSS-upscaled to "fill" (that both blurs and balloons the fonts).
-  // Resolution-independent sizing. The plot is authored in a fixed logical CW×CH coordinate system, but it
-  // RENDERS at whatever width CSS gives the canvas: native (centred) by default, or 100% of the column for
-  // the "fill" plots (see styles.css). Reading clientWidth lets us pick a render scale so the backing buffer
-  // matches the on-screen device pixels exactly, so an enlarged plot is genuinely re-rendered crisp (not a
-  // stretched bitmap) and its fonts/strokes scale up proportionally, like resizing a real figure. Uniform
-  // scale keeps the hover→data mapping (which divides by the element rect) exactly correct.
+  // A plot is authored in a fixed logical CW×CH coordinate system. By DEFAULT it renders at native size
+  // (backing = CW×dpr, displayed at CW px, centred in its pane). The "fill" hero plots opt in by wrapping
+  // their canvas in a definite-size flex box (.pw-fill / .fillwrap): for those we read the box and scale the
+  // render to FIT it (contain, preserving aspect), so the plot grows to use the screen and is re-rendered
+  // crisp at that size, never a stretched bitmap. Uniform scale keeps the hover→data mapping exact.
   function sized(cv: HTMLCanvasElement, w: number, h: number): CanvasRenderingContext2D {
     const dd = dpr.current;
-    const dispW = cv.clientWidth || w;            // CSS-driven display width (fill = column width, native = w)
-    const scale = dispW > 8 ? dispW / w : 1;
+    const host = cv.parentElement;
+    const fill = !!host && (host.classList.contains("pw-fill") || host.classList.contains("fillwrap"));
+    let scale = 1;
+    if (fill) { const aw = host!.clientWidth, ah = host!.clientHeight; if (aw > 8 && ah > 8) scale = Math.min(aw / w, ah / h); }
     const bw = Math.round(w * scale * dd), bh = Math.round(h * scale * dd);
     if (cv.width !== bw || cv.height !== bh) { cv.width = bw; cv.height = bh; }
-    if (!cv.style.width) { cv.style.width = w + "px"; cv.style.height = h + "px"; } // native default; fill canvases are overridden to 100%/auto in CSS
+    const sw = w * scale + "px", sh = h * scale + "px";
+    if (cv.style.width !== sw) cv.style.width = sw;
+    if (cv.style.height !== sh) cv.style.height = sh;
     const ctx = cv.getContext("2d")!;
     ctx.setTransform(scale * dd, 0, 0, scale * dd, 0, 0);
     ctx.lineJoin = "round"; ctx.lineCap = "round"; // smooth curve joints
@@ -2214,12 +2217,12 @@ export function App() {
               <div className="pane-head">Microcavity exciton-polariton dispersion · lower/upper polariton <i style={{ color: CYAN, fontStyle: "normal" }}>━</i> coloured photon→exciton · bare cavity <i style={{ color: "rgba(31,119,180,0.7)", fontStyle: "normal" }}>┄</i> · exciton <i style={{ color: "rgba(214,39,40,0.7)", fontStyle: "normal" }}>┄</i></div>
               <PanelEqn t={"E_{\\mathrm{LP/UP}}(k_\\parallel)=\\tfrac12\\!\\left[E_c+E_x\\pm\\sqrt{(E_c-E_x)^2+(2V)^2}\\right],\\quad E_c(k_\\parallel)=E_c^0+\\frac{\\hbar^2k_\\parallel^2}{2m_{\\mathrm{cav}}}"} where="2×2 coupled-oscillator (Hopfield); anticross, never cross" />
               <div className="pane-sub"><b>What:</b> the cavity photon is a light 2-D particle, so its energy rises with in-plane momentum k‖ and sweeps through the flat exciton. The coupling 2V turns that crossing into an <b>anticrossing</b>: the lower and upper polaritons, each a k-dependent mix of <span style={{ color: CYAN }}>photon</span> and <span style={{ color: RED }}>exciton</span> (the Hopfield fractions, shown as colour). <b>Approx:</b> single coupled mode, parabolic cavity, no loss.</div>
-              <PlotWrap cw={DP_CW} ch={DP_CH} area={{ ml: DP_ML, mt: DP_MT, pw: DP_PW, ph: DP_PH }} inv={(px, py) => { const Eexc = DEFAULT_MICROCAVITY.Eexc, mcav = DEFAULT_MICROCAVITY.mcav, Ecav0 = Eexc + disp.delta, V = disp.rabi2V / 2; const kP = linspace(0, 7e6, 48), b = polaritonBranches(kP, { Ecav0, Eexc, mcav, V }), c = cavityDispersion(kP, { Ecav0, mcav }); let lo = Math.min(Eexc, ...b.ELP, ...c), hi = Math.max(Eexc, ...b.EUP, ...c); const pd = (hi - lo) * 0.08 + 1e-4; lo -= pd; hi += pd; return [(((px - DP_ML) / DP_PW) * 7).toFixed(2), (lo + (1 - (py - DP_MT) / DP_PH) * (hi - lo)).toFixed(3)]; }}>
+              <PlotWrap fill cw={DP_CW} ch={DP_CH} area={{ ml: DP_ML, mt: DP_MT, pw: DP_PW, ph: DP_PH }} inv={(px, py) => { const Eexc = DEFAULT_MICROCAVITY.Eexc, mcav = DEFAULT_MICROCAVITY.mcav, Ecav0 = Eexc + disp.delta, V = disp.rabi2V / 2; const kP = linspace(0, 7e6, 48), b = polaritonBranches(kP, { Ecav0, Eexc, mcav, V }), c = cavityDispersion(kP, { Ecav0, mcav }); let lo = Math.min(Eexc, ...b.ELP, ...c), hi = Math.max(Eexc, ...b.EUP, ...c); const pd = (hi - lo) * 0.08 + 1e-4; lo -= pd; hi += pd; return [(((px - DP_ML) / DP_PW) * 7).toFixed(2), (lo + (1 - (py - DP_MT) / DP_PH) * (hi - lo)).toFixed(3)]; }}>
                 <canvas ref={dispCanvas} className="cv" />
               </PlotWrap>
               <div className="pane-head">Angle-resolved reflectivity map · A(ω,k∥) = −(1/π) Im G_c · the dispersion as it is <i style={{ color: AMBER, fontStyle: "normal" }}>measured</i> · bare cavity <i style={{ color: "rgba(130,195,245,0.9)", fontStyle: "normal" }}>┄</i> · exciton <i style={{ color: "rgba(245,150,150,0.9)", fontStyle: "normal" }}>┄</i></div>
               <div className="pane-sub"><b>What:</b> the same anticrossing, rendered the way a lab actually records it. For each in-plane wavevector k∥ (set by the collection angle θ) the cavity spectral function A(ω,k∥) peaks at the LP/UP energies; the two bright ridges are the polariton branches, the dark gap between them is the vacuum-Rabi splitting 2V. Intensity follows the photon (Hopfield) weight, so each branch brightens on its photon-like side. <b>Model:</b> input-output cavity Green's function, κ = {Math.round(disp.kappa * 1000)} meV (live), γ = 1.5 meV linewidths.</div>
-              <div className="plotwrap"><canvas ref={dispMapCanvas} className="cv" /></div>
+              <div className="plotwrap fillwrap"><canvas ref={dispMapCanvas} className="cv" /></div>
             </div>
           ) : (
             <>
@@ -2234,12 +2237,12 @@ export function App() {
                     <div className="pane-head">Cavity transmission spectroscopy · A(ω,Δ) as the cavity tunes through the emitters · the vacuum-Rabi anticrossing as it is <i style={{ color: AMBER, fontStyle: "normal" }}>measured</i> · bare cavity <i style={{ color: "rgba(110,180,235,0.95)", fontStyle: "normal" }}>┄</i> · emitter <i style={{ color: "rgba(245,150,150,0.95)", fontStyle: "normal" }}>┄</i></div>
                     <PanelEqn t={"T(\\omega,\\Delta)\\propto-\\tfrac1\\pi\\,\\mathrm{Im}\\,\\frac{\\omega-\\omega_a+i\\gamma/2}{(\\omega-\\omega_c+i\\kappa/2)(\\omega-\\omega_a+i\\gamma/2)-G^2},\\quad G=g\\sqrt N"} where="input-output cavity Green's function; poles at the LP/UP energies, gap Ω_R=2g√N at Δ=0" />
                     <div className="pane-sub"><b>What:</b> sweep the cavity across the emitter resonance and record what comes through. Each vertical slice is a transmission spectrum; the two bright ridges are the lower/upper polaritons, anticrossing at Δ=0 where they never touch, separated by the vacuum-Rabi gap Ω_R = 2g√N. Raise the cavity loss Γ to broaden the ridges, raise N or g to open the gap. The <span style={{ color: "#9cd2ff" }}>Δ slice</span> marker is the spectrum drawn below; drag the detuning dial to move it. <b>Live</b> from the same dials that drive the 3D and the populations.</div>
-                    <div className="plotwrap"><canvas ref={transMapCanvas} className="cv" /></div>
+                    <div className="plotwrap fillwrap"><canvas ref={transMapCanvas} className="cv" /></div>
                   </div>
                   <div className="trans-bottom">
                     <div className="pane">
                       <div className="pane-head">Transmission line-cut · T(ω) at the live detuning Δ = {fmt((dyn.detuning ?? 0), 3)} ω_c · the probe spectrum, a vacuum-Rabi doublet</div>
-                      <div className="plotwrap"><canvas ref={transCutCanvas} className="cv" /></div>
+                      <div className="plotwrap fillwrap"><canvas ref={transCutCanvas} className="cv" /></div>
                     </div>
                     {(() => {
                       const G = dyn.g * Math.sqrt(Math.max(1, dyn.m)), kap = Math.max(0.006, dyn.gamma), gam = 0.008 + dyn.sigma;
@@ -2503,15 +2506,19 @@ function ScenePanel({ open, onToggle, v, set }: { open: boolean; onToggle: () =>
   );
 }
 
-function PlotWrap({ cw, ch, area, inv, fit, children }: { cw: number; ch: number; area: { ml: number; mt: number; pw: number; ph: number }; inv: (px: number, py: number) => [string, string] | null; fit?: boolean; children: React.ReactNode }) {
+function PlotWrap({ cw, ch, area, inv, fit, fill, children }: { cw: number; ch: number; area: { ml: number; mt: number; pw: number; ph: number }; inv: (px: number, py: number) => [string, string] | null; fit?: boolean; fill?: boolean; children: React.ReactNode }) {
   const ov = useRef<HTMLCanvasElement>(null);
   const onMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const cv = ov.current; if (!cv) return;
-    // measure the PLOT canvas itself (the overlay's previous sibling), not the wrapper, in fit mode the
-    // wrapper centres a scaled-down canvas, so the wrapper box is larger than the plot. Mapping mouse→data
+    // measure the PLOT canvas itself (the overlay's previous sibling), not the wrapper, in fit/fill mode the
+    // wrapper centres a scaled canvas, so the wrapper box differs from the plot. Mapping mouse→data
     // by the canvas rect (cw/r.width, ch/r.height) stays correct at any display scale.
     const main = (cv.previousElementSibling as HTMLElement | null) ?? e.currentTarget;
     const r = main.getBoundingClientRect();
+    // keep the overlay exactly over the (centred/scaled) plot canvas so the crosshair never drifts
+    const wr = e.currentTarget.getBoundingClientRect();
+    cv.style.left = (r.left - wr.left) + "px"; cv.style.top = (r.top - wr.top) + "px";
+    cv.style.width = r.width + "px"; cv.style.height = r.height + "px"; cv.style.transform = "none"; cv.style.maxWidth = "none"; cv.style.maxHeight = "none";
     const d = Math.min(window.devicePixelRatio || 1, 2);
     if (cv.width !== Math.round(cw * d)) { cv.width = Math.round(cw * d); cv.height = Math.round(ch * d); }
     const ctx = cv.getContext("2d"); if (!ctx) return;
@@ -2525,7 +2532,7 @@ function PlotWrap({ cw, ch, area, inv, fit, children }: { cw: number; ch: number
     ctx.fillText(`[${v[0]}, ${v[1]}]`, x + (right ? -5 : 5), Math.max(area.mt + 11, y - 5));
   };
   const clear = () => { const cv = ov.current; if (!cv) return; const ctx = cv.getContext("2d"); if (ctx) ctx.clearRect(0, 0, cv.width, cv.height); };
-  return (<div className={fit ? "plotwrap pw-fit" : "plotwrap"} onMouseMove={onMove} onMouseLeave={clear}>{children}<canvas ref={ov} className="plot-ov" /></div>);
+  return (<div className={"plotwrap" + (fit ? " pw-fit" : "") + (fill ? " pw-fill" : "")} onMouseMove={onMove} onMouseLeave={clear}>{children}<canvas ref={ov} className="plot-ov" /></div>);
 }
 function mkCanvas(n: number): HTMLCanvasElement { const c = document.createElement("canvas"); c.width = n; c.height = n; return c; }
 function seg(ctx: CanvasRenderingContext2D, x0: number, y0: number, x1: number, y1: number) { ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); }
